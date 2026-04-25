@@ -1,0 +1,59 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run typecheck)",
+      "Bash(npm run lint)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path // empty'); if echo \"$FILE\" | grep -q '\\.py$'; then grep -n 'client.messages.create\\|anthropic.Anthropic' \"$FILE\" 2>/dev/null | grep -v 'prompts/' && echo 'WARNING: Possible inline prompt detected. All Claude prompts must live in backend/prompts/ — not inline in code.' || true; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CMD=$(jq -r '.tool_input.command // empty'); if echo \"$CMD\" | grep -qE '(git push|deploy|railway up|vercel deploy)'; then pytest --tb=short -q 2>&1 | tail -5 || (echo 'BLOCKED: Tests must pass before deploying. Run pytest and fix failures first.' && exit 2); fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path // empty'); if echo \"$FILE\" | grep -q '\\.py$'; then black \"$FILE\" --quiet 2>/dev/null && flake8 \"$FILE\" --max-line-length=100 --quiet 2>/dev/null || echo \"Lint issues found in $FILE — review before committing.\"; fi"
+          },
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path // empty'); if echo \"$FILE\" | grep -q 'test_'; then pytest \"$FILE\" --tb=short -q 2>/dev/null || echo \"Tests failed in $FILE — fix before moving on.\"; fi"
+          },
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path // empty'); if echo \"$FILE\" | grep -q '\\.py$'; then python3 -c \"\nimport ast, sys\ntry:\n    with open('$FILE') as f:\n        tree = ast.parse(f.read())\n    for node in ast.walk(tree):\n        if isinstance(node, ast.Call):\n            func = getattr(node.func, 'attr', '') or getattr(node.func, 'id', '')\n            if func in ['calculate', 'sum', 'mean', 'variance', 'average']:\n                args = [getattr(a, 's', getattr(a, 'n', '')) for a in node.args]\nexcept:\n    pass\n\" 2>/dev/null || true; fi"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '=== IronLedger Session Started ==='; echo 'GOLDEN RULE: Numbers from pandas. Prose from Claude. Guardrail verifies both.'; echo 'NO inline prompts. NO Claude math. NO pgvector this week.'; echo 'Demo company: DRONE Inc. (not DRONE Inc. — legal reasons)'; echo '================================'"
+          }
+        ]
+      }
+    ]
+  }
+}

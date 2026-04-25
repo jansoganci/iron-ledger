@@ -1,0 +1,12 @@
+{
+  "name": "ironledger",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,green --kill-others-on-fail \"uvicorn backend.main:app --reload --port 8000\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "uvicorn backend.main:app --reload --port 8000",
+    "dev:frontend": "npm --prefix frontend run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
