@@ -1,5 +1,5 @@
 # Day 5 — Mail + E2E Tests + Polish
-*IronLedger 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
+*Month Proof 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
 
 ## Goal
 
@@ -9,7 +9,7 @@ End-to-end pipeline is demo-ready: Resend is fully wired, a real HTML email arri
 
 > From a clean browser session:
 > 1. Sign in as `demo@dronedemo.com`. Upload `drone_mar_2026.xlsx` (Feb 2026 baseline already loaded). Report renders with Verified badge.
-> 2. Click **Send Email**. Enter a real inbox address (e.g. the developer's). Confirm a success toast fires. Open the inbox — email arrives within 30s with subject `[IronLedger] Mar 2026 — DRONE Inc.`, HTML body containing the narrative + anomaly list with US accounting numbers + link to the dashboard.
+> 2. Click **Send Email**. Enter a real inbox address (e.g. the developer's). Confirm a success toast fires. Open the inbox — email arrives within 30s with subject `[Month Proof] Mar 2026 — DRONE Inc.`, HTML body containing the narrative + anomaly list with US accounting numbers + link to the dashboard.
 > 3. `SELECT mail_sent, mail_sent_at FROM reports WHERE ...` → `true` + timestamp.
 > 4. Run `pytest` — **all tests green**, including all §7 tests.
 > 5. Run `black --check .` + `flake8` on backend → clean.
@@ -62,14 +62,14 @@ External pre-requisites:
   ```python
   class ResendEmailSender:
       def send(self, to: str, subject: str, html: str, text: str) -> SendResult:
-          response = resend.Emails.send({"from": "IronLedger <reports@...>",
+          response = resend.Emails.send({"from": "Month Proof <reports@...>",
                                          "to": to, "subject": subject,
                                          "html": html, "text": text})
           return SendResult(message_id=response["id"])
   ```
 - [ ] Network retry: 3 attempts, 0.5s → 1.5s → 4s backoff (same pattern as Storage adapter), retry only on network/5xx. On exhaustion → raise `TransientIOError`. **The `POST /mail/send` handler maps `TransientIOError` to HTTP 500 + `messages.MAIL_FAILED`** (per `api.md` Error Codes Reference — `mail_failed → 500`).
 - [ ] Do NOT retry 4xx (e.g. invalid sender, invalid recipient) — deterministic; surface immediately.
-- [ ] **From address** uses `IronLedger Reports <reports@ironledger.ai>`. `# TODO: replace with verified Resend sender domain before launch` — `ironledger.ai` is a placeholder; the production sender must be a domain verified in Resend with SPF + DKIM propagated (start DNS Day-4 evening per risks.md R-003).
+- [ ] **From address** uses `Month Proof Reports <reports@monthproof.ai>`. `# TODO: replace with verified Resend sender domain before launch` — `monthproof.ai` is a placeholder; the production sender must be a domain verified in Resend with SPF + DKIM propagated (start DNS Day-4 evening per risks.md R-003).
 
 ### 2. Email Template
 
@@ -79,8 +79,8 @@ External pre-requisites:
   - Narrative text block (from `reports.summary`)
   - Anomaly list — each row: account name, severity chip (high/medium color), variance %, one-line description
   - Numbers formatted US-accounting: `$1,234`, `($1,234)` for negatives, `$4.73M` for narrative figures
-  - CTA: "View full report in IronLedger →" linking to `${FRONTEND_URL}/report/${period}`
-  - Footer: "Sent by IronLedger — month-end close, verified."
+  - CTA: "View full report in Month Proof →" linking to `${FRONTEND_URL}/report/${period}`
+  - Footer: "Sent by Month Proof — month-end close, verified."
 - [ ] `backend/templates/report_email.txt` — plain-text fallback (Gmail/Outlook plain-text mode clients)
 - [ ] Use Jinja2 for templating (add `jinja2` to `requirements.txt`)
 - [ ] **Rule:** every number in the HTML template uses the same `format_currency` helper as the backend API layer — single source of US accounting formatting

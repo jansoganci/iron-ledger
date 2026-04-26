@@ -59,7 +59,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-[400px]">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-text-primary">IronLedger</h1>
+          <h1 className="text-2xl font-semibold text-text-primary">Month Proof</h1>
           <p className="text-sm text-text-secondary mt-1">Create your account.</p>
         </div>
 

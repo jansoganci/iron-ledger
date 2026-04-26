@@ -1,4 +1,4 @@
-# IronLedger Proje Durumu Özeti
+# Month Proof Proje Durumu Özeti
 *Son Güncelleme: 24 Nisan 2026*
 
 ---

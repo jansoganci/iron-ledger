@@ -3,7 +3,7 @@ export default function LandingPage() {
     <div className="bg-canvas text-text-primary font-sans antialiased min-h-screen">
       <header className="max-w-[720px] mx-auto px-6 pt-10 pb-6 flex items-center justify-between">
         <span className="font-data text-xs tracking-widest uppercase text-text-secondary">
-          IronLedger · Month-End Close · 2026
+          Month Proof · Month-End Close · 2026
         </span>
         <a
           href="/login"
@@ -48,7 +48,7 @@ export default function LandingPage() {
         </p>
 
         <p className="text-base text-text-secondary mt-6 max-w-[520px] leading-relaxed">
-          IronLedger is a month-end close agent for US finance teams. This page
+          Month Proof is a month-end close agent for US finance teams. This page
           explains how it works before it asks you to trust it.
         </p>
       </section>
@@ -60,7 +60,7 @@ export default function LandingPage() {
         </p>
 
         <p className="font-serif text-2xl font-semibold text-text-primary mb-8 leading-snug">
-          Here's what IronLedger flagged in DRONE Inc.'s March close.
+          Here's what Month Proof flagged in DRONE Inc.'s March close.
         </p>
 
         <article className="bg-surface border border-border rounded-xl p-6 shadow-sm">
@@ -90,7 +90,7 @@ export default function LandingPage() {
 
         <p className="text-base text-text-secondary mt-10 leading-relaxed">
           No screenshots of dashboards on this page. That's the actual shape of
-          what IronLedger writes after it reads your file — one card per flagged
+          what Month Proof writes after it reads your file — one card per flagged
           account, one paragraph per anomaly, every number traceable back to a
           cell in the source spreadsheet.
         </p>
@@ -120,7 +120,7 @@ export default function LandingPage() {
           </span>
           <p className="text-sm text-text-secondary leading-relaxed">
             <span className="font-medium text-text-primary">Quarterly summaries.</span>{" "}
-            After three monthly closes, IronLedger generates a quarter-over-quarter
+            After three monthly closes, Month Proof generates a quarter-over-quarter
             narrative with trend analysis and recurring anomaly patterns.
           </p>
         </div>
@@ -207,8 +207,8 @@ export default function LandingPage() {
         </p>
 
         <div className="font-data text-sm text-text-secondary mb-10 space-y-1 border border-border rounded-xl px-5 py-4 bg-surface">
-          <p><span className="uppercase tracking-wider text-text-primary">To:</span>{" "}Finance directors evaluating IronLedger</p>
-          <p><span className="uppercase tracking-wider text-text-primary">From:</span>{" "}The IronLedger team</p>
+          <p><span className="uppercase tracking-wider text-text-primary">To:</span>{" "}Finance directors evaluating Month Proof</p>
+          <p><span className="uppercase tracking-wider text-text-primary">From:</span>{" "}The Month Proof team</p>
           <p><span className="uppercase tracking-wider text-text-primary">Re:</span>{" "}What this tool will not do</p>
           <p><span className="uppercase tracking-wider text-text-primary">Date:</span> April 2026</p>
         </div>
@@ -224,7 +224,7 @@ export default function LandingPage() {
             any model, ours or a vendor's.
           </li>
           <li>
-            We do not replace your judgment. IronLedger produces a first draft
+            We do not replace your judgment. Month Proof produces a first draft
             of the close narrative. The decision of what to send — and what to
             change — is yours.
           </li>
@@ -251,7 +251,7 @@ export default function LandingPage() {
 
       <footer className="max-w-[720px] mx-auto px-6 py-8 border-t border-border flex items-center justify-between">
         <p className="font-data text-xs text-text-secondary uppercase tracking-widest">
-          IronLedger · 2026
+          Month Proof · 2026
         </p>
         <p className="text-xs text-text-secondary">
           Built at Anthropic Hackathon, April 2026

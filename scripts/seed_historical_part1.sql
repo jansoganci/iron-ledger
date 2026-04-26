@@ -1,5 +1,5 @@
 -- =============================================================================
--- IronLedger — Sentinel Secure Historical Seed (PART 1 of 4)
+-- Month Proof — Sentinel Secure Historical Seed (PART 1 of 4)
 -- =============================================================================
 -- company_id : 7696819b-a525-4bd7-85e9-baecc635465a
 -- Periods    : 2024-10-01 through 2025-01-01  (4 months)

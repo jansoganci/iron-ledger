@@ -1,6 +1,6 @@
 # Three-Sector Demo Plan
 
-> **Active execution doc.** AccountMapper sprint is paused (see `account_mapper_sprint_plan.md`). The hackathon demo will showcase IronLedger across **three distinct industries** using curated multi-file datasets that flow through the existing (smoke-tested) pipeline with **zero new code**.
+> **Active execution doc.** AccountMapper sprint is paused (see `account_mapper_sprint_plan.md`). The hackathon demo will showcase Month Proof across **three distinct industries** using curated multi-file datasets that flow through the existing (smoke-tested) pipeline with **zero new code**.
 
 **Demo headline:** *"One product, three sectors — Field Services, Retail/E-commerce, Professional Services. Same multi-file consolidation engine. Same reconciliation classifier. Same plain-language report."*
 

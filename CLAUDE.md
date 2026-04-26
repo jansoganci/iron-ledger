@@ -1,4 +1,4 @@
-# IronLedger — Claude Code Context
+# Month Proof — Claude Code Context
 
 AI-powered month-end close agent for US finance teams. Drop messy Excel files → agent finds anomalies, compares to history, writes a verified plain-language report, sends email.
 
@@ -46,7 +46,7 @@ flake8
 ## Project Structure
 
 ```
-ironledger/
+monthproof/
 ├── backend/
 │   ├── main.py                       # App factory — middleware, lifespan, router include
 │   ├── messages.py                   # ALL user-facing error strings (single source)

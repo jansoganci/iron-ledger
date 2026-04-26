@@ -151,7 +151,7 @@ function NavHeader({
     <div className="flex items-center justify-between px-4 h-14 border-b border-border shrink-0">
       <div className="flex items-baseline gap-2 min-w-0">
         <span className="text-base font-semibold text-text-primary tracking-tight">
-          IronLedger
+          Month Proof
         </span>
         <span className="text-xs text-text-secondary hidden xl:inline">
           Month-end close
@@ -296,7 +296,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Dialog.Root>
 
           <span className="text-base font-semibold text-text-primary tracking-tight">
-            IronLedger
+            Month Proof
           </span>
         </div>
       </header>

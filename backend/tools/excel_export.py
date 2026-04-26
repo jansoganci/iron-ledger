@@ -1,4 +1,4 @@
-"""Excel export for IronLedger close packages.
+"""Excel export for Month Proof close packages.
 
 Builds a 3-sheet .xlsx workbook from consolidated monthly data:
   Sheet 1 — Consolidated P&L   (one row per account, totals by category)

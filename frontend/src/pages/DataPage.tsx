@@ -222,7 +222,7 @@ export default function DataPage() {
   function handleExportCSV() {
     if (!filteredData.length) return;
     
-    const filename = `ironledger-data-${selectedYear}${
+    const filename = `monthproof-data-${selectedYear}${
       selectedMonth !== "all" ? `-${selectedMonth}` : ""
     }${selectedCategory ? `-${selectedCategory}` : ""}.csv`;
     

@@ -1,5 +1,5 @@
-# IronLedger — Completed Work Log
-*IronLedger 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
+# Month Proof — Completed Work Log
+*Month Proof 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
 
 Append-only log of what actually shipped. Update at end of each working session.
 

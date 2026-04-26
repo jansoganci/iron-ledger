@@ -350,7 +350,7 @@ async def run_raw(
     from datetime import datetime
 
     banner = (
-        f"=== IronLedger Raw Data — UNVERIFIED ===\n"
+        f"=== Month Proof Raw Data — UNVERIFIED ===\n"
         f"Run ID: {run_id}\n"
         f"Company: {company_name}\n"
         f"Period: {period}\n"
@@ -596,7 +596,7 @@ async def export_report_xlsx(
         company_name=company_name,
     )
 
-    filename = f"ironledger_{period}_close_package.xlsx"
+    filename = f"monthproof_{period}_close_package.xlsx"
     return Response(
         content=xlsx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

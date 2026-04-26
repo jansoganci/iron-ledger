@@ -1,5 +1,5 @@
-# IronLedger — Cross-Day Risk Register
-*IronLedger 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
+# Month Proof — Cross-Day Risk Register
+*Month Proof 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
 
 Live, append-only register of risks that span multiple sprint days. Risks isolated to a single day live in that day's file under **Risks (this day)**.
 
@@ -447,7 +447,7 @@ Day files record risks scoped to one day's work ("Haiku rate-limit during testin
 - Day-5 + Day-6 rehearsals verify pipeline is clean on DRONE data
 - Demo-day emergency lever: raise tolerance to 3% (documented as emergency-only, not normal)
 
-**Trigger action:** If it fires live → **frame it as a feature**: "And here's the guardrail working — it refused to save an unverified report. This is exactly the point of IronLedger. Let me click Retry Analysis." Then show the retry succeeds (or pivot to Loom backup if retry also fails).
+**Trigger action:** If it fires live → **frame it as a feature**: "And here's the guardrail working — it refused to save an unverified report. This is exactly the point of Month Proof. Let me click Retry Analysis." Then show the retry succeeds (or pivot to Loom backup if retry also fails).
 
 **Referenced by:** day-3 §Risks, day-6 §6 Fallback Plans
 

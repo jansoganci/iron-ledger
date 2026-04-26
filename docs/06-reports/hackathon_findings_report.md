@@ -1,4 +1,4 @@
-# IronLedger Hackathon Findings Report
+# Month Proof Hackathon Findings Report
 
 > Synthesis of three source documents:
 > - `docs/en son yapılacaklar.txt` (master brief + three SMB scenarios)
@@ -12,7 +12,7 @@
 
 ## 0. Executive summary
 
-The three documents converge on the same architectural spine. No core decisions need to be reopened. The single strategic sharpening this report recommends: **promote "classification of discrepancies" from a footnote to the demo's centerpiece.** That one shift separates IronLedger from every enterprise close tool on the market and is the most defensible claim the product can make to the jury.
+The three documents converge on the same architectural spine. No core decisions need to be reopened. The single strategic sharpening this report recommends: **promote "classification of discrepancies" from a footnote to the demo's centerpiece.** That one shift separates Month Proof from every enterprise close tool on the market and is the most defensible claim the product can make to the jury.
 
 Priority-ordered build:
 
@@ -206,7 +206,7 @@ Chosen because (a) it's a relatable 8-person SMB, (b) all six discrepancy catego
 **Visual:** screenshot of the 7 filenames in a finder window.
 
 ### Act 2 — The drop (90s)
-> "She drags all 7 files into IronLedger, labels the period March 2026, clicks Analyze."
+> "She drags all 7 files into Month Proof, labels the period March 2026, clicks Analyze."
 
 **Visual:** live drag-drop into the upload UI. Files appear as chips. Progress bar runs through Parser → Consolidator → Reconciler → Interpreter. 45s later: consolidated P&L on screen. Hover any number → tooltip shows source file + row.
 
@@ -216,21 +216,21 @@ Four highlighted reconciliations. Click each. (Timing: ~45s per card.)
 
 **Card 1 — Missing journal entry**
 > "Supplier invoices total $37,800. QuickBooks COGS: $36,100. Gap: $1,700."
-> IronLedger's narrative: *"This is a missing journal entry. CableMax's invoice dated March 22 appears in your supplier file but not in QuickBooks. Likely not yet entered."*
+> Month Proof's narrative: *"This is a missing journal entry. CableMax's invoice dated March 22 appears in your supplier file but not in QuickBooks. Likely not yet entered."*
 > [Button: Draft Reclass JE]
 
 **Card 2 — Stale reference data**
 > "Service contracts expected $3,825. GL shows $3,540. Gap: $285."
-> IronLedger: *"This is stale reference data. Three customers are marked 'Active' in your contract file but have no matching revenue this period: [names]. They likely cancelled without the list being updated."*
+> Month Proof: *"This is stale reference data. Three customers are marked 'Active' in your contract file but have no matching revenue this period: [names]. They likely cancelled without the list being updated."*
 
 **Card 3 — Categorical misclassification**
 > "Payroll file: $44,200. GL wages: $44,900. Gap: $700."
-> IronLedger: *"This is a categorical misclassification. A $700 on-call bonus appears in your GL under 'Contractors' but matches a line in your payroll file. Should be reclassed to Payroll."*
+> Month Proof: *"This is a categorical misclassification. A $700 on-call bonus appears in your GL under 'Contractors' but matches a line in your payroll file. Should be reclassed to Payroll."*
 > [Button: Draft Reclass JE]
 
 **Card 4 — Timing cutoff (not an error)**
 > "Installation revenue in GL: $8,000. Bank deposits: $4,000. Gap: $4,000."
-> IronLedger: *"This is a timing cutoff, not an error. Your GL recognizes full installation revenue on completion; the bank shows only the 50% deposit. Balance is due April 15. Expect reversal next period — no action needed."*
+> Month Proof: *"This is a timing cutoff, not an error. Your GL recognizes full installation revenue on completion; the bank shows only the 50% deposit. Balance is due April 15. Expect reversal next period — no action needed."*
 
 **Guardrail badge: green throughout. Every dollar figure hoverable to source.**
 
@@ -245,7 +245,7 @@ Four highlighted reconciliations. Click each. (Timing: ~45s per card.)
 > "This is what she sends to her auditor. Every number traced to a file and row."
 
 ### Act 5 — The close (30s)
-> "Six hours of work, three minutes. Vena costs $50K/year and assumes clean data. FloQast assumes your GL is the source of truth. IronLedger is the only product that reads **the chaos as it arrives** — and tells you **why** your files disagree, not just that they do."
+> "Six hours of work, three minutes. Vena costs $50K/year and assumes clean data. FloQast assumes your GL is the source of truth. Month Proof is the only product that reads **the chaos as it arrives** — and tells you **why** your files disagree, not just that they do."
 
 ---
 
@@ -422,7 +422,7 @@ This is the sheet auditors will spend the most time in.
 
 ## 9. The one thing that, if missing, kills the prize
 
-**Classification.** If the demo shows reconciliations with dollar deltas but no classification, IronLedger looks like a prettier diff tool. Every enterprise incumbent already computes dollar deltas. The moat is that Claude Opus, given pandas-computed residuals + per-source breakdowns + detection hints, labels each delta with one of six pattern-categories. That is the only feature in the build that an off-the-shelf BI tool cannot produce in 2026.
+**Classification.** If the demo shows reconciliations with dollar deltas but no classification, Month Proof looks like a prettier diff tool. Every enterprise incumbent already computes dollar deltas. The moat is that Claude Opus, given pandas-computed residuals + per-source breakdowns + detection hints, labels each delta with one of six pattern-categories. That is the only feature in the build that an off-the-shelf BI tool cannot produce in 2026.
 
 If time pressure forces a cut, **cut anything before cutting classification.** Cut UI polish. Cut the third Excel sheet. Cut provenance hover. Do not cut classification.
 

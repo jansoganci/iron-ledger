@@ -1,4 +1,4 @@
-# IronLedger — 30-Hour Execution Plan & Product Audit
+# Month Proof — 30-Hour Execution Plan & Product Audit
 
 > Drafted 2026-04-24. Hackathon deadline in ~30 hours.
 > Purpose: close the gap between the proposition and the shipped product.

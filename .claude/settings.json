@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '=== IronLedger Session Started ==='; echo 'GOLDEN RULE: Numbers from pandas. Prose from Claude. Guardrail verifies both.'; echo 'NO inline prompts. NO Claude math. NO pgvector this week.'; echo 'Demo company: DRONE Inc. (not DRONE Inc. — legal reasons)'; echo '================================'"
+            "command": "echo '=== MonthProof Session Started ==='; echo 'GOLDEN RULE: Numbers from pandas. Prose from Claude. Guardrail verifies both.'; echo 'NO inline prompts. NO Claude math. NO pgvector this week.'; echo 'Demo company: DRONE Inc. (not DRONE Inc. — legal reasons)'; echo '================================'"
           }
         ]
       }

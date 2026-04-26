@@ -1,4 +1,4 @@
-# IronLedger — Runtime Dependencies
+# Month Proof — Runtime Dependencies
 # Python 3.11 — pin for Render/hosting via root .python-version (pandas 2.2.x wheels; avoid 3.14)
 # CRITICAL: xlrd must be exactly 1.2.0 — later versions dropped .xls support
 # CRITICAL: anthropic must be >= 0.40 for claude-opus-4-7 support

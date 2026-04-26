@@ -1,5 +1,5 @@
 # Day 6 — Demo + Deploy + Submit
-*IronLedger 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
+*Month Proof 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
 
 ## Goal
 
@@ -128,7 +128,7 @@ Per `docs/runbook.md` §Fallback Plans. Verify each fallback is actually usable 
 - [ ] **Railway cold start fails** — localhost + ngrok ready on demo laptop. Test the ngrok command before demo: `ngrok http 8000`. Save the tunneled URL; know how to swap `VITE_API_URL` in Vercel env (or run frontend locally on `:5173` pointing to localhost:8000).
 - [ ] **File upload hangs** — pre-recorded video segment for that section (from Day-5 backup Loom)
 - [ ] **Email doesn't arrive** — show sent confirmation in the UI toast; verbal pivot: "email is also in your dashboard as `mail_sent: true`"
-- [ ] **Guardrail fires unexpectedly** — frame it as a feature, not a bug. Rehearse the pivot: "And here's the guardrail working — it caught a number mismatch and refused to save an unverified report. This is the point of IronLedger."
+- [ ] **Guardrail fires unexpectedly** — frame it as a feature, not a bug. Rehearse the pivot: "And here's the guardrail working — it caught a number mismatch and refused to save an unverified report. This is the point of Month Proof."
 - [ ] **Vercel down** — run frontend locally on `:5173`, backend still on Railway
 - [ ] **Entire internet down** — run both locally; judges will understand
 
@@ -153,7 +153,7 @@ Run through this list **in order** exactly 30 minutes before go-time.
 
 - [ ] `README.md` at repo root — structure:
   ```markdown
-  # IronLedger
+  # Month Proof
   AI-powered month-end close agent. Drop messy Excel files → agent finds anomalies, compares to history, writes a verified plain-language report, sends email.
   
   **Live demo:** https://<vercel-url>
@@ -210,7 +210,7 @@ Run through this list **in order** exactly 30 minutes before go-time.
 - [ ] Open Cerebral Valley submission form
 - [ ] Fields to complete:
   - Team / solo name
-  - Project name: IronLedger
+  - Project name: Month Proof
   - One-line description: "AI-powered month-end close agent for US finance teams. Drop messy Excel files → verified plain-language variance report → email to the CFO. In under 2 minutes."
   - Live demo URL: `https://<vercel-url>`
   - Video URL: Loom link
@@ -352,7 +352,7 @@ After the Cerebral Valley receipt lands:
 
 - [ ] Append the final Day-6 shipping log to `docs/sprint/completed.md`
 - [ ] Move `docs/sprint/risks.md` items that resolved into completed; leave unresolved items as the **post-MVP backlog**
-- [ ] Tag the submission commit: `git tag -a hackathon-submission -m "IronLedger hackathon submission, Apr 26 2026"`
+- [ ] Tag the submission commit: `git tag -a hackathon-submission -m "Month Proof hackathon submission, Apr 26 2026"`
 - [ ] Sleep. Seriously. Judging may run late; be rested for the live demo, if applicable.
 
 Post-hackathon retrospective (Day 7+):

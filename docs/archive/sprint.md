@@ -1,4 +1,4 @@
-# IronLedger — 6-Day Sprint
+# Month Proof — 6-Day Sprint
 *Built with Opus 4.7 Hackathon — April 2026*
 *v3 — reconciled with CLAUDE.md, scope.md, tech-stack.md, agent-flow.md, db-schema.md, api.md, design.md*
 
@@ -220,7 +220,7 @@
 **Goal:** Full E2E works from file drop to inbox. All critical paths have tests. Demo quality.
 
 ### Mail
-- [ ] Wire `adapters/resend_email.py` — Resend API client, HTML template (simple, readable), subject `[IronLedger] {Month YYYY} — {Company}`
+- [ ] Wire `adapters/resend_email.py` — Resend API client, HTML template (simple, readable), subject `[Month Proof] {Month YYYY} — {Company}`
 - [ ] `POST /mail/send` — accepts `{report_id, to_email}`, returns `{status, message_id}`. Marks `reports.mail_sent = true`, `mail_sent_at = now()`.
 - [ ] `MailButton` wired end-to-end with success toast ("Report emailed to ...") and error toast on failure
 - [ ] Mail body: narrative summary + anomaly list + link to dashboard. No technical jargon.

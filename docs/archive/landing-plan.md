@@ -16,7 +16,7 @@ Type: Inter for UI chrome (nav, button), serif for body — load one editorial s
 ### Global page shell
 - `<body class="bg-canvas text-text-primary font-serif antialiased">` — serif is the DEFAULT on this page; Inter overrides only on nav + CTA button.
 - Single column, max width `max-w-[680px]` centered (`mx-auto px-6`) — memo column width, not dashboard width.
-- A thin top bar: small IronLedger wordmark left (Inter, `font-semibold`), no nav links, no "Log in" button in the top-right (keeps the page feeling like a document, not a marketing funnel — the only CTA is Section 4). Optional: subtle "Sign in →" link in small secondary-text type top-right only for returning users.
+- A thin top bar: small Month Proof wordmark left (Inter, `font-semibold`), no nav links, no "Log in" button in the top-right (keeps the page feeling like a document, not a marketing funnel — the only CTA is Section 4). Optional: subtle "Sign in →" link in small secondary-text type top-right only for returning users.
 - Section numbers in the left margin (`§1`, `§2`, `§3`, `§4`, `§5`) in `text-text-secondary` monospace — this is the visual signature that makes a juror say "oh this is different" in 5 seconds.
 
 ---
@@ -27,10 +27,10 @@ Type: Inter for UI chrome (nav, button), serif for body — load one editorial s
 
 **Copy direction.**
 - No hero image. No dashboard screenshot.
-- Wordmark "IronLedger" at the very top in small Inter weight, then a thin divider rule.
+- Wordmark "Month Proof" at the very top in small Inter weight, then a thin divider rule.
 - One editorial paragraph, ~60–80 words, written in second person ("You're still in the spreadsheet. Travel is up $38K. You can't tell if it's the Denver offsite or a miscoded Amex batch...").
 - Closes with the headline, pulled from Hook A: *"It's 11:47 PM. One number moved. You're the only one who's noticed."* Set large, serif, left-aligned, not centered.
-- One sub-line under the headline in `text-text-secondary`: *"IronLedger is a month-end close agent for US finance teams. This page explains how it works before it asks you to trust it."*
+- One sub-line under the headline in `text-text-secondary`: *"Month Proof is a month-end close agent for US finance teams. This page explains how it works before it asks you to trust it."*
 
 **Visual / layout.**
 - Massive top padding (`pt-32`) — the page should feel like a memo, not a landing.
@@ -52,14 +52,14 @@ Type: Inter for UI chrome (nav, button), serif for body — load one editorial s
 **Purpose.** Show *one* concrete thing the product produces, using the DRONE Inc. demo data. Replaces the full annotated-document idea. One card the reader can inspect in 10 seconds is more persuasive than a flashy demo they half-watch.
 
 **Copy direction.**
-- A single short intro line above the card: *"Here's what IronLedger flagged in DRONE Inc.'s March close."*
+- A single short intro line above the card: *"Here's what Month Proof flagged in DRONE Inc.'s March close."*
 - The card contains, in order:
   - Severity pill: **HIGH** (uses `severity-high-bg` / `severity-high-fg` from the existing token set — visual continuity with the actual app).
   - Account name: **Travel & Entertainment**
   - Variance line: **+$38,420 (+61%)** vs. February — monospace, large.
   - A two-sentence plain-English explanation in the CFO-assistant voice (the kind of thing the Interpreter agent actually produces): e.g. *"Travel spending nearly doubled against the 6-month baseline of $24K/month. The increase concentrates in the final week of March — consistent with an offsite, not a steady-state change."*
   - A tiny footer row: `Verified against source · Guardrail passed ✓` — the `✓` is the ONE teal element in this section. This is where the reader first learns that the teal mark means "checked."
-- Below the card, one paragraph of prose (~40 words): *"No screenshots of dashboards on this page. This is the actual shape of what IronLedger writes after it reads your file — one card per flagged account, one paragraph per anomaly, every number traceable to a cell."*
+- Below the card, one paragraph of prose (~40 words): *"No screenshots of dashboards on this page. This is the actual shape of what Month Proof writes after it reads your file — one card per flagged account, one paragraph per anomaly, every number traceable to a cell."*
 
 **Visual / layout.**
 - Card is the only "boxed" element on the landing page. Everything else is flowing text. This creates emphasis purely through contrast — no decoration needed.
@@ -69,7 +69,7 @@ Type: Inter for UI chrome (nav, button), serif for body — load one editorial s
 **Rough HTML / Tailwind.**
 - `<section class="max-w-[680px] mx-auto px-6 py-20">`
   - `<p class="font-mono text-xs text-text-secondary mb-6">§2</p>`
-  - `<p class="text-lg text-text-primary mb-8">Here's what IronLedger flagged...</p>`
+  - `<p class="text-lg text-text-primary mb-8">Here's what Month Proof flagged...</p>`
   - `<article class="bg-surface border border-border rounded-lg p-6 shadow-sm">`
     - `<span class="inline-block rounded-md bg-severity-high-bg text-severity-high-fg text-xs font-semibold uppercase tracking-wide px-2 py-0.5 font-sans">HIGH</span>`
     - `<h3 class="text-xl font-semibold mt-3 font-sans">Travel &amp; Entertainment</h3>`
@@ -143,14 +143,14 @@ Type: Inter for UI chrome (nav, button), serif for body — load one editorial s
 **Copy direction.**
 - Format as a real memo: `TO:` / `FROM:` / `RE:` / `DATE:` header in monospace, then a numbered list of non-goals in prose, then signed names.
 - Header:
-  - `TO: Finance directors evaluating IronLedger`
-  - `FROM: The IronLedger team`
+  - `TO: Finance directors evaluating Month Proof`
+  - `FROM: The Month Proof team`
   - `RE: What this tool will not do`
   - `DATE: April 2026`
 - Body paragraphs (numbered, one short paragraph each — not bullets):
   1. *"We do not do arithmetic. Every number in every report comes from pandas operating on your source file. The model writes sentences; it does not calculate totals."*
   2. *"We do not train on your data. Your files are not used to improve any model, ours or a vendor's."*
-  3. *"We do not replace your judgment. IronLedger produces a first draft of the close narrative. The decision of what to send — and what to change — is yours."*
+  3. *"We do not replace your judgment. Month Proof produces a first draft of the close narrative. The decision of what to send — and what to change — is yours."*
   4. *"We do not claim to close your books. We claim to get you to a defensible first draft faster than rewriting last month's commentary by hand."*
 - Closing line: *"If any of the above stops being true, this page will be updated the same day."*
 - Signed — real first names + role (e.g. *"— Jan, Founder"*). For a hackathon a single signature is fine.
@@ -182,7 +182,7 @@ Type: Inter for UI chrome (nav, button), serif for body — load one editorial s
 The component must mirror `LoginPage.tsx` exactly at the structural level. That means:
 - Same outer wrapper: `<div className="min-h-screen flex items-center justify-center bg-canvas px-4">`.
 - Same inner width: `<div className="w-full max-w-[400px]">`.
-- Same masthead block: centered `IronLedger` h1 (`text-2xl font-semibold text-text-primary`), same sub-line (`Month-end close, verified.`).
+- Same masthead block: centered `Month Proof` h1 (`text-2xl font-semibold text-text-primary`), same sub-line (`Month-end close, verified.`).
 - Same card shell: `<form className="bg-surface border border-border rounded-lg p-6 shadow-sm">`.
 - Same field component pattern: label in `text-sm font-medium text-text-primary mb-1.5`, input in the full class string already used on LoginPage's email input (including `read-only:opacity-60` during loading).
 - Same inline error container: `role="alert" className="rounded-md bg-severity-high-bg px-3 py-2 text-sm text-severity-high-fg"`. Never toast.

@@ -1,4 +1,4 @@
-# IronLedger — API Contract
+# Month Proof — API Contract
 *Version 1.0 — Hackathon MVP*
 
 Base URL (local): `http://localhost:8000`

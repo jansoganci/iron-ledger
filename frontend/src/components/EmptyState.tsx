@@ -51,7 +51,7 @@ export function EmptyState({ onBaselineUploaded }: EmptyStateProps) {
         <div className="space-y-2">
           <h1 className="text-xl font-semibold text-text-primary">Baseline received</h1>
           <p className="text-sm text-text-secondary">
-            Come back at month-end and upload the next period — IronLedger will compare it
+            Come back at month-end and upload the next period — Month Proof will compare it
             against this baseline and surface any anomalies.
           </p>
         </div>
@@ -78,7 +78,7 @@ export function EmptyState({ onBaselineUploaded }: EmptyStateProps) {
         </h1>
         <div className="space-y-2 text-sm text-text-secondary">
           <p>
-            IronLedger compares each month to your history. You haven't uploaded anything
+            Month Proof compares each month to your history. You haven't uploaded anything
             yet, so there's nothing to compare against.
           </p>
           <p>

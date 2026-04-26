@@ -1,5 +1,5 @@
 # Day 2 — Parser Agent + Comparison Agent
-*IronLedger 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
+*Month Proof 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
 
 ## Goal
 

@@ -1,5 +1,5 @@
 # Day 3 — Interpreter Agent + Numeric Guardrail + Full API
-*IronLedger 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
+*Month Proof 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
 
 ## Goal
 
@@ -155,7 +155,7 @@ All endpoints except `/health` require JWT (Day 1). All responses carry `trace_i
 - [ ] Filename header: `raw_{period}_{run_id_short}.txt` — the `raw_` prefix is a **visual trust signal** per `design.md`
 - [ ] File content starts with an unverified banner:
   ```
-  === IronLedger Raw Data — UNVERIFIED ===
+  === Month Proof Raw Data — UNVERIFIED ===
   Run ID: {run_id}
   Period: {period}
   Company: {company_name}

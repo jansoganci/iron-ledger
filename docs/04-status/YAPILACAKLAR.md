@@ -1,8 +1,8 @@
-# IRONLEDGER HACKATHON MASTER BRIEF
+# MONTH PROOF HACKATHON MASTER BRIEF
 
 ## Context: What We're Building
 
-**IronLedger** is an AI-powered month-end close tool for US SMBs. Target: companies with 5–40 employees, no FP&A budget, using QuickBooks + manual Excel files from departments. They spend 5–10 hours every month manually consolidating files and hunting discrepancies.
+**Month Proof** is an AI-powered month-end close tool for US SMBs. Target: companies with 5–40 employees, no FP&A budget, using QuickBooks + manual Excel files from departments. They spend 5–10 hours every month manually consolidating files and hunting discrepancies.
 
 **Current state:** Single-file variance analyzer. Upload one file, detect anomalies vs. last month, Claude explains them.
 
@@ -163,7 +163,7 @@ Goal: close the gap from 25% to ~80% delivered.
 
 ## Instructions for AI
 
-You are helping build IronLedger for a hackathon. The above is your complete context: product state, user scenarios, technical gaps, and the 30-hour plan.
+You are helping build Month Proof for a hackathon. The above is your complete context: product state, user scenarios, technical gaps, and the 30-hour plan.
 
 When asked to implement something:
 1. Follow the existing architecture: pandas calculates → Claude interprets → guardrail verifies

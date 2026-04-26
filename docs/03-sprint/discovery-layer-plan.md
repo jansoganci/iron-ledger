@@ -1,5 +1,5 @@
 # Discovery & Mapping Layer — Implementation Plan
-*IronLedger post-hackathon work — pivots the Parser from rigid schema-first to LLM-first preprocessing*
+*Month Proof post-hackathon work — pivots the Parser from rigid schema-first to LLM-first preprocessing*
 
 A twelve-step plan for introducing a Discovery & Mapping Layer between raw file upload and database writes. The layer is LLM-first for structure interpretation, deterministic for transformation. Written as a durable reference: each step documents **goal, files, changes, rationale, deliverable, and verification**, so a future reader can resume mid-sprint without re-deriving context.
 

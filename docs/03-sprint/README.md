@@ -1,4 +1,4 @@
-# IronLedger — Sprint System
+# Month Proof — Sprint System
 *Built with Opus 4.7 Hackathon — April 2026*
 
 This folder is the **living plan** for the 6-day sprint. One file per day, plus a completed-work log and a cross-day risk register.

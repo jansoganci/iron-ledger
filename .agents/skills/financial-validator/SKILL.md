@@ -1,9 +1,9 @@
 ---
 name: financial-validator
-description: Use this skill before finalizing any financial report, running the agent pipeline, or writing narrative output. Enforces the IronLedger architectural rules for data integrity and agent flow.
+description: Use this skill before finalizing any financial report, running the agent pipeline, or writing narrative output. Enforces the Month Proof architectural rules for data integrity and agent flow.
 ---
 
-# IronLedger Financial Validator Skill
+# Month Proof Financial Validator Skill
 
 ## When to use this skill
 - Before writing any Claude narrative (Interpretation agent)

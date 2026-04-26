@@ -1,4 +1,4 @@
--- IronLedger — Demo Seed Data
+-- Month Proof — Demo Seed Data
 -- Run AFTER 0001_initial_schema.sql and AFTER the demo user is created
 -- in Supabase Auth (demo@dronedemo.com).
 --

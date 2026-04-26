@@ -1,5 +1,5 @@
 # Day 4 — Frontend
-*IronLedger 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
+*Month Proof 6-Day Sprint — Built with Opus 4.7 Hackathon, April 2026*
 
 ## Goal
 
@@ -167,7 +167,7 @@ Per `design.md` §5 — full spec implementation.
 
 - [ ] `src/pages/LoginPage.tsx`:
   - Single centered card, `max-width: 400px`, 24px padding, `#FFFFFF` surface on `#FAFAF9` canvas, 1px `#E5E4E2` border
-  - Headline: "IronLedger" + subhead "Month-end close, verified."
+  - Headline: "Month Proof" + subhead "Month-end close, verified."
   - Email input: `type="email"`, `autoComplete="username"`, required
   - Password input: `type="password"`, `autoComplete="current-password"`, required
   - Sign in button: full-width, teal `#0D9488`, white text, disabled while request in flight

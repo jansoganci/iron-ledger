@@ -1,4 +1,4 @@
-# IronLedger
+# Month Proof
 ### AI-Powered Month-End Close Agent
 *Built with Claude Opus 4.7 — Anthropic Hackathon April 2026*
 
@@ -6,7 +6,7 @@
 
 ## What it does
 
-Drop your messy financial Excel files. IronLedger's agent reads them, compares to history, finds anomalies, writes a plain-language report, and emails it — in under 2 minutes.
+Drop your messy financial Excel files. Month Proof's agent reads them, compares to history, finds anomalies, writes a plain-language report, and emails it — in under 2 minutes.
 
 Built for US finance teams spending 10-15 hours/month on manual close work.
 
@@ -44,8 +44,8 @@ claude "write a test for the variance calculation in agents/comparison.py"
 
 ### 1. Clone and install
 ```bash
-git clone https://github.com/YOUR_USERNAME/ironledger
-cd ironledger
+git clone https://github.com/YOUR_USERNAME/monthproof
+cd monthproof
 cp .env.example .env   # fill in your keys
 pip install -r requirements.txt
 cd frontend && npm install
@@ -64,7 +64,7 @@ cd frontend && npm install
 # Or use Supabase CLI: supabase db push
 
 # In Supabase Dashboard → Authentication → Users, create a demo user:
-#   email:    demo@ironledger.com
+#   email:    demo@monthproof.com
 #   password: (your choice)
 # The app will guide you through company setup on first login
 ```

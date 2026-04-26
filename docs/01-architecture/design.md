@@ -1,4 +1,4 @@
-# IronLedger — Design Decisions
+# Month Proof — Design Decisions
 *Built with Opus 4.7 Hackathon — April 2026*
 
 ---
@@ -55,7 +55,7 @@ Severity chips are always color + text label (never color alone) for accessibili
 ### 1. Home Page — Upload
 ```
 ┌────────────────────────────────────────┐
-│  IronLedger                            │
+│  Month Proof                           │
 │  Financial Intelligence Agent          │
 ├────────────────────────────────────────┤
 │                                        │
@@ -155,7 +155,7 @@ Email + password. Shown at `/login`. For the hackathon demo the session is pre-w
 ```
 ┌────────────────────────────────────────┐
 │                                        │
-│              IronLedger                │
+│             Month Proof                │
 │     Month-end close, verified.         │
 │                                        │
 │   ┌──────────────────────────────┐     │
@@ -186,7 +186,7 @@ Inline error above the Sign in button. Plain English, no mention of which field 
 ```
 ┌────────────────────────────────────────┐
 │                                        │
-│              IronLedger                │
+│             Month Proof                │
 │     Month-end close, verified.         │
 │                                        │
 │   ┌──────────────────────────────┐     │
@@ -334,7 +334,7 @@ Tone: friendly, inviting, not alarming. The user has done nothing wrong.
 
 ```
 ┌────────────────────────────────────────┐
-│  IronLedger                            │
+│  Month Proof                           │
 │  Month-end close, verified.            │
 ├────────────────────────────────────────┤
 │                                        │
@@ -344,7 +344,7 @@ Tone: friendly, inviting, not alarming. The user has done nothing wrong.
 │                                        │
 │        Let's set up your baseline      │
 │                                        │
-│  IronLedger compares each month to     │
+│  Month Proof compares each month to    │
 │  your history. You haven't uploaded    │
 │  anything yet, so there's nothing to   │
 │  compare against.                      │
@@ -753,7 +753,7 @@ Completed steps use ✓ icon in `#166534`. Active step uses a filled circle ● 
 
 ## Responsive Breakpoints
 
-IronLedger is desktop-first — the target user is a controller sitting at a workstation with a 1440px+ monitor. Tablet and mobile are supported for the critical path only (upload + read report); dense exploratory views are desktop-only.
+Month Proof is desktop-first — the target user is a controller sitting at a workstation with a 1440px+ monitor. Tablet and mobile are supported for the critical path only (upload + read report); dense exploratory views are desktop-only.
 
 **Breakpoints**
 

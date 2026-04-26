@@ -1,4 +1,4 @@
-// IronLedger Dashboard — Shared Components + Both Variations
+// Month Proof Dashboard — Shared Components + Both Variations
 // Exported to window for use in main HTML file
 
 const { useState, useEffect, useRef } = React;
@@ -147,7 +147,7 @@ const NAV_ITEMS = [
 const Sidebar = ({active='dashboard', onNav}) => (
   <aside className="sidebar">
     <div className="sidebar-brand">
-      <div className="sidebar-logo">IronLedger</div>
+      <div className="sidebar-logo">Month Proof</div>
       <div className="sidebar-context">Month-end close</div>
     </div>
     <nav className="sidebar-nav">

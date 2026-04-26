@@ -1,9 +1,9 @@
 ---
 name: code-auditor
-description: Use this skill to audit newly written code for architectural consistency, security issues, and adherence to IronLedger coding standards. Run after completing any agent, tool, or endpoint.
+description: Use this skill to audit newly written code for architectural consistency, security issues, and adherence to Month Proof coding standards. Run after completing any agent, tool, or endpoint.
 ---
 
-# IronLedger Code Auditor Skill
+# Month Proof Code Auditor Skill
 
 ## When to use this skill
 - After writing or editing any file in `backend/agents/`

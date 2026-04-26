@@ -1,5 +1,5 @@
 {
-  "name": "ironledger",
+  "name": "monthproof",
   "private": true,
   "scripts": {
     "dev": "concurrently -n backend,frontend -c blue,green --kill-others-on-fail \"uvicorn backend.main:app --reload --port 8000\" \"npm --prefix frontend run dev\"",

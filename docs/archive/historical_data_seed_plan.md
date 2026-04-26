@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-**Goal:** Make Sentinel Secure appear as if it's been using IronLedger for 1.5 years, with realistic month-over-month variance patterns that showcase the platform's analytical capabilities.
+**Goal:** Make Sentinel Secure appear as if it's been using Month Proof for 1.5 years, with realistic month-over-month variance patterns that showcase the platform's analytical capabilities.
 
 **Approach:** Python script generates SQL INSERT statements for 16 months (Jan 2025 - Apr 2026) of financial data, bypassing the upload pipeline entirely. Months 17 and 18 will be uploaded manually through the app to demonstrate the live pipeline.
 

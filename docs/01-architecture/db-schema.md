@@ -1,4 +1,4 @@
-# IronLedger — Database Schema
+# Month Proof — Database Schema
 *Built with Opus 4.7 Hackathon — April 2026*
 
 ---

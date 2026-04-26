@@ -28,16 +28,16 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    logger.info("IronLedger starting up")
+    logger.info("MonthProof starting up")
     yield
-    logger.info("IronLedger shutting down")
+    logger.info("MonthProof shutting down")
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="IronLedger",
+        title="MonthProof",
         version="0.1.0",
         lifespan=lifespan,
     )

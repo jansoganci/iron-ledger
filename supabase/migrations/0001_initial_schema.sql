@@ -1,4 +1,4 @@
--- IronLedger — Database Schema
+-- Month Proof — Database Schema
 -- Run against a Supabase PostgreSQL project.
 -- Supabase Auth must be enabled (auth.users exists).
 --

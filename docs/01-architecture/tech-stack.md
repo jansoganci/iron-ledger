@@ -1,4 +1,4 @@
-# IronLedger — Tech Stack
+# Month Proof — Tech Stack
 *Built with Opus 4.7 Hackathon — April 2026*
 *v2 — Updated with Deep Search findings*
 
@@ -158,7 +158,7 @@ Without this layer, reports shown to the CFO are not reliable.
 ## Folder Structure
 
 ```
-ironledger/
+monthproof/
 ├── backend/
 │   ├── main.py                  # FastAPI app
 │   ├── agents/

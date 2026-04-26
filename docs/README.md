@@ -1,6 +1,6 @@
-# IronLedger Documentation
+# Month Proof Documentation
 
-Welcome to the IronLedger documentation. This folder contains all project documentation organized by category.
+Welcome to the Month Proof documentation. This folder contains all project documentation organized by category.
 
 ## 📁 Documentation Structure
 

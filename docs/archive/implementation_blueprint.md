@@ -25,7 +25,7 @@ This is the north star. Every task below exists to serve one of these moments.
 | M9 | 4:50–5:20 | **Card 4 — Timing cutoff (NOT an error).** Installation revenue $4K gap = 50% deposit. "No action needed — reverses next period." | Classification = `timing_cutoff`. Distinguishes from errors. |
 | M10 | 5:20–5:40 | **Guardrail badge.** Green throughout. Brief hover tooltip: "Every dollar figure verified against pandas." | Existing guardrail stays green. Tolerance tightened to `max(1%, $1k)`. |
 | M11 | 5:40–6:10 | **Download Excel.** 3-sheet workbook lands on desktop. Open it. Consolidated P&L / Reconciliations / Source Breakdown. | `GET /report/.../export.xlsx` returns a real `.xlsx`. |
-| M12 | 6:10–6:30 | **Close.** "Six hours → three minutes. Vena $50K/year assumes clean data. IronLedger reads the chaos as it arrives and tells you _why_ your files disagree, not just _that_ they do." | Roadmap slide visible behind speaker. |
+| M12 | 6:10–6:30 | **Close.** "Six hours → three minutes. Vena $50K/year assumes clean data. Month Proof reads the chaos as it arrives and tells you _why_ your files disagree, not just _that_ they do." | Roadmap slide visible behind speaker. |
 
 ### Non-negotiable demo assertions
 - Classification badges on every reconciliation card (the $30K feature).

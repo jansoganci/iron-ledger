@@ -1,4 +1,4 @@
-# IronLedger — Onboarding Revision Plan
+# Month Proof — Onboarding Revision Plan
 
 **Status:** Planning only — no code has been written.  
 **Scope:** Registration flow, login flow, onboarding route, company creation endpoint.

@@ -1,4 +1,4 @@
-# IronLedger — Scope Document
+# Month Proof — Scope Document
 *Built with Opus 4.7 Hackathon — April 2026*
 *v2 — US market focus, market data, and input list updated*
 
@@ -29,7 +29,7 @@ US finance teams spend 10-15 hours every month-end close on tasks that should ta
 - 36% of C-suite leaders identify "manual error detection during close" as the biggest issue (BlackLine global survey)
 - Manual reconciliation workload drops by 60-70% with automation (AICPA Continuous Finance Survey)
 
-**Gap:** Enterprise tools (FloQast, BlackLine) require months of setup, are expensive, and are not SMB-friendly. IronLedger: drop files, get report.
+**Gap:** Enterprise tools (FloQast, BlackLine) require months of setup, are expensive, and are not SMB-friendly. Month Proof: drop files, get report.
 
 ---
 

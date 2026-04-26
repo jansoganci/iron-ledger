@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>IronLedger — Upload Flow</title>
+<title>Month Proof — Upload Flow</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,600;1,8..60,300;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -1195,7 +1195,7 @@ function DropzoneEmpty({onFiles}) {
 
   return (
     <div className="dropzone-wrap">
-      <div className="dz-wordmark">IronLedger</div>
+      <div className="dz-wordmark">Month Proof</div>
       <div
         className={`dropzone ${over?'over':''}`}
         onDragOver={e=>{e.preventDefault();setOver(true);}}
@@ -1277,7 +1277,7 @@ function Uploading({files, onDone}) {
     <div className="upload-card uploading-wrap">
       <div className="upload-header">
         <div className="upload-title">Uploading files…</div>
-        <div className="upload-sub">Securely transferring to IronLedger</div>
+        <div className="upload-sub">Securely transferring to Month Proof</div>
       </div>
       <div className="upload-items">
         {files.map((f,i) => (
@@ -1364,7 +1364,7 @@ function Processing({resultType, onComplete, autoPlay}) {
         <div className="proc-header">
           <div className="proc-eyebrow">
             <span className="proc-eyebrow-dot"></span>
-            IronLedger Agent · Running
+            Month Proof Agent · Running
           </div>
           <div className="proc-title">Analyzing your files.</div>
           <div className="proc-hint"><ClockIcon/> Usually under 2 minutes</div>
@@ -1544,7 +1544,7 @@ function EmptyDashboard({onUpload}) {
     <div className="empty-dash">
       <div className="dash-shell">
         <div className="dash-sidebar">
-          <div className="dash-logo">IronLedger</div>
+          <div className="dash-logo">Month Proof</div>
           {['Dashboard','Reports','Anomalies','Vendors','Settings'].map((item,i)=>(
             <div key={item} className={`dash-nav-item ${i===0?'active':''}`}>
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">

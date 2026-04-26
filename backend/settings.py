@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_jwt_secret: str = ""
     resend_api_key: str = ""
-    resend_from_email: str = "reports@ironledger.ai"
+    # Use a Resend-verified sender domain in production.
+    resend_from_email: str = "reports@monthproof.ai"
     frontend_url: str = "http://localhost:5173"
     app_env: str = "development"
 

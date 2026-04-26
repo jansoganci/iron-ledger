@@ -1,4 +1,4 @@
-# IronLedger — Cloudflare Pages (static Vite app from frontend/)
+# Month Proof — Cloudflare Pages (static Vite app from frontend/)
 # Used with: npx wrangler pages deploy (see project README or deploy docs)
 #
 # `name` is the default Cloudflare Pages project name when you omit --project-name.
@@ -8,5 +8,5 @@
 # are baked in at `npm run build`. Use frontend/.env.production (gitignored) or export
 # them in the shell before building. See frontend/.env.example for variable names.
 
-name = "iron-ledger"
+name = "monthproof"
 compatibility_date = "2026-04-26"

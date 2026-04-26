@@ -1,4 +1,4 @@
-# IronLedger — Demo Runbook
+# Month Proof — Demo Runbook
 *Built with Opus 4.7 Hackathon — April 2026*
 
 This is the exact script for the 3-minute demo video and live judging.
@@ -33,7 +33,7 @@ If it fails twice, switch to localhost fallback immediately (see below).
 ### [0:00 - 0:20] Hook — The Problem
 Say:
 > "Finance teams spend 10 to 15 hours every month-end manually consolidating Excel files,
-> calculating variances, and writing reports. IronLedger eliminates that.
+> calculating variances, and writing reports. Month Proof eliminates that.
 > Drop your files. Get a verified report. In under 2 minutes."
 
 Show: The upload screen. Clean, minimal.
@@ -96,13 +96,13 @@ Say:
 > The same agent reads QuickBooks exports, NetSuite reports, ADP payroll CSVs —
 > even the weird XML files NetSuite disguises as .xls.
 > 87% of CFOs say AI will be critical to finance in 2026.
-> Only 14% have actually integrated it. IronLedger is the bridge."
+> Only 14% have actually integrated it. Month Proof is the bridge."
 
 ---
 
 ### [2:45 - 3:00] Close
 Say:
-> "IronLedger. Built with Claude Opus 4.7. 
+> "Month Proof. Built with Claude Opus 4.7.
 > Numbers from pandas. Prose from Claude. Trust from the guardrail."
 
 Show: Upload screen again. Clean close.
