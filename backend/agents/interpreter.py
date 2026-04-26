@@ -35,12 +35,14 @@ def _guardrail_user_message(exc_str: str) -> str:
             sign_note = (
                 " with a negative sign" if val < 0 else ""
             )
+            neg_revenue_hint = (
+                "Negative values in income or revenue accounts are the most common cause — "
+                "check that revenue amounts in your GL file are entered as positive numbers. "
+            ) if val < 0 else ""
             return (
                 f"The AI report mentioned {formatted}{sign_note}, but that exact figure "
                 f"could not be matched to your financial data. "
-                f"{'Negative values in income or revenue accounts are the most common cause — '
-                   'check that revenue amounts in your GL file are entered as positive numbers. '
-                   if val < 0 else ''}"
+                f"{neg_revenue_hint}"
                 f"You can download the unverified raw data below, fix the source file, "
                 f"and re-upload to generate a verified report."
             )
