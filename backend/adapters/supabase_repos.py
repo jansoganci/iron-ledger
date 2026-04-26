@@ -279,6 +279,19 @@ class SupabaseReportsRepo:
             raise _wrap_db(exc) from exc
         return _row_to_report(resp.data[0])
 
+    def upgrade_summary(self, company_id: str, period: date, new_summary: str) -> None:
+        """Atomically overwrite summary and set opus_upgraded=TRUE."""
+        try:
+            _with_retry(
+                lambda: self._db.table("reports")
+                .update({"summary": new_summary, "opus_upgraded": True})
+                .eq("company_id", company_id)
+                .eq("period", str(period))
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+
     def mark_mail_sent(self, report_id: str) -> None:
         try:
             self._db.table("reports").update(
@@ -402,6 +415,51 @@ class SupabaseRunsRepo:
             )
         except Exception as exc:
             raise _wrap_db(exc) from exc
+
+    def set_opus_status(self, run_id: str, status: str) -> None:
+        body = {"opus_status": status, "updated_at": datetime.utcnow().isoformat()}
+        try:
+            _with_retry(
+                lambda: self._db.table("runs").update(body).eq("id", run_id).execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+
+    def get_latest_run_id_for_period(self, company_id: str, period: date) -> str | None:
+        """Return the id of the most recently created run for (company_id, period)."""
+        try:
+            resp = (
+                self._db.table("runs")
+                .select("id")
+                .eq("company_id", company_id)
+                .eq("period", str(period))
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        return resp.data[0]["id"] if resp.data else None
+
+    def get_prior_pandas_summaries(
+        self, company_id: str, before_period: date, limit: int = 3
+    ) -> list[dict]:
+        """Return pandas_summary JSONB for the N most recent completed runs before the given period."""
+        try:
+            resp = (
+                self._db.table("runs")
+                .select("period, pandas_summary")
+                .eq("company_id", company_id)
+                .eq("status", "complete")
+                .lt("period", str(before_period))
+                .not_.is_("pandas_summary", "null")
+                .order("period", desc=True)
+                .limit(limit)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        return resp.data or []
 
     def set_storage_key(self, run_id: str, storage_key: str) -> None:
         body = {
@@ -923,6 +981,7 @@ def _row_to_report(r: dict) -> Report:
         mail_sent=r.get("mail_sent", False),
         mail_sent_at=r.get("mail_sent_at"),
         reconciliations=r.get("reconciliations"),
+        opus_upgraded=r.get("opus_upgraded", False) or False,
         created_at=r.get("created_at"),
     )
 

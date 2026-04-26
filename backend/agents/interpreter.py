@@ -118,6 +118,11 @@ class InterpreterAgent:
             gen_status,
             extra={"step": 4, "step_label": "Generating report...", "progress_pct": 95},
         )
+        self._update_generating_progress(
+            run_id,
+            progress_pct=96,
+            step_label="Drafting narrative...",
+        )
 
         try:
             narrative: NarrativeJSON = self._run_with_guardrail(
@@ -166,14 +171,11 @@ class InterpreterAgent:
             return False
 
         # Update: narrative generated, finalizing report
-        try:
-            self._runs.update_status(
-                run_id,
-                RunStatus.GENERATING,
-                extra={"progress_pct": 98},
-            )
-        except Exception:
-            pass
+        self._update_generating_progress(
+            run_id,
+            progress_pct=98,
+            step_label="Finalizing report...",
+        )
 
         # Merge per-item classifications from Claude back into reconciliation items.
         # Claude's output is used first; hint-based rules fill any gaps.
@@ -280,6 +282,13 @@ class InterpreterAgent:
 
         last_message = ""
         for attempt in range(max_retries):
+            # Keep users informed during longer LLM/guardrail work.
+            if attempt > 0:
+                self._update_generating_progress(
+                    run_id,
+                    progress_pct=97,
+                    step_label=f"Re-checking narrative ({attempt + 1}/{max_retries})...",
+                )
             prompt_file = (
                 "narrative_prompt.txt"
                 if attempt == 0
@@ -313,3 +322,22 @@ class InterpreterAgent:
             f"Report could not be verified after {max_retries} attempts. "
             f"Last mismatch: {last_message}"
         )
+
+    def _update_generating_progress(
+        self,
+        run_id: str,
+        progress_pct: int,
+        step_label: str,
+    ) -> None:
+        """Best-effort progress updates during GENERATING without changing state."""
+        try:
+            self._runs.update_status(
+                run_id,
+                RunStatus.GENERATING,
+                extra={"step": 4, "step_label": step_label, "progress_pct": progress_pct},
+            )
+        except Exception as exc:
+            logger.warning(
+                "interpreter progress update failed",
+                extra={"run_id": run_id, "progress_pct": progress_pct, "error": str(exc)},
+            )

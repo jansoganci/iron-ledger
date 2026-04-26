@@ -66,6 +66,7 @@ class Report:
     mail_sent: bool = False
     mail_sent_at: datetime | None = None
     reconciliations: list[dict] | None = None
+    opus_upgraded: bool = False
     created_at: datetime | None = None
 
 

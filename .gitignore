@@ -1,4 +1,8 @@
 .env
+.env.local
+.env.production
+frontend/.env.production
+frontend/.env.production.local
 __pycache__/
 *.pyc
 .DS_Store

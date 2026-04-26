@@ -62,6 +62,9 @@ DISCOVERY_LOW_CONFIDENCE = (
     "We need you to review how we read this file before continuing."
 )
 
+MAPPING_FAILED = "We couldn't classify your accounts. Please re-upload."
+MAPPING_INVALID_GL_ACCOUNT = "One or more selected GL accounts is no longer valid."
+
 DISCOVERY_REJECTED = (
     "You rejected our reading of this file. Please try a different export."
 )

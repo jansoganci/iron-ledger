@@ -496,6 +496,7 @@ class ParserAgent:
         company_id: str,
         period: date,
         run_id: str,
+        account_name_map: dict[str, str] | None = None,
     ) -> tuple[list[dict], str, pd.DataFrame]:
         """Download, discover, normalize, validate, map — without state transitions.
 
@@ -526,6 +527,13 @@ class ParserAgent:
 
         df_normalized, _ = normalizer.apply_plan(df_raw, plan, period)
         df_validated = validator.validate(df_normalized)
+
+        # Apply AccountMapper decisions before category mapping and groupby (B2 fix).
+        # Must run here so GL account names are in place before _map_accounts aggregates.
+        if account_name_map:
+            df_validated["account"] = df_validated["account"].map(
+                lambda x: account_name_map.get(str(x).strip(), x)
+            )
 
         source_column = self._extract_source_column(plan)
 

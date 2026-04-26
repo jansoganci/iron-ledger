@@ -9,10 +9,16 @@ import { LoadingProgress } from "../components/LoadingProgress";
 import { GuardrailWarning } from "../components/GuardrailWarning";
 import { EmptyState } from "../components/EmptyState";
 import { ParsePreviewPanel } from "../components/ParsePreviewPanel";
+import { MappingReview } from "../components/MappingReview";
+import { DiscoveryReview } from "../components/DiscoveryReview";
 import { useToast } from "../components/ToastProvider";
 import { useCompany } from "../hooks/useCompany";
 import { cn } from "../lib/utils";
-import type { ParsePreview } from "../components/LoadingProgress";
+import type {
+  DiscoveryPlanPayload,
+  MappingDraft,
+  ParsePreview,
+} from "../components/LoadingProgress";
 
 interface HasHistoryResponse {
   has_history: boolean;
@@ -22,9 +28,13 @@ interface HasHistoryResponse {
 type PageView =
   | "upload"
   | "processing"
+  | "discovery-review"
+  | "mapping-review"
   | "preview"
   | "guardrail-failed"
   | "terminal-failed";
+
+type ProcessingMode = "default" | "post-discovery";
 
 interface GuardrailState {
   runId: string;
@@ -47,7 +57,10 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>("default");
   const [parsePreview, setParsePreview] = useState<ParsePreview | null>(null);
+  const [discoveryPlan, setDiscoveryPlan] = useState<DiscoveryPlanPayload | null>(null);
+  const [mappingDraft, setMappingDraft] = useState<MappingDraft | null>(null);
   const [guardrailState, setGuardrailState] = useState<GuardrailState | null>(null);
   const [terminalFailure, setTerminalFailure] =
     useState<TerminalFailureState | null>(null);
@@ -55,6 +68,9 @@ export default function UploadPage() {
   const [cooldownLeft, setCooldownLeft] = useState(0);
   // Track runs that have already been confirmed so we don't re-show preview on remount
   const [confirmedRuns, setConfirmedRuns] = useState<Set<string>>(new Set());
+  // Track runs whose mapping has been confirmed — prevents MappingReview re-appearing
+  // while Phase B is still running (APPLYING_MAPPING status, ~20s re-parse window).
+  const [confirmedMappingRuns, setConfirmedMappingRuns] = useState<Set<string>>(new Set());
 
   const { data: historyData, refetch: refetchHistory } = useQuery<HasHistoryResponse>({
     queryKey: ["has-history"],
@@ -97,6 +113,7 @@ export default function UploadPage() {
         body: fd,
       });
       setCurrentRunId(res.run_id);
+      setProcessingMode("default");
       setView("processing");
     } catch (err) {
       if (err instanceof RateLimitedError) {
@@ -114,6 +131,48 @@ export default function UploadPage() {
     }
   }
 
+  function handleAwaitingMappingConfirmation(runId: string, draft: MappingDraft) {
+    if (confirmedRuns.has(runId)) return;
+    if (confirmedMappingRuns.has(runId)) return; // already confirmed, Phase B still running
+    setMappingDraft(draft);
+    setView("mapping-review");
+  }
+
+  function handleAwaitingDiscoveryConfirmation(runId: string, plan: DiscoveryPlanPayload) {
+    if (confirmedRuns.has(runId)) return;
+    setDiscoveryPlan(plan);
+    setView("discovery-review");
+  }
+
+  function handleDiscoveryApproved() {
+    setDiscoveryPlan(null);
+    // Speed up polling right after discovery approval so mapping progress
+    // is visible even when this stage completes quickly.
+    setProcessingMode("post-discovery");
+    setView("processing");
+  }
+
+  function handleDiscoveryRejected() {
+    setDiscoveryPlan(null);
+    setTerminalFailure({
+      status: "parsing_failed",
+      message: "You rejected our reading of this file. Please try a different export.",
+    });
+    setView("terminal-failed");
+  }
+
+  function handleMappingConfirmed() {
+    // Record that this run's mapping was confirmed so we don't re-show MappingReview
+    // if polling fires again before Phase B transitions the status away from
+    // applying_mapping.
+    if (currentRunId) {
+      setConfirmedMappingRuns((prev) => new Set([...prev, currentRunId]));
+    }
+    setMappingDraft(null);
+    setProcessingMode("default");
+    setView("processing");
+  }
+
   function handleAwaitingConfirmation(runId: string, preview: ParsePreview) {
     if (confirmedRuns.has(runId)) return;
     setParsePreview(preview);
@@ -124,6 +183,7 @@ export default function UploadPage() {
     if (currentRunId) {
       setConfirmedRuns((prev) => new Set([...prev, currentRunId]));
     }
+    setProcessingMode("default");
     setView("processing");
   }
 
@@ -132,11 +192,13 @@ export default function UploadPage() {
     rawDataUrl: string | null,
     errorMessage: string | null
   ) {
+    setProcessingMode("default");
     setGuardrailState({ runId, rawDataUrl, errorMessage });
     setView("guardrail-failed");
   }
 
   function handleTerminalFailure(status: string, message: string) {
+    setProcessingMode("default");
     setTerminalFailure({ status, message });
     setView("terminal-failed");
   }
@@ -145,6 +207,7 @@ export default function UploadPage() {
     setTerminalFailure(null);
     setCurrentRunId(null);
     setParsePreview(null);
+    setProcessingMode("default");
     setSelectedFiles([]);
     setUploadError(null);
     setView("upload");
@@ -152,6 +215,7 @@ export default function UploadPage() {
 
   function handleRetry(newRunId: string) {
     setCurrentRunId(newRunId);
+    setProcessingMode("default");
     setGuardrailState(null);
     setParsePreview(null);
     setView("processing");
@@ -227,6 +291,28 @@ export default function UploadPage() {
     );
   }
 
+  if (view === "discovery-review" && discoveryPlan && currentRunId) {
+    return (
+      <DiscoveryReview
+        runId={currentRunId}
+        plan={discoveryPlan}
+        onApproved={handleDiscoveryApproved}
+        onRejected={handleDiscoveryRejected}
+      />
+    );
+  }
+
+  // Mapping review — AI suggested GL accounts, user approves before consolidation
+  if (view === "mapping-review" && mappingDraft && currentRunId) {
+    return (
+      <MappingReview
+        runId={currentRunId}
+        draft={mappingDraft}
+        onConfirmed={handleMappingConfirmed}
+      />
+    );
+  }
+
   // Processing view
   if (view === "processing" && currentRunId) {
     return (
@@ -235,8 +321,11 @@ export default function UploadPage() {
           <LoadingProgress
             runId={currentRunId}
             period={period}
+            processingMode={processingMode}
             onGuardrailFailed={handleGuardrailFailed}
             onAwaitingConfirmation={handleAwaitingConfirmation}
+            onAwaitingMappingConfirmation={handleAwaitingMappingConfirmation}
+            onAwaitingDiscoveryConfirmation={handleAwaitingDiscoveryConfirmation}
             onTerminalFailure={handleTerminalFailure}
           />
         </div>

@@ -56,6 +56,12 @@ def get_llm_client() -> AnthropicLLMClient:
     return AnthropicLLMClient(get_settings().anthropic_api_key)
 
 
+def get_account_mapper():
+    from backend.agents.account_mapper import AccountMapper
+
+    return AccountMapper(llm_client=get_llm_client())
+
+
 def get_email_sender() -> ResendEmailSender:
     s = get_settings()
     return ResendEmailSender(s.resend_api_key, s.resend_from_email)

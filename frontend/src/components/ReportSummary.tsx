@@ -1,9 +1,10 @@
-import { AlertTriangle, CheckCircle, Download, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle, Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { formatPeriod } from "../lib/formatters";
 import { ReconciliationPanel } from "./ReconciliationPanel";
 import type { ReconciliationItem } from "./ReconciliationCard";
 
 export type ReportStatus = "verified" | "stale" | "guardrail_failed";
+export type OpusStatus = "pending" | "running" | "done" | "failed";
 
 interface ReportSummaryProps {
   summary: string;
@@ -13,6 +14,8 @@ interface ReportSummaryProps {
   companyName: string;
   status: ReportStatus;
   isGenerating?: boolean;
+  opusStatus?: OpusStatus | null;
+  opusUpgraded?: boolean;
   onRegenerate?: () => void;
   reconciliations?: ReconciliationItem[] | null;
   excelDownloadUrl?: string;
@@ -26,6 +29,8 @@ export function ReportSummary({
   companyName,
   status,
   isGenerating = false,
+  opusStatus = null,
+  opusUpgraded = false,
   onRegenerate,
   reconciliations,
   excelDownloadUrl,
@@ -64,9 +69,19 @@ export function ReportSummary({
   }
 
   const isStale = status === "stale";
+  const showOpusBanner = opusStatus === "pending" || opusStatus === "running";
 
   return (
     <div className="rounded-lg border border-border bg-surface p-6 space-y-4">
+      {showOpusBanner && (
+        <div
+          className="flex items-center gap-2 rounded-md bg-accent/10 border border-accent/20 px-3 py-2 text-sm text-accent"
+          style={{ transition: "opacity 0.4s ease" }}
+        >
+          <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+          <span>Advanced analysis in progress — your upgraded report will appear here shortly.</span>
+        </div>
+      )}
       <div>
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className="text-lg font-semibold text-text-primary">
@@ -76,6 +91,12 @@ export function ReportSummary({
             <span className="inline-flex items-center gap-1 rounded-full bg-favorable-bg text-favorable-fg px-2 py-0.5 text-xs font-semibold">
               <CheckCircle className="h-3 w-3" aria-hidden />
               Verified · Guardrail Passed
+            </span>
+          )}
+          {opusUpgraded && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 text-accent px-2 py-0.5 text-xs font-semibold">
+              <Sparkles className="h-3 w-3" aria-hidden />
+              Advanced Analysis
             </span>
           )}
           {isStale && (

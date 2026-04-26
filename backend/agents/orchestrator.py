@@ -16,7 +16,8 @@ from backend.api.deps import (
     get_reports_repo,
     get_runs_repo,
 )
-from backend.domain.contracts import DiscoveryPlan
+from backend.agents.account_mapper import AccountMapper
+from backend.domain.contracts import DEFAULT_GL_CATEGORIES, DiscoveryPlan, MappingDraft
 from backend.domain.errors import DiscoveryLowConfidence
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
@@ -436,14 +437,7 @@ def run_parser_after_discovery_approval(
 
     Resumes the pipeline from the approved plan:
     re-download → normalize → validate → map_accounts → parse_preview →
-    AWAITING_CONFIRMATION.
-
-    Step 9a skeleton: reads the stored plan, strips DB-only `_`-prefixed
-    keys, validates it into a DiscoveryPlan, then delegates to
-    `ParserAgent.resume_from_plan()` — which Step 9b will implement.
-    Until 9b lands, calling this endpoint transitions the run to
-    PARSING_FAILED via the bare-exception safety net below (AttributeError
-    on the missing method). Acceptable interim behavior.
+    AWAITING_CONFIRMATION using ParserAgent.resume_from_plan().
     """
     try:
         runs_repo = get_runs_repo()
@@ -474,17 +468,7 @@ def run_parser_after_discovery_approval(
             accounts_repo=get_accounts_repo(),
             runs_repo=get_runs_repo(),
         )
-        # Step 9b will add ParserAgent.resume_from_plan(). Until then the
-        # getattr-guard below logs a clear TODO and falls through to the
-        # bare-exception handler (→ PARSING_FAILED).
-        resume = getattr(parser, "resume_from_plan", None)
-        if resume is None:
-            logger.error(
-                "ParserAgent.resume_from_plan not yet implemented (Step 9b)",
-                extra={"run_id": run_id, "trace_id": get_trace_id()},
-            )
-            raise NotImplementedError("ParserAgent.resume_from_plan — Step 9b")
-        resume(
+        parser.resume_from_plan(
             run_id=run_id,
             company_id=company_id,
             storage_key=storage_key,
@@ -502,3 +486,403 @@ def run_parser_after_discovery_approval(
             exc_info=True,
         )
         _fail_if_not_terminal(run_id, messages.INTERNAL_ERROR)
+
+
+# ---------------------------------------------------------------------------
+# AccountMapper pipeline — Phase A + Phase B
+# ---------------------------------------------------------------------------
+
+_FILE_TYPE_PATTERNS: dict[str, list[str]] = {
+    "general_ledger": [
+        "gl",
+        "general_ledger",
+        "quickbooks",
+        "qb",
+        "gl_export",
+        "ledger",
+    ],
+    "payroll": ["payroll", "salary", "salaries", "wages", "gusto", "adp", "rippling"],
+    "contracts": ["contract", "subscription", "recurring", "roster", "customer"],
+    "supplier_invoices": ["invoice", "supplier", "vendor", "purchase", "bill", "ap"],
+}
+
+
+def _detect_file_type(filename: str) -> str:
+    """Infer SourceFileType from the filename stem — no user input required."""
+    stem = filename.lower().replace("-", "_").replace(" ", "_").split(".")[0]
+    for file_type, patterns in _FILE_TYPE_PATTERNS.items():
+        if any(p in stem for p in patterns):
+            return file_type
+    return "supplier_invoices"
+
+
+def run_multi_file_parser_with_mapping(
+    run_id: str,
+    storage_keys: list[str],
+    company_id: str,
+    period: date,
+) -> None:
+    """Phase A: parse all files, run AccountMapper for non-GL files,
+    store mapping draft, pause at AWAITING_MAPPING_CONFIRMATION.
+
+    Phase B is triggered by POST /runs/{run_id}/confirm-mappings.
+    If all files are GL (no mapping needed) the function runs consolidation
+    directly and transitions to AWAITING_CONFIRMATION instead.
+    """
+    import pandas as pd
+
+    from backend.agents.consolidator import _is_gl_label
+
+    try:
+        parser = ParserAgent(
+            file_storage=get_file_storage(),
+            llm_client=get_llm_client(),
+            accounts_repo=get_accounts_repo(),
+            runs_repo=get_runs_repo(),
+        )
+        mapper = AccountMapper(llm_client=get_llm_client())
+        runs_repo = get_runs_repo()
+        accounts_repo = get_accounts_repo()
+
+        runs_repo.update_status(
+            run_id,
+            RunStatus.PARSING,
+            extra={
+                "step": 1,
+                "step_label": f"Reading {len(storage_keys)} files...",
+                "progress_pct": 10,
+            },
+        )
+
+        # GL files first so accounts_repo is populated before dept files are mapped.
+        sorted_keys = sorted(
+            storage_keys, key=lambda k: 0 if _is_gl_label(k.split("/")[-1]) else 1
+        )
+
+        per_file_data: list[tuple[str, list[dict], str, pd.DataFrame, bool, str]] = []
+        for i, key in enumerate(sorted_keys):
+            label = key.split("/")[-1]
+            is_gl = _is_gl_label(label)
+            file_type = "general_ledger" if is_gl else _detect_file_type(label)
+            try:
+                preview_rows, source_column, raw_df = parser.parse_file_silently(
+                    storage_key=key,
+                    company_id=company_id,
+                    period=period,
+                    run_id=run_id,
+                )
+                per_file_data.append(
+                    (label, preview_rows, source_column, raw_df, is_gl, file_type)
+                )
+                logger.info(
+                    "multi_file_parsed_with_mapping",
+                    extra={
+                        "run_id": run_id,
+                        "file": label,
+                        "file_type": file_type,
+                        "accounts": len(preview_rows),
+                        "index": i + 1,
+                        "total": len(sorted_keys),
+                        "trace_id": get_trace_id(),
+                    },
+                )
+            except Exception as exc:
+                logger.error(
+                    "multi_file_parse_error",
+                    extra={
+                        "run_id": run_id,
+                        "file": label,
+                        "error": str(exc),
+                        "trace_id": get_trace_id(),
+                    },
+                )
+                _fail_if_not_terminal(run_id, messages.PARSE_FAILED)
+                return
+
+        # GL pool: use company's chart of accounts if available, else GAAP defaults.
+        gl_pool = list(accounts_repo.list_for_company(company_id).keys()) or list(
+            DEFAULT_GL_CATEGORIES
+        )
+
+        # Run AccountMapper for each non-GL file.
+        all_draft_items = []
+        file_keys = {
+            label: key
+            for label, key, *_ in [
+                (f[0], sorted_keys[i]) for i, f in enumerate(per_file_data)
+            ]
+        }
+        # Rebuild file_keys correctly
+        file_keys = {}
+        for (label, _, _, _, _, _), key in zip(per_file_data, sorted_keys):
+            file_keys[label] = key
+
+        for label, preview_rows, _, _, is_gl, file_type in per_file_data:
+            if is_gl:
+                continue
+            unique_values = sorted(
+                {row["account"] for row in preview_rows if row.get("account")}
+            )
+            _, draft = mapper.build_draft(
+                unique_values=unique_values,
+                file_type=file_type,
+                source_file=label,
+                gl_pool=gl_pool,
+            )
+            all_draft_items.extend(draft.items)
+
+        aggregate_draft = MappingDraft(items=all_draft_items, gl_account_pool=gl_pool)
+
+        if not all_draft_items:
+            # All files are GL — skip mapping, consolidate directly.
+            _run_consolidation(
+                run_id,
+                company_id,
+                period,
+                per_file_data,
+                runs_repo,
+                storage_keys=sorted_keys,
+            )
+            return
+
+        # Persist draft + file key map, then pause for user review.
+        parse_preview = {
+            "mapping_draft": aggregate_draft.model_dump(mode="json"),
+            "file_keys": file_keys,
+            "is_multi_file": True,
+        }
+        runs_repo.set_parse_preview(run_id, parse_preview)
+        runs_repo.set_file_count(run_id, len(sorted_keys))
+
+        await_map_status = RunStateMachine.transition(
+            RunStatus.PARSING, RunStatus.AWAITING_MAPPING_CONFIRMATION
+        )
+        runs_repo.update_status(
+            run_id,
+            await_map_status,
+            extra={
+                "step": 2,
+                "step_label": "Review AI account mappings...",
+                "progress_pct": 50,
+            },
+        )
+        logger.info(
+            "mapping_draft_ready",
+            extra={
+                "run_id": run_id,
+                "draft_items": len(all_draft_items),
+                "files": len(sorted_keys),
+                "trace_id": get_trace_id(),
+            },
+        )
+
+    except Exception as exc:
+        logger.error(
+            "run_multi_file_parser_with_mapping unhandled exception",
+            extra={"run_id": run_id, "error": str(exc), "trace_id": get_trace_id()},
+            exc_info=True,
+        )
+        _fail_if_not_terminal(run_id, messages.INTERNAL_ERROR)
+
+
+def apply_mapping_and_consolidate(
+    run_id: str,
+    company_id: str,
+    period: date,
+    user_decisions: dict[str, str],
+) -> None:
+    """Phase B: apply user-approved mappings, re-parse files, consolidate.
+
+    Re-downloads each file from Storage (double-parse approach — files remain
+    in Storage until COMPLETE per existing architecture). Applies user_decisions
+    as account_name_map in parse_file_silently for non-GL files, then runs the
+    full consolidation pipeline and transitions to AWAITING_CONFIRMATION.
+
+    user_decisions: {source_pattern: gl_account_name}
+    """
+    import pandas as pd
+
+    from backend.agents.consolidator import _is_gl_label
+
+    try:
+        parser = ParserAgent(
+            file_storage=get_file_storage(),
+            llm_client=get_llm_client(),
+            accounts_repo=get_accounts_repo(),
+            runs_repo=get_runs_repo(),
+        )
+        runs_repo = get_runs_repo()
+
+        # Validate state. The confirm-mappings endpoint already transitioned to
+        # APPLYING_MAPPING before firing this background task, so any duplicate
+        # invocation (caused by the frontend re-triggering before Phase B completes)
+        # will find a non-matching status and exit immediately.
+        run = runs_repo.get_by_id(run_id)
+        current_status = run.get("status")
+        if current_status != RunStatus.APPLYING_MAPPING.value:
+            logger.error(
+                "apply_mapping wrong state — likely a duplicate invocation",
+                extra={"run_id": run_id, "status": current_status},
+            )
+            return
+
+        parse_preview = run.get("parse_preview") or {}
+        file_keys: dict[str, str] = parse_preview.get("file_keys", {})
+
+        if not file_keys:
+            logger.error(
+                "apply_mapping no file_keys in parse_preview", extra={"run_id": run_id}
+            )
+            _fail_if_not_terminal(run_id, messages.INTERNAL_ERROR)
+            return
+
+        # Re-parse each file applying user decisions for non-GL files.
+        per_file_data: list[tuple[str, list[dict], str, pd.DataFrame, bool, str]] = []
+        for label, storage_key in file_keys.items():
+            is_gl = _is_gl_label(label)
+            file_type = "general_ledger" if is_gl else _detect_file_type(label)
+            account_name_map = None if is_gl else (user_decisions or None)
+            try:
+                preview_rows, source_column, raw_df = parser.parse_file_silently(
+                    storage_key=storage_key,
+                    company_id=company_id,
+                    period=period,
+                    run_id=run_id,
+                    account_name_map=account_name_map,
+                )
+                per_file_data.append(
+                    (label, preview_rows, source_column, raw_df, is_gl, file_type)
+                )
+                logger.info(
+                    "apply_mapping_parsed",
+                    extra={
+                        "run_id": run_id,
+                        "file": label,
+                        "is_gl": is_gl,
+                        "trace_id": get_trace_id(),
+                    },
+                )
+            except Exception as exc:
+                logger.error(
+                    "apply_mapping parse error",
+                    extra={"run_id": run_id, "file": label, "error": str(exc)},
+                )
+                _fail_if_not_terminal(run_id, messages.PARSE_FAILED)
+                return
+
+        storage_keys_ordered = list(file_keys.values())
+        _run_consolidation(
+            run_id,
+            company_id,
+            period,
+            per_file_data,
+            runs_repo,
+            storage_keys=storage_keys_ordered,
+            from_status=RunStatus.APPLYING_MAPPING,
+        )
+
+    except Exception as exc:
+        logger.error(
+            "apply_mapping_and_consolidate unhandled exception",
+            extra={"run_id": run_id, "error": str(exc), "trace_id": get_trace_id()},
+            exc_info=True,
+        )
+        _fail_if_not_terminal(run_id, messages.INTERNAL_ERROR)
+
+
+def _run_consolidation(
+    run_id: str,
+    company_id: str,
+    period: date,
+    per_file_data: list,
+    runs_repo,
+    storage_keys: list[str],
+    from_status: RunStatus = RunStatus.PARSING,
+) -> None:
+    """Shared consolidation logic for both Phase A (all-GL) and Phase B.
+
+    Builds source_dfs, runs consolidate(), computes hints, writes parse_preview,
+    transitions to AWAITING_CONFIRMATION.
+    """
+    import pandas as pd
+
+    from backend.tools.hint_computer import compute_hints
+
+    runs_repo.update_status(
+        run_id,
+        from_status,
+        extra={"step_label": "Consolidating files...", "progress_pct": 60},
+    )
+
+    source_dfs: list[tuple[str, pd.DataFrame]] = []
+    source_raw_dfs: dict[str, pd.DataFrame] = {}
+    for label, preview_rows, _, raw_df, *_ in per_file_data:
+        source_dfs.append((label, pd.DataFrame(preview_rows)))
+        source_raw_dfs[label] = raw_df
+
+    consolidated_df, recon_items = consolidate(source_dfs)
+
+    for item in recon_items:
+        item.hints = compute_hints(
+            item=item,
+            consolidated_df=consolidated_df,
+            period=period,
+            source_raw_dfs=source_raw_dfs,
+        )
+
+    rows = [
+        {
+            "account": row["account"],
+            "amount": float(row["amount"]),
+            "category": row["category"],
+            "confidence": 1.0,
+            "source_breakdown": [
+                {"source_file": s["source_file"], "amount": s["amount"]}
+                for s in (row.get("source_breakdown") or [])
+            ],
+        }
+        for _, row in consolidated_df.iterrows()
+    ]
+
+    source_breakdown_by_account: dict[str, list[dict]] = {}
+    for _, row in consolidated_df.iterrows():
+        acct = row["account"]
+        source_breakdown_by_account[acct] = row.get("source_breakdown") or []
+
+    reconciliations_payload = [item.model_dump(mode="json") for item in recon_items]
+
+    parse_preview = {
+        "rows": rows,
+        "source_column": "Consolidated",
+        "drops": {},
+        "source_breakdown_by_account": source_breakdown_by_account,
+        "reconciliations": reconciliations_payload,
+        "is_multi_file": True,
+    }
+
+    runs_repo.set_parse_preview(run_id, parse_preview)
+    runs_repo.set_file_count(run_id, len(storage_keys))
+
+    await_status = RunStateMachine.transition(
+        from_status, RunStatus.AWAITING_CONFIRMATION
+    )
+    runs_repo.update_status(
+        run_id,
+        await_status,
+        extra={
+            "step": 3,
+            "step_label": "Waiting for your review...",
+            "progress_pct": 50,
+        },
+    )
+
+    logger.info(
+        "multi_file_consolidation_complete",
+        extra={
+            "run_id": run_id,
+            "files": len(storage_keys),
+            "consolidated_accounts": len(rows),
+            "reconciliation_items": len(recon_items),
+            "trace_id": get_trace_id(),
+        },
+    )

@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, Database } from "l
 import { apiFetch } from "../lib/api";
 import { useCompany } from "../hooks/useCompany";
 import { ReportSummary } from "../components/ReportSummary";
+import type { OpusStatus } from "../components/ReportSummary";
 import { AnomalyCard, AnomalyCardData, AnomalyCardSkeleton } from "../components/AnomalyCard";
 import { MailButton } from "../components/MailButton";
 import {
@@ -11,7 +12,7 @@ import {
   LowConfidenceColumn,
 } from "../components/MappingConfirmPanel";
 import type { ReconciliationItem } from "../components/ReconciliationCard";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const CATEGORY_ORDER = [
   "REVENUE",
@@ -44,8 +45,15 @@ interface ReportResponse {
   anomaly_count: number;
   error_count: number;
   is_stale: boolean;
+  opus_upgraded: boolean;
   anomalies: AnomalyResponse[];
   reconciliations: ReconciliationItem[] | null;
+}
+
+interface RunStatusResponse {
+  run_id: string;
+  status: string;
+  opus_status: OpusStatus;
 }
 
 interface NavState {
@@ -64,15 +72,57 @@ export default function ReportPage() {
   const initialLowConf = navState.lowConfidenceColumns ?? [];
 
   const [mappingDismissed, setMappingDismissed] = useState(false);
+  const [opusStatus, setOpusStatus] = useState<OpusStatus | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startedAt = useRef<number>(Date.now());
 
   const { data: company, isLoading: companyLoading } = useCompany();
 
-  const { data: report, isLoading: reportLoading, error } = useQuery<ReportResponse>({
+  const { data: report, isLoading: reportLoading, error, refetch: refetchReport } = useQuery<ReportResponse>({
     queryKey: ["report", company?.id, period],
     queryFn: () =>
       apiFetch<ReportResponse>(`/report/${company!.id}/${period}`),
     enabled: !!company?.id && !!period,
   });
+
+  // Poll opus_status while run_id is known and upgrade is in flight.
+  useEffect(() => {
+    if (!runId) return;
+
+    const POLL_MS = 3_000;
+    const TIMEOUT_MS = 90_000;
+
+    const stop = () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+
+    pollingRef.current = setInterval(async () => {
+      const elapsed = Date.now() - startedAt.current;
+      if (elapsed >= TIMEOUT_MS) {
+        stop();
+        setOpusStatus((prev) => (prev === "pending" || prev === "running" ? "failed" : prev));
+        return;
+      }
+
+      try {
+        const data = await apiFetch<RunStatusResponse>(`/runs/${runId}/status`);
+        setOpusStatus(data.opus_status);
+        if (data.opus_status === "done") {
+          stop();
+          refetchReport();
+        } else if (data.opus_status === "failed") {
+          stop();
+        }
+      } catch {
+        // network hiccup — keep polling
+      }
+    }, POLL_MS);
+
+    return stop;
+  }, [runId, refetchReport]);
 
   const isLoading = companyLoading || reportLoading;
 
@@ -158,6 +208,8 @@ export default function ReportPage() {
             anomalyCount={report.anomaly_count}
             companyName={company?.name ?? ""}
             status={report.is_stale ? "stale" : "verified"}
+            opusStatus={opusStatus}
+            opusUpgraded={report.opus_upgraded}
             onRegenerate={() => navigate(`/upload?period=${report.period}`)}
             reconciliations={report.reconciliations}
             excelDownloadUrl={`/report/${report.company_id}/${report.period}/export.xlsx`}

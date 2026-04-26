@@ -40,7 +40,7 @@ export function ReconciliationCard({
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
-    navigator.clipboard.writeText(suggested_action).then(() => {
+    navigator.clipboard.writeText(suggested_action ?? "").then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     });
@@ -56,10 +56,12 @@ export function ReconciliationCard({
         <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
           {account}
         </h3>
-        <ClassificationBadge
-          classification={classification}
-          className="shrink-0"
-        />
+        {classification && (
+          <ClassificationBadge
+            classification={classification}
+            className="shrink-0"
+          />
+        )}
       </div>
 
       {/* Numbers row */}

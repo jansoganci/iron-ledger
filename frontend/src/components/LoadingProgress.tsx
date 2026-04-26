@@ -64,13 +64,49 @@ interface RunStatusResponse {
   raw_data_url: string | null;
   low_confidence_columns: LowConfidenceColumn[];
   parse_preview: ParsePreview | null;
+  mapping_draft: MappingDraft | null;
+  discovery_plan: DiscoveryPlanPayload | null;
+}
+
+export interface MappingDraftItem {
+  source_pattern: string;
+  source_file: string;
+  file_type: string;
+  suggested_gl_account: string | null;
+  confident: boolean;
+}
+
+export interface MappingDraft {
+  items: MappingDraftItem[];
+  gl_account_pool: string[];
+}
+
+export interface DiscoveryHierarchyHint {
+  row_index: number;
+  parent_category: string;
+}
+
+export interface DiscoveryPlanPayload {
+  header_row_index: number;
+  skip_row_indices: number[];
+  column_mapping: Record<string, string | null>;
+  hierarchy_hints: DiscoveryHierarchyHint[];
+  discovery_confidence: number;
+  notes?: string;
+  _preview?: string[][];
 }
 
 interface LoadingProgressProps {
   runId: string;
   period: string;
+  processingMode?: "default" | "post-discovery";
   onGuardrailFailed: (runId: string, rawDataUrl: string | null, errorMessage: string | null) => void;
   onAwaitingConfirmation?: (runId: string, preview: ParsePreview) => void;
+  onAwaitingMappingConfirmation?: (runId: string, draft: MappingDraft) => void;
+  onAwaitingDiscoveryConfirmation?: (
+    runId: string,
+    plan: DiscoveryPlanPayload
+  ) => void;
   onTerminalFailure: (status: string, message: string) => void;
 }
 
@@ -89,28 +125,39 @@ function statusToStepIndex(status: string): number {
 export function LoadingProgress({
   runId,
   period,
+  processingMode = "default",
   onGuardrailFailed,
   onAwaitingConfirmation,
+  onAwaitingMappingConfirmation,
+  onAwaitingDiscoveryConfirmation,
   onTerminalFailure,
 }: LoadingProgressProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const [smoothProgress, setSmoothProgress] = useState<Record<number, number>>({});
+  const [optimisticProgress, setOptimisticProgress] = useState(40);
 
   const isTerminal = (status: string) =>
     status === "complete" ||
     status === "guardrail_failed" ||
+    status === "awaiting_mapping_confirmation" ||
     status === "awaiting_confirmation" ||
     status === "awaiting_discovery_confirmation" ||
     TERMINAL_FAILED.has(status);
 
-  const { data, error } = useQuery<RunStatusResponse>({
+  const shouldUseFastPolling = (status?: string) => {
+    // Fast polling is only needed during the short post-discovery handoff.
+    if (processingMode !== "post-discovery") return false;
+    return status === "mapping" || status === "discovering" || status === "pending";
+  };
+
+  const { data, error, isFetchedAfterMount } = useQuery<RunStatusResponse>({
     queryKey: ["run-status", runId],
     queryFn: () => apiFetch<RunStatusResponse>(`/runs/${runId}/status`),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       if (!status || isTerminal(status)) return false;
-      return 4000;
+      return shouldUseFastPolling(status) ? 800 : 4000;
     },
     retry: (count, err) => {
       if (err instanceof RateLimitedError) return false;
@@ -118,9 +165,32 @@ export function LoadingProgress({
     },
   });
 
+  const isPostDiscoveryOptimistic =
+    processingMode === "post-discovery" && !isFetchedAfterMount;
+
+  // Immediately show "working" motion on post-discovery remount, even before
+  // the first network poll completes.
+  useEffect(() => {
+    if (!isPostDiscoveryOptimistic) return;
+
+    setOptimisticProgress(40);
+    const interval = setInterval(() => {
+      setOptimisticProgress((prev) => Math.min(prev + 2, 58));
+    }, 220);
+
+    return () => clearInterval(interval);
+  }, [isPostDiscoveryOptimistic]);
+
   useEffect(() => {
     if (!data) return;
-    const { status, raw_data_url, error_message, parse_preview } = data;
+    const {
+      status,
+      raw_data_url,
+      error_message,
+      parse_preview,
+      mapping_draft,
+      discovery_plan,
+    } = data;
 
     if (status === "complete") {
       navigate(`/report/${period}`, {
@@ -133,6 +203,21 @@ export function LoadingProgress({
     }
     if (status === "guardrail_failed") {
       onGuardrailFailed(runId, raw_data_url, error_message);
+      return;
+    }
+    if (status === "awaiting_mapping_confirmation" && mapping_draft) {
+      onAwaitingMappingConfirmation?.(runId, mapping_draft);
+      return;
+    }
+    if (status === "awaiting_discovery_confirmation") {
+      if (discovery_plan) {
+        onAwaitingDiscoveryConfirmation?.(runId, discovery_plan);
+      } else {
+        onTerminalFailure(
+          status,
+          "We need your review, but we could not load the file structure preview. Please try uploading again."
+        );
+      }
       return;
     }
     if (status === "awaiting_confirmation" && parse_preview) {
@@ -186,11 +271,12 @@ export function LoadingProgress({
   }, [error]);
 
   const currentStatus = data?.status ?? "pending";
-  const activeStep = statusToStepIndex(currentStatus);
+  const effectiveStatus = isPostDiscoveryOptimistic ? "mapping" : currentStatus;
+  const activeStep = statusToStepIndex(effectiveStatus);
 
   function getStepState(idx: number): "done" | "active" | "pending" {
     if (activeStep === -1) {
-      if (currentStatus === "complete") return "done";
+      if (effectiveStatus === "complete") return "done";
       return "pending";
     }
     if (idx < activeStep) return "done";
@@ -206,7 +292,10 @@ export function LoadingProgress({
 
       {STEPS.map((step, idx) => {
         const state = getStepState(idx);
-        const displayProgress = smoothProgress[idx] ?? 0;
+        const displayProgress =
+          isPostDiscoveryOptimistic && idx === activeStep
+            ? optimisticProgress
+            : (smoothProgress[idx] ?? 0);
         const isCompleting = state === "active" && displayProgress >= 99;
         
         return (

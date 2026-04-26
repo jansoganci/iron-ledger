@@ -22,14 +22,18 @@ from fastapi import UploadFile
 from pydantic import BaseModel, EmailStr
 
 from backend import messages
+from backend.agents.opus_upgrade import run_opus_upgrade
 from backend.agents.orchestrator import (
+    apply_mapping_and_consolidate,
     run_comparison_and_report,
     run_multi_file_parser_until_preview,
+    run_multi_file_parser_with_mapping,
     run_parser_after_discovery_approval,
     run_parser_until_preview,
 )
 from backend.api.auth import get_cached_company, get_company_id, get_current_user
 from backend.api.deps import (
+    get_account_mapper,
     get_accounts_repo,
     get_anomalies_repo,
     get_companies_repo,
@@ -263,7 +267,7 @@ async def upload(
         )
     else:
         background_tasks.add_task(
-            run_multi_file_parser_until_preview,
+            run_multi_file_parser_with_mapping,
             run_id=run_id,
             storage_keys=storage_keys,
             company_id=company_id,
@@ -290,7 +294,7 @@ async def run_status(
     except RLSForbiddenError as exc:
         raise HTTPException(status_code=403, detail=messages.FORBIDDEN) from exc
 
-    return {
+    response: dict = {
         "run_id": run["id"],
         "status": run["status"],
         "step": run.get("step", 0),
@@ -300,11 +304,18 @@ async def run_status(
         "error_message": run.get("error_message"),
         "report_id": run.get("report_id"),
         "raw_data_url": run.get("raw_data_url"),
+        "opus_status": run.get("opus_status", "pending"),
         "low_confidence_columns": _map_low_confidence(
             run.get("low_confidence_columns") or []
         ),
         "parse_preview": run.get("parse_preview"),
     }
+    if run["status"] == RunStatus.AWAITING_MAPPING_CONFIRMATION.value:
+        pp = run.get("parse_preview") or {}
+        response["mapping_draft"] = pp.get("mapping_draft")
+    if run["status"] == RunStatus.AWAITING_DISCOVERY_CONFIRMATION.value:
+        response["discovery_plan"] = run.get("discovery_plan")
+    return response
 
 
 @router.get("/runs/{run_id}/raw")
@@ -490,6 +501,7 @@ async def get_report(
         "anomaly_count": report.anomaly_count,
         "error_count": report.error_count,
         "is_stale": is_stale,
+        "opus_upgraded": report.opus_upgraded,
         "anomalies": anomaly_list,
         "reconciliations": report.reconciliations or [],
     }
@@ -932,8 +944,96 @@ async def confirm_run(
         period=period_date,
         storage_key=storage_key,
     )
+    background_tasks.add_task(
+        run_opus_upgrade,
+        run_id=run_id,
+        company_id=company_id,
+        period=period_date,
+    )
 
     return {"status": "confirmed", "run_id": run_id, "entries_written": len(entries)}
+
+
+# ------------------------------------------------------------------ #
+# AccountMapper: confirm-mappings                                    #
+# ------------------------------------------------------------------ #
+
+
+class ConfirmMappingsRequest(BaseModel):
+    decisions: dict[str, str]
+    # {source_pattern: gl_account_name} — flat, no per-file-type nesting
+
+
+@router.post("/runs/{run_id}/confirm-mappings")
+@limiter.limit("20/minute")
+async def confirm_mappings(
+    request: Request,
+    run_id: str,
+    body: ConfirmMappingsRequest,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user),
+    company_id: str = Depends(get_company_id),
+):
+    """Accept user-approved account mappings and resume the pipeline (Phase B)."""
+    if not body.decisions:
+        raise HTTPException(status_code=400, detail="decisions must not be empty")
+
+    runs_repo = get_runs_repo()
+    try:
+        run = runs_repo.get_by_id(run_id)
+    except RLSForbiddenError as exc:
+        raise HTTPException(status_code=403, detail=messages.FORBIDDEN) from exc
+
+    # State guard
+    if run.get("status") != RunStatus.AWAITING_MAPPING_CONFIRMATION.value:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run is not awaiting mapping confirmation (status: {run.get('status')})",
+        )
+
+    # Validate all submitted gl_accounts are in the saved pool
+    pp = run.get("parse_preview") or {}
+    draft = pp.get("mapping_draft") or {}
+    pool: list[str] = draft.get("gl_account_pool", [])
+    bad = [gl for gl in body.decisions.values() if gl and gl not in pool]
+    if bad:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{messages.MAPPING_INVALID_GL_ACCOUNT} Unknown: {bad}",
+        )
+
+    # Resolve period from the run row
+    period_raw = run.get("period")
+    try:
+        period_date = date.fromisoformat(str(period_raw)[:10])
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=422, detail="Could not determine run period"
+        ) from exc
+
+    # Synchronously transition to APPLYING_MAPPING before firing the background task.
+    # This prevents re-entry: any subsequent confirm-mappings call will see a non-
+    # AWAITING_MAPPING_CONFIRMATION status and get 409 immediately — even if Phase B
+    # is still running. Without this, the 20-second Phase B re-parse window allows
+    # the UI polling loop to re-trigger MappingReview and submit duplicate requests.
+    applying_status = RunStateMachine.transition(
+        RunStatus.AWAITING_MAPPING_CONFIRMATION, RunStatus.APPLYING_MAPPING
+    )
+    runs_repo.update_status(
+        run_id,
+        applying_status,
+        extra={"step_label": "Applying mappings…", "progress_pct": 55},
+    )
+
+    background_tasks.add_task(
+        apply_mapping_and_consolidate,
+        run_id=run_id,
+        company_id=company_id,
+        period=period_date,
+        user_decisions=body.decisions,
+    )
+
+    return {"status": "applying_mappings", "run_id": run_id}
 
 
 @router.post("/runs/{run_id}/confirm-discovery")

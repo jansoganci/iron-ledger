@@ -15,6 +15,22 @@ ReconciliationClassification = Literal[
     "structural_explained",
 ]
 
+SourceFileType = Literal[
+    "general_ledger",
+    "payroll",
+    "supplier_invoices",
+    "contracts",
+]
+
+DEFAULT_GL_CATEGORIES: list[str] = [
+    "REVENUE",
+    "COGS",
+    "OPEX",
+    "G&A",
+    "R&D",
+    "OTHER_INCOME",
+]
+
 GoldenField = Literal[
     "account",
     "account_code",
@@ -60,6 +76,35 @@ class MappingOutput(BaseModel):
 
 class MappingResponse(BaseModel):
     mappings: list[MappingOutput]
+
+
+# ---------------------------------------------------------------------------
+# AccountMapper contracts
+# ---------------------------------------------------------------------------
+
+
+class AccountMappingDecision(BaseModel):
+    gl_account: str | None
+    confident: bool
+
+
+class AccountMappingResponse(BaseModel):
+    """Haiku output: {raw_value: {gl_account, confident}}."""
+
+    mappings: dict[str, AccountMappingDecision]
+
+
+class MappingDraftItem(BaseModel):
+    source_pattern: str  # raw value from file ("AlarmTech Industries")
+    source_file: str  # filename it came from
+    file_type: SourceFileType  # detected from filename
+    suggested_gl_account: str | None
+    confident: bool  # pre-check row in UI when True
+
+
+class MappingDraft(BaseModel):
+    items: list[MappingDraftItem]
+    gl_account_pool: list[str]  # valid GL account names for the dropdown
 
 
 class ParserOutput(BaseModel):

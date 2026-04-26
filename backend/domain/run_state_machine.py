@@ -11,6 +11,8 @@ class RunStatus(str, Enum):
     DISCOVERING = "discovering"
     AWAITING_DISCOVERY_CONFIRMATION = "awaiting_discovery_confirmation"
     MAPPING = "mapping"
+    AWAITING_MAPPING_CONFIRMATION = "awaiting_mapping_confirmation"
+    APPLYING_MAPPING = "applying_mapping"
     AWAITING_CONFIRMATION = "awaiting_confirmation"
     COMPARING = "comparing"
     GENERATING = "generating"
@@ -28,9 +30,16 @@ _ALLOWED: dict[RunStatus, frozenset[RunStatus]] = {
     RunStatus.PARSING: frozenset(
         {
             RunStatus.DISCOVERING,
+            RunStatus.AWAITING_MAPPING_CONFIRMATION,
             RunStatus.AWAITING_CONFIRMATION,
             RunStatus.PARSING_FAILED,
         }
+    ),
+    RunStatus.AWAITING_MAPPING_CONFIRMATION: frozenset(
+        {RunStatus.APPLYING_MAPPING, RunStatus.PARSING_FAILED}
+    ),
+    RunStatus.APPLYING_MAPPING: frozenset(
+        {RunStatus.AWAITING_CONFIRMATION, RunStatus.PARSING_FAILED}
     ),
     RunStatus.DISCOVERING: frozenset(
         {
