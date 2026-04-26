@@ -1,0 +1,2427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IronLedger — Design Token Spec v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+/* ─────────────────────────────────────────────
+   IRON LEDGER — DESIGN TOKENS v2
+   Single source of truth for CSS custom properties
+   ───────────────────────────────────────────── */
+
+:root {
+
+  /* ── NEUTRAL / WARM STONE ── */
+  --neutral-50:  #FAFAF8;
+  --neutral-100: #F4F3F0;
+  --neutral-200: #E9E8E4;
+  --neutral-300: #D5D3CE;
+  --neutral-400: #BAB8B2;
+  --neutral-500: #9A9892;
+  --neutral-600: #787670;
+  --neutral-700: #5A5853;
+  --neutral-800: #3C3A36;
+  --neutral-900: #252421;
+  --neutral-950: #151412;
+
+  /* ── AMBER / PRIMARY ── (oklch ~0.68 0.17 54) */
+  --amber-50:  #FFF8ED;
+  --amber-100: #FFEECE;
+  --amber-200: #FEDA9A;
+  --amber-300: #FDC060;
+  --amber-400: #FBA12A;
+  --amber-500: #F08408;
+  --amber-600: #C46600;
+  --amber-700: #9A4D00;
+  --amber-800: #763900;
+  --amber-900: #572900;
+  --amber-950: #371800;
+
+  /* ── EMERALD / REWARD ── (oklch ~0.60 0.16 152) */
+  --emerald-50:  #EDFAF3;
+  --emerald-100: #D1F4E4;
+  --emerald-200: #A3E8CA;
+  --emerald-300: #68D4A8;
+  --emerald-400: #34BB83;
+  --emerald-500: #16A066;
+  --emerald-600: #0F7F50;
+  --emerald-700: #0A613C;
+  --emerald-800: #07472C;
+  --emerald-900: #04311E;
+  --emerald-950: #021E12;
+
+  /* ── VIOLET / AGENTIC ── (oklch ~0.58 0.16 282) */
+  --violet-50:  #F3F1FD;
+  --violet-100: #E5DFFB;
+  --violet-200: #CABEF7;
+  --violet-300: #A897F0;
+  --violet-400: #8570E6;
+  --violet-500: #6651D4;
+  --violet-600: #4F3DAE;
+  --violet-700: #3A2C87;
+  --violet-800: #281D63;
+  --violet-900: #1A1244;
+  --violet-950: #0E0928;
+
+  /* ── TEAL / UTILITY (legacy, demoted) ── */
+  --teal-400: #2DD4BF;
+  --teal-500: #14B8A6;
+  --teal-600: #0D9488;
+  --teal-700: #0F766E;
+
+  /* ── SEMANTIC SURFACE TOKENS ── */
+  --canvas:          var(--neutral-50);
+  --surface:         #FFFFFF;
+  --surface-raised:  #FFFFFF;
+  --surface-overlay: #FFFFFF;
+  --border:          var(--neutral-200);
+  --border-strong:   var(--neutral-300);
+
+  /* ── SEMANTIC TEXT TOKENS ── */
+  --text-primary:   var(--neutral-900);
+  --text-secondary: var(--neutral-600);
+  --text-tertiary:  var(--neutral-500);
+  --text-disabled:  var(--neutral-400);
+  --text-inverse:   #FFFFFF;
+
+  /* ── SEMANTIC ACCENT TOKENS ── */
+  --accent-primary:      var(--amber-500);
+  --accent-primary-dark: var(--amber-600);
+  --accent-primary-bg:   var(--amber-50);
+  --accent-primary-text: var(--amber-700);
+
+  --accent-reward:      var(--emerald-500);
+  --accent-reward-dark: var(--emerald-600);
+  --accent-reward-bg:   var(--emerald-50);
+  --accent-reward-text: var(--emerald-700);
+
+  --accent-agent:      var(--violet-500);
+  --accent-agent-dark: var(--violet-600);
+  --accent-agent-bg:   var(--violet-50);
+  --accent-agent-text: var(--violet-700);
+
+  --accent-utility:      var(--teal-600);
+  --accent-utility-bg:   #F0FDFA;
+  --accent-utility-text: var(--teal-700);
+
+  /* ── SEVERITY TOKENS (revised) ── */
+  --severity-high-bg:       #FEF0F0;
+  --severity-high-text:     #B91C1C;
+  --severity-high-border:   #FECACA;
+
+  --severity-medium-bg:     var(--amber-50);
+  --severity-medium-text:   var(--amber-700);
+  --severity-medium-border: var(--amber-200);
+
+  --severity-normal-bg:     var(--neutral-100);
+  --severity-normal-text:   var(--neutral-600);
+  --severity-normal-border: var(--neutral-200);
+
+  --severity-favorable-bg:     var(--emerald-50);
+  --severity-favorable-text:   var(--emerald-700);
+  --severity-favorable-border: var(--emerald-200);
+
+  /* ── SHADOW TOKENS ── */
+  --shadow-xs:  0 1px 2px oklch(0.14 0.01 60 / 0.06);
+  --shadow-sm:  0 2px 6px oklch(0.14 0.01 60 / 0.08), 0 1px 2px oklch(0.14 0.01 60 / 0.04);
+  --shadow-md:  0 4px 16px oklch(0.14 0.01 60 / 0.10), 0 2px 4px oklch(0.14 0.01 60 / 0.05);
+  --shadow-lg:  0 8px 32px oklch(0.14 0.01 60 / 0.12), 0 4px 8px oklch(0.14 0.01 60 / 0.06);
+  --shadow-xl:  0 20px 60px oklch(0.14 0.01 60 / 0.16), 0 8px 16px oklch(0.14 0.01 60 / 0.08);
+  --shadow-amber: 0 4px 20px oklch(0.68 0.17 54 / 0.28);
+  --shadow-emerald: 0 4px 20px oklch(0.60 0.16 152 / 0.24);
+  --shadow-violet: 0 4px 20px oklch(0.58 0.16 282 / 0.24);
+
+  /* ── MOTION TOKENS ── */
+  --duration-instant: 80ms;
+  --duration-fast:    140ms;
+  --duration-base:    220ms;
+  --duration-slow:    380ms;
+  --duration-reward:  650ms;
+
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-linear: linear;
+
+  --scale-hover:  1.015;
+  --scale-press:  0.970;
+  --scale-reward: 1.040;
+
+  /* ── RADIUS TOKENS ── */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* ── BORDER TOKENS ── */
+  --ring-focus: 0 0 0 3px oklch(0.68 0.17 54 / 0.30);
+  --ring-reward: 0 0 0 3px oklch(0.60 0.16 152 / 0.30);
+  --ring-agent: 0 0 0 3px oklch(0.58 0.16 282 / 0.30);
+}
+
+/* ─────────────────────────────────
+   SPEC DOCUMENT STYLES
+   ───────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: 14px;
+  background: var(--canvas);
+  color: var(--text-primary);
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* DOC LAYOUT */
+.doc-header {
+  border-bottom: 1px solid var(--border);
+  padding: 48px 64px 40px;
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+.doc-header::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 480px; height: 100%;
+  background: radial-gradient(ellipse at 100% 50%,
+    oklch(0.68 0.17 54 / 0.06) 0%,
+    oklch(0.58 0.16 282 / 0.04) 50%,
+    transparent 70%);
+  pointer-events: none;
+}
+
+.doc-header-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 16px;
+}
+
+.doc-header h1 {
+  font-family: 'Source Serif 4', serif;
+  font-size: 42px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.doc-header h1 em {
+  font-style: italic;
+  color: var(--amber-600);
+}
+
+.doc-header-sub {
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 560px;
+  line-height: 1.6;
+}
+
+.doc-meta {
+  display: flex;
+  gap: 24px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+.doc-meta-item {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.doc-meta-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+}
+
+.doc-nav {
+  display: flex;
+  gap: 2px;
+  padding: 12px 64px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  overflow-x: auto;
+}
+.nav-pill {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+  text-decoration: none;
+  border: none;
+  background: none;
+}
+.nav-pill:hover {
+  color: var(--text-primary);
+  background: var(--neutral-100);
+}
+.nav-pill.active {
+  color: var(--amber-700);
+  background: var(--amber-50);
+}
+
+.doc-body {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 56px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 72px;
+}
+
+/* SECTION */
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.section-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  min-width: 28px;
+}
+.section-title {
+  font-family: 'Source Serif 4', serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+.section-desc {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  max-width: 320px;
+  text-align: right;
+  line-height: 1.5;
+}
+
+/* COLOR SWATCH GRID */
+.palette-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.palette-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.palette-label-name {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.palette-label-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.palette-label-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  color: var(--text-tertiary);
+  background: var(--canvas);
+}
+.swatch-row {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 3px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.swatch {
+  height: 52px;
+  position: relative;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.swatch:hover {
+  transform: scaleY(1.08);
+  z-index: 1;
+}
+.swatch-info {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--neutral-900);
+  color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 5px 8px;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}
+.swatch:hover .swatch-info { display: block; }
+
+.swatch-scale-labels {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 3px;
+  margin-top: 4px;
+}
+.swatch-scale-labels span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+/* SEMANTIC TOKEN TABLE */
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.token-table th {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.token-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-strong);
+  vertical-align: middle;
+}
+.token-table tr:last-child td {
+  border-bottom: none;
+}
+.token-table tr:hover td {
+  background: var(--neutral-50);
+}
+.token-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--violet-700);
+}
+.token-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.token-swatch-inline {
+  width: 20px; height: 20px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.token-role {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.token-usage {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* SEVERITY BADGES */
+.severity-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.severity-card {
+  border-radius: var(--radius-md);
+  padding: 16px;
+  border: 1px solid;
+}
+.severity-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.severity-example {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.severity-tokens {
+  margin-top: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  opacity: 0.7;
+  line-height: 1.8;
+}
+
+/* MOTION DEMOS */
+.motion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.motion-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.motion-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.motion-card-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+.motion-demo-area {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--canvas);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.motion-tokens-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.motion-token-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 3px 8px;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+}
+
+/* Demo elements */
+.demo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  background: var(--amber-500);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+  box-shadow: var(--shadow-xs);
+  font-family: 'Inter', sans-serif;
+}
+.demo-btn:hover {
+  transform: scale(var(--scale-hover));
+  background: var(--amber-600);
+  box-shadow: var(--shadow-amber);
+}
+.demo-btn:active {
+  transform: scale(var(--scale-press));
+}
+
+.demo-card-hover {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+  width: 200px;
+}
+.demo-card-hover:hover {
+  transform: translateY(-2px) scale(1.008);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+.demo-reward-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  background: var(--emerald-500);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  font-family: 'Inter', sans-serif;
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform var(--duration-base) var(--ease-spring),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+.demo-reward-btn.triggered {
+  animation: rewardPulse var(--duration-reward) var(--ease-spring) forwards;
+}
+@keyframes rewardPulse {
+  0%   { transform: scale(1); box-shadow: none; }
+  25%  { transform: scale(var(--scale-reward)); box-shadow: var(--shadow-emerald); }
+  60%  { transform: scale(0.99); }
+  100% { transform: scale(1); box-shadow: none; }
+}
+.demo-reward-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, white 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity var(--duration-reward) var(--ease-out);
+}
+.demo-reward-btn.triggered::after {
+  animation: rewardFlash var(--duration-reward) var(--ease-out);
+}
+@keyframes rewardFlash {
+  0%  { opacity: 0; }
+  20% { opacity: 0.25; }
+  100%{ opacity: 0; }
+}
+
+.demo-pulse {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--violet-500);
+  position: relative;
+}
+.demo-pulse::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--violet-400);
+  animation: agentPulse 1.8s var(--ease-out) infinite;
+}
+.demo-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid var(--violet-300);
+  animation: agentPulse 1.8s var(--ease-out) 0.3s infinite;
+}
+@keyframes agentPulse {
+  0%   { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+
+.demo-agent-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.demo-agent-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--neutral-200);
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+}
+.demo-agent-bar::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--violet-400), var(--violet-500), var(--violet-400), transparent);
+  background-size: 200% 100%;
+  animation: dataFlow 1.6s var(--ease-linear) infinite;
+}
+@keyframes dataFlow {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* DURATION TABLE */
+.motion-token-table {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.mtt-header {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 10px 14px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--border);
+}
+.mtt-cell {
+  padding: 11px 14px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+}
+.mtt-cell:last-child, .mtt-cell:nth-last-child(2), .mtt-cell:nth-last-child(3) {
+  border-bottom: none;
+}
+.mtt-name { font-family: 'JetBrains Mono', monospace; color: var(--violet-700); }
+.mtt-value { font-family: 'JetBrains Mono', monospace; color: var(--amber-700); }
+.mtt-desc { color: var(--text-secondary); }
+.mtt-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.mtt-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--amber-400);
+}
+
+/* EASING DEMOS */
+.easing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.easing-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-xs);
+}
+.easing-card-name { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--violet-700); margin-bottom: 2px; }
+.easing-card-value { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-tertiary); margin-bottom: 12px; word-break: break-all; line-height: 1.4; }
+.easing-preview {
+  height: 36px;
+  position: relative;
+  cursor: pointer;
+}
+.easing-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--amber-500);
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  transition: left 0.4s linear;
+}
+.easing-preview:hover .easing-dot { left: calc(100% - 10px); }
+.easing-card[data-easing="out"] .easing-dot { transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+.easing-card[data-easing="in-out"] .easing-dot { transition-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+.easing-card[data-easing="spring"] .easing-dot { transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); background: var(--emerald-500); }
+.easing-card[data-easing="linear"] .easing-dot { transition-timing-function: linear; background: var(--neutral-400); }
+.easing-track {
+  position: absolute;
+  top: 50%;
+  left: 0; right: 0;
+  height: 1px;
+  background: var(--border-strong);
+  transform: translateY(-50%);
+}
+.easing-use {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 10px;
+}
+
+/* TYPOGRAPHY SECTION */
+.type-specimens {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.type-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 0;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: baseline;
+}
+.type-row:last-child { border-bottom: none; }
+.type-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 24px;
+}
+.type-role-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.type-specs {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  line-height: 1.8;
+}
+.type-spec-chip {
+  display: inline-block;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-right: 3px;
+}
+
+/* CSS BLOCK */
+.css-block-wrapper {
+  background: var(--neutral-900);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.css-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--neutral-950);
+  border-bottom: 1px solid oklch(1 0 0 / 0.08);
+}
+.css-block-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: oklch(1 0 0 / 0.5);
+  letter-spacing: 0.04em;
+}
+.copy-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  background: oklch(1 0 0 / 0.08);
+  color: oklch(1 0 0 / 0.6);
+  border: 1px solid oklch(1 0 0 / 0.12);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.copy-btn:hover {
+  background: oklch(1 0 0 / 0.14);
+  color: oklch(1 0 0 / 0.9);
+}
+.copy-btn.copied {
+  background: oklch(0.60 0.16 152 / 0.3);
+  color: var(--emerald-300);
+  border-color: oklch(0.60 0.16 152 / 0.4);
+}
+.css-block {
+  padding: 24px;
+  overflow-x: auto;
+  max-height: 380px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: oklch(1 0 0 / 0.15) transparent;
+}
+.css-block pre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: oklch(0.88 0.02 60);
+  white-space: pre;
+}
+.css-comment { color: oklch(0.65 0.02 60); }
+.css-prop { color: oklch(0.78 0.12 282); }
+.css-val { color: oklch(0.82 0.14 54); }
+.css-hex { color: oklch(0.80 0.10 152); }
+.css-selector { color: oklch(0.88 0.02 60); }
+
+/* COMPONENT EXAMPLES */
+.component-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.comp-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.comp-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 16px;
+}
+
+/* Buttons demo */
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px;
+  background: var(--amber-500); color: white;
+  font-size: 13px; font-weight: 600; border-radius: var(--radius-sm);
+  cursor: pointer; border: none; font-family: 'Inter', sans-serif;
+  transition: transform var(--duration-fast) var(--ease-out), background var(--duration-fast), box-shadow var(--duration-fast) var(--ease-out);
+  box-shadow: var(--shadow-xs);
+}
+.btn-primary:hover { transform: scale(var(--scale-hover)); background: var(--amber-600); box-shadow: var(--shadow-amber); }
+.btn-primary:active { transform: scale(var(--scale-press)); }
+
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px;
+  background: var(--surface); color: var(--text-primary);
+  font-size: 13px; font-weight: 500; border-radius: var(--radius-sm);
+  cursor: pointer; border: 1px solid var(--border-strong); font-family: 'Inter', sans-serif;
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast), border-color var(--duration-fast);
+  box-shadow: var(--shadow-xs);
+}
+.btn-secondary:hover { transform: scale(var(--scale-hover)); box-shadow: var(--shadow-sm); border-color: var(--neutral-400); }
+.btn-secondary:active { transform: scale(var(--scale-press)); }
+
+.btn-reward {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px;
+  background: var(--emerald-500); color: white;
+  font-size: 13px; font-weight: 600; border-radius: var(--radius-sm);
+  cursor: pointer; border: none; font-family: 'Inter', sans-serif;
+  transition: transform var(--duration-base) var(--ease-spring), box-shadow var(--duration-fast) var(--ease-out);
+  box-shadow: var(--shadow-xs);
+}
+.btn-reward:hover { transform: scale(var(--scale-hover)); box-shadow: var(--shadow-emerald); }
+.btn-reward:active { transform: scale(var(--scale-press)); }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px;
+  background: transparent; color: var(--text-secondary);
+  font-size: 13px; font-weight: 500; border-radius: var(--radius-sm);
+  cursor: pointer; border: none; font-family: 'Inter', sans-serif;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast);
+}
+.btn-ghost:hover { background: var(--neutral-100); color: var(--text-primary); }
+
+/* Anomaly card */
+.anomaly-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  cursor: pointer;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base);
+}
+.anomaly-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+.anomaly-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.anomaly-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: var(--radius-xs);
+  border: 1px solid;
+}
+.badge-high {
+  background: var(--severity-high-bg);
+  color: var(--severity-high-text);
+  border-color: var(--severity-high-border);
+}
+.badge-favorable {
+  background: var(--severity-favorable-bg);
+  color: var(--severity-favorable-text);
+  border-color: var(--severity-favorable-border);
+}
+.badge-medium {
+  background: var(--severity-medium-bg);
+  color: var(--severity-medium-text);
+  border-color: var(--severity-medium-border);
+}
+.anomaly-value {
+  font-family: 'Source Serif 4', serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.anomaly-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* Agent status */
+.agent-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--accent-agent-bg);
+  border: 1px solid oklch(0.58 0.16 282 / 0.2);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+}
+.agent-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--violet-500);
+  position: relative;
+  flex-shrink: 0;
+}
+.agent-dot::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: var(--violet-400);
+  opacity: 0.4;
+  animation: agentPulse 1.8s var(--ease-out) infinite;
+}
+.agent-text { font-size: 12px; font-weight: 500; color: var(--violet-700); flex: 1; }
+.agent-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--violet-500); }
+
+/* TAILWIND SECTION */
+.tw-table {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.tw-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+}
+.tw-row:last-child { border-bottom: none; }
+.tw-row.header { background: var(--canvas); }
+.tw-cell {
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  border-right: 1px solid var(--border);
+}
+.tw-cell:last-child { border-right: none; }
+.tw-header-cell {
+  padding: 9px 14px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  font-family: 'Inter', sans-serif;
+  border-right: 1px solid var(--border);
+}
+.tw-header-cell:last-child { border-right: none; }
+.tw-token-name { color: var(--violet-700); }
+.tw-css-var { color: var(--amber-700); }
+.tw-usage { color: var(--text-secondary); font-family: 'Inter', sans-serif; font-size: 11px; }
+
+/* CHANGELOG */
+.change-grid {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 0 16px;
+}
+.change-dot-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.change-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+  border: 2px solid;
+}
+.change-line {
+  flex: 1;
+  width: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+.change-content { padding-bottom: 20px; }
+.change-type {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+.change-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+/* UTIL */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+.flex-col { display: flex; flex-direction: column; gap: 8px; }
+.gap-2 { gap: 6px; }
+.small-note {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.6;
+  font-style: italic;
+  padding: 12px 16px;
+  background: var(--canvas);
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* ── PRINT STYLES ── */
+@media print {
+  @page { size: A4 portrait; margin: 1cm 1.2cm; }
+
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Hide interactive chrome */
+  .doc-nav,
+  .copy-btn,
+  .demo-btn,
+  .demo-reward-btn,
+  .demo-card-hover,
+  .demo-pulse,
+  .demo-agent-row,
+  .easing-preview,
+  .motion-demo-area,
+  #rewardBtn { display: none !important; }
+
+  /* Kill sticky */
+  .doc-nav { position: static !important; }
+
+  /* Kill animations */
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Remove max-width constraint, full page */
+  .doc-body {
+    max-width: 100% !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  /* Page break per section */
+  section { break-before: page; padding-top: 24pt; }
+  section:first-child { break-before: avoid; }
+
+  /* Keep elements together */
+  .palette-row,
+  .swatch-row,
+  .severity-card,
+  .motion-card,
+  .type-row,
+  .anomaly-card,
+  .token-table tr,
+  .tw-row,
+  .change-content { break-inside: avoid; }
+
+  /* Section headings stay with content */
+  .section-header { break-after: avoid; }
+
+  /* Make swatch rows visible without hover */
+  .swatch { height: 44px !important; }
+  .swatch-info { display: none !important; }
+
+  /* CSS block: limit height */
+  .css-block { max-height: none !important; overflow: visible !important; }
+
+  /* Easing cards: static placeholder */
+  .easing-card { break-inside: avoid; }
+
+  /* Remove link underlines from nav pills in doc */
+  a { text-decoration: none !important; color: inherit !important; }
+
+  /* Doc header: no gradient overflow */
+  .doc-header::before { display: none !important; }
+  .doc-header { break-after: avoid; page-break-after: avoid; }
+
+  /* Component grid: allow wrapping */
+  .component-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Motion grid: 1 col for space */
+  .motion-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Footer stays together */
+  footer { break-inside: avoid; margin-top: 24pt; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="doc-header">
+  <div class="doc-header-label">IronLedger · Design Tokens · v2.0</div>
+  <h1>"The financial chaos<br/><em>ends here."</em></h1>
+  <p class="doc-header-sub">
+    Evolved token system — warmer, more vibrant, still trust-anchored. 
+    Three new accent axes. Full motion token set. Revised type scale.
+    Drop-in CSS custom properties for Radix + Tailwind.
+  </p>
+  <div class="doc-meta">
+    <div class="doc-meta-item"><span class="doc-meta-dot" style="background:var(--amber-500)"></span>Amber — Primary/CTA</div>
+    <div class="doc-meta-item"><span class="doc-meta-dot" style="background:var(--emerald-500)"></span>Emerald — Reward/Success</div>
+    <div class="doc-meta-item"><span class="doc-meta-dot" style="background:var(--violet-500)"></span>Violet — Agentic/Alive</div>
+    <div class="doc-meta-item"><span class="doc-meta-dot" style="background:var(--teal-600)"></span>Teal — Utility (legacy)</div>
+    <div class="doc-meta-item"><span class="doc-meta-dot" style="background:var(--neutral-400)"></span>April 26, 2026</div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav class="doc-nav">
+  <a href="#colors" class="nav-pill active">01 Colors</a>
+  <a href="#semantic" class="nav-pill">02 Semantic Tokens</a>
+  <a href="#severity" class="nav-pill">03 Severity</a>
+  <a href="#motion" class="nav-pill">04 Motion</a>
+  <a href="#type" class="nav-pill">05 Typography</a>
+  <a href="#components" class="nav-pill">06 Components</a>
+  <a href="#css" class="nav-pill">07 CSS Output</a>
+  <a href="#tailwind" class="nav-pill">08 Tailwind Map</a>
+  <a href="#changelog" class="nav-pill">09 Changelog</a>
+</nav>
+
+<main class="doc-body">
+
+  <!-- ── 01 COLORS ── -->
+  <section id="colors">
+    <div class="section-header">
+      <span class="section-number">01</span>
+      <span class="section-title">Color Scales</span>
+      <span class="section-desc">Three new accent axes + revised warm neutral. All oklch-sourced for perceptual uniformity. Hover swatches for hex values.</span>
+    </div>
+
+    <!-- NEUTRAL -->
+    <div class="palette-row">
+      <div class="palette-label">
+        <span class="palette-label-name">Neutral</span>
+        <span class="palette-label-desc">Warm Stone — canvas, surface, borders, text</span>
+        <span class="palette-label-badge">oklch(L 0.01 60)</span>
+      </div>
+      <div class="swatch-row">
+        <div class="swatch" style="background:#FAFAF8"><span class="swatch-info">50 · #FAFAF8<br/>--neutral-50<br/>canvas</span></div>
+        <div class="swatch" style="background:#F4F3F0"><span class="swatch-info">100 · #F4F3F0<br/>--neutral-100</span></div>
+        <div class="swatch" style="background:#E9E8E4"><span class="swatch-info">200 · #E9E8E4<br/>--neutral-200<br/>border</span></div>
+        <div class="swatch" style="background:#D5D3CE"><span class="swatch-info">300 · #D5D3CE<br/>--neutral-300<br/>border-strong</span></div>
+        <div class="swatch" style="background:#BAB8B2"><span class="swatch-info">400 · #BAB8B2<br/>--neutral-400<br/>text-disabled</span></div>
+        <div class="swatch" style="background:#9A9892"><span class="swatch-info">500 · #9A9892<br/>--neutral-500<br/>text-tertiary</span></div>
+        <div class="swatch" style="background:#787670"><span class="swatch-info">600 · #787670<br/>--neutral-600<br/>text-secondary</span></div>
+        <div class="swatch" style="background:#5A5853"><span class="swatch-info">700 · #5A5853<br/>--neutral-700</span></div>
+        <div class="swatch" style="background:#3C3A36"><span class="swatch-info">800 · #3C3A36<br/>--neutral-800</span></div>
+        <div class="swatch" style="background:#252421"><span class="swatch-info">900 · #252421<br/>--neutral-900<br/>text-primary</span></div>
+        <div class="swatch" style="background:#151412"><span class="swatch-info">950 · #151412<br/>--neutral-950</span></div>
+      </div>
+      <div class="swatch-scale-labels"><span>50</span><span>100</span><span>200</span><span>300</span><span>400</span><span>500</span><span>600</span><span>700</span><span>800</span><span>900</span><span>950</span></div>
+    </div>
+
+    <!-- AMBER -->
+    <div class="palette-row">
+      <div class="palette-label">
+        <span class="palette-label-name" style="color:var(--amber-700)">Amber</span>
+        <span class="palette-label-desc">Hero CTAs, primary actions, focus rings — warm brass, not warning</span>
+        <span class="palette-label-badge">oklch(L 0.17 54)</span>
+      </div>
+      <div class="swatch-row">
+        <div class="swatch" style="background:#FFF8ED"><span class="swatch-info">50 · #FFF8ED<br/>--amber-50<br/>accent-primary-bg</span></div>
+        <div class="swatch" style="background:#FFEECE"><span class="swatch-info">100 · #FFEECE<br/>--amber-100</span></div>
+        <div class="swatch" style="background:#FEDA9A"><span class="swatch-info">200 · #FEDA9A<br/>--amber-200</span></div>
+        <div class="swatch" style="background:#FDC060"><span class="swatch-info">300 · #FDC060<br/>--amber-300</span></div>
+        <div class="swatch" style="background:#FBA12A"><span class="swatch-info">400 · #FBA12A<br/>--amber-400</span></div>
+        <div class="swatch" style="background:#F08408"><span class="swatch-info">500 · #F08408<br/>--amber-500<br/>accent-primary ★</span></div>
+        <div class="swatch" style="background:#C46600"><span class="swatch-info">600 · #C46600<br/>--amber-600<br/>accent-primary-dark</span></div>
+        <div class="swatch" style="background:#9A4D00"><span class="swatch-info">700 · #9A4D00<br/>--amber-700<br/>accent-primary-text</span></div>
+        <div class="swatch" style="background:#763900"><span class="swatch-info">800 · #763900<br/>--amber-800</span></div>
+        <div class="swatch" style="background:#572900"><span class="swatch-info">900 · #572900<br/>--amber-900</span></div>
+        <div class="swatch" style="background:#371800"><span class="swatch-info">950 · #371800<br/>--amber-950</span></div>
+      </div>
+      <div class="swatch-scale-labels"><span>50</span><span>100</span><span>200</span><span>300</span><span>400</span><span>500</span><span>600</span><span>700</span><span>800</span><span>900</span><span>950</span></div>
+    </div>
+
+    <!-- EMERALD -->
+    <div class="palette-row">
+      <div class="palette-label">
+        <span class="palette-label-name" style="color:var(--emerald-700)">Emerald</span>
+        <span class="palette-label-desc">Reward moments, success states, anomaly-free results — premium, not neon</span>
+        <span class="palette-label-badge">oklch(L 0.16 152)</span>
+      </div>
+      <div class="swatch-row">
+        <div class="swatch" style="background:#EDFAF3"><span class="swatch-info">50 · #EDFAF3<br/>--emerald-50<br/>accent-reward-bg</span></div>
+        <div class="swatch" style="background:#D1F4E4"><span class="swatch-info">100 · #D1F4E4<br/>--emerald-100</span></div>
+        <div class="swatch" style="background:#A3E8CA"><span class="swatch-info">200 · #A3E8CA<br/>--emerald-200</span></div>
+        <div class="swatch" style="background:#68D4A8"><span class="swatch-info">300 · #68D4A8<br/>--emerald-300</span></div>
+        <div class="swatch" style="background:#34BB83"><span class="swatch-info">400 · #34BB83<br/>--emerald-400</span></div>
+        <div class="swatch" style="background:#16A066"><span class="swatch-info">500 · #16A066<br/>--emerald-500<br/>accent-reward ★</span></div>
+        <div class="swatch" style="background:#0F7F50"><span class="swatch-info">600 · #0F7F50<br/>--emerald-600<br/>accent-reward-dark</span></div>
+        <div class="swatch" style="background:#0A613C"><span class="swatch-info">700 · #0A613C<br/>--emerald-700<br/>accent-reward-text</span></div>
+        <div class="swatch" style="background:#07472C"><span class="swatch-info">800 · #07472C<br/>--emerald-800</span></div>
+        <div class="swatch" style="background:#04311E"><span class="swatch-info">900 · #04311E<br/>--emerald-900</span></div>
+        <div class="swatch" style="background:#021E12"><span class="swatch-info">950 · #021E12<br/>--emerald-950</span></div>
+      </div>
+      <div class="swatch-scale-labels"><span>50</span><span>100</span><span>200</span><span>300</span><span>400</span><span>500</span><span>600</span><span>700</span><span>800</span><span>900</span><span>950</span></div>
+    </div>
+
+    <!-- VIOLET -->
+    <div class="palette-row">
+      <div class="palette-label">
+        <span class="palette-label-name" style="color:var(--violet-700)">Violet</span>
+        <span class="palette-label-desc">Agentic indicators, processing pulses, data flow — alive, not alarming</span>
+        <span class="palette-label-badge">oklch(L 0.16 282)</span>
+      </div>
+      <div class="swatch-row">
+        <div class="swatch" style="background:#F3F1FD"><span class="swatch-info">50 · #F3F1FD<br/>--violet-50<br/>accent-agent-bg</span></div>
+        <div class="swatch" style="background:#E5DFFB"><span class="swatch-info">100 · #E5DFFB<br/>--violet-100</span></div>
+        <div class="swatch" style="background:#CABEF7"><span class="swatch-info">200 · #CABEF7<br/>--violet-200</span></div>
+        <div class="swatch" style="background:#A897F0"><span class="swatch-info">300 · #A897F0<br/>--violet-300</span></div>
+        <div class="swatch" style="background:#8570E6"><span class="swatch-info">400 · #8570E6<br/>--violet-400</span></div>
+        <div class="swatch" style="background:#6651D4"><span class="swatch-info">500 · #6651D4<br/>--violet-500<br/>accent-agent ★</span></div>
+        <div class="swatch" style="background:#4F3DAE"><span class="swatch-info">600 · #4F3DAE<br/>--violet-600<br/>accent-agent-dark</span></div>
+        <div class="swatch" style="background:#3A2C87"><span class="swatch-info">700 · #3A2C87<br/>--violet-700<br/>accent-agent-text</span></div>
+        <div class="swatch" style="background:#281D63"><span class="swatch-info">800 · #281D63<br/>--violet-800</span></div>
+        <div class="swatch" style="background:#1A1244"><span class="swatch-info">900 · #1A1244<br/>--violet-900</span></div>
+        <div class="swatch" style="background:#0E0928"><span class="swatch-info">950 · #0E0928<br/>--violet-950</span></div>
+      </div>
+      <div class="swatch-scale-labels"><span>50</span><span>100</span><span>200</span><span>300</span><span>400</span><span>500</span><span>600</span><span>700</span><span>800</span><span>900</span><span>950</span></div>
+    </div>
+
+    <!-- TEAL LEGACY -->
+    <div class="palette-row">
+      <div class="palette-label">
+        <span class="palette-label-name" style="color:var(--teal-700)">Teal</span>
+        <span class="palette-label-desc">Legacy utility — secondary links, data table accents, inline highlights only</span>
+        <span class="palette-label-badge">demoted from primary accent</span>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(4, 56px); gap: 3px; border-radius:var(--radius-sm); overflow:hidden;">
+        <div class="swatch" style="background:#2DD4BF; height:40px"><span class="swatch-info">400 · #2DD4BF</span></div>
+        <div class="swatch" style="background:#14B8A6; height:40px"><span class="swatch-info">500 · #14B8A6</span></div>
+        <div class="swatch" style="background:#0D9488; height:40px"><span class="swatch-info">600 · #0D9488 ← was accent</span></div>
+        <div class="swatch" style="background:#0F766E; height:40px"><span class="swatch-info">700 · #0F766E</span></div>
+      </div>
+    </div>
+
+    <p class="small-note">All three new accents share chroma ≈ 0.17 and are spaced 76° apart on the hue wheel (54°→152°→282°). This means any two can coexist on the same screen without visual tension — they read as a family, not a collision.</p>
+  </section>
+
+  <!-- ── 02 SEMANTIC TOKENS ── -->
+  <section id="semantic">
+    <div class="section-header">
+      <span class="section-number">02</span>
+      <span class="section-title">Semantic Token Map</span>
+      <span class="section-desc">Use these in components, never raw scale tokens. Scale = what; semantic = why.</span>
+    </div>
+
+    <table class="token-table">
+      <thead>
+        <tr>
+          <th>Token</th><th>Value → Scale</th><th>Role</th><th>Use for</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Surface -->
+        <tr><td colspan="4" style="padding:8px 12px 4px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-tertiary); background:var(--canvas)">Surface</td></tr>
+        <tr><td class="token-name">--canvas</td><td class="token-value"><span class="token-swatch-inline" style="background:#FAFAF8"></span>#FAFAF8 → neutral-50</td><td class="token-role">App background</td><td class="token-usage">body bg, empty states</td></tr>
+        <tr><td class="token-name">--surface</td><td class="token-value"><span class="token-swatch-inline" style="background:#ffffff; border:1px solid #e9e8e4;"></span>#FFFFFF</td><td class="token-role">Card, sheet, panel</td><td class="token-usage">cards, sidebars, dropdowns</td></tr>
+        <tr><td class="token-name">--border</td><td class="token-value"><span class="token-swatch-inline" style="background:#E9E8E4"></span>#E9E8E4 → neutral-200</td><td class="token-role">Default separator</td><td class="token-usage">table borders, dividers</td></tr>
+        <tr><td class="token-name">--border-strong</td><td class="token-value"><span class="token-swatch-inline" style="background:#D5D3CE"></span>#D5D3CE → neutral-300</td><td class="token-role">Emphasized border</td><td class="token-usage">active rows, focused inputs</td></tr>
+        <!-- Text -->
+        <tr><td colspan="4" style="padding:8px 12px 4px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-tertiary); background:var(--canvas)">Text</td></tr>
+        <tr><td class="token-name">--text-primary</td><td class="token-value"><span class="token-swatch-inline" style="background:#252421"></span>#252421 → neutral-900</td><td class="token-role">Body text, labels</td><td class="token-usage">headings, form labels, data</td></tr>
+        <tr><td class="token-name">--text-secondary</td><td class="token-value"><span class="token-swatch-inline" style="background:#787670"></span>#787670 → neutral-600</td><td class="token-role">Supporting text</td><td class="token-usage">descriptions, timestamps</td></tr>
+        <tr><td class="token-name">--text-tertiary</td><td class="token-value"><span class="token-swatch-inline" style="background:#9A9892"></span>#9A9892 → neutral-500</td><td class="token-role">Deemphasized</td><td class="token-usage">placeholders, helper text</td></tr>
+        <tr><td class="token-name">--text-disabled</td><td class="token-value"><span class="token-swatch-inline" style="background:#BAB8B2"></span>#BAB8B2 → neutral-400</td><td class="token-role">Disabled UI</td><td class="token-usage">disabled inputs, muted items</td></tr>
+        <!-- Accent -->
+        <tr><td colspan="4" style="padding:8px 12px 4px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-tertiary); background:var(--canvas)">Accent</td></tr>
+        <tr><td class="token-name">--accent-primary</td><td class="token-value"><span class="token-swatch-inline" style="background:#F08408"></span>#F08408 → amber-500</td><td class="token-role">Hero CTA, primary action</td><td class="token-usage">primary btn bg, progress bars</td></tr>
+        <tr><td class="token-name">--accent-primary-dark</td><td class="token-value"><span class="token-swatch-inline" style="background:#C46600"></span>#C46600 → amber-600</td><td class="token-role">Hover/pressed state</td><td class="token-usage">btn hover, active indicator</td></tr>
+        <tr><td class="token-name">--accent-primary-bg</td><td class="token-value"><span class="token-swatch-inline" style="background:#FFF8ED"></span>#FFF8ED → amber-50</td><td class="token-role">Tinted bg</td><td class="token-usage">selected row bg, highlight</td></tr>
+        <tr><td class="token-name">--accent-reward</td><td class="token-value"><span class="token-swatch-inline" style="background:#16A066"></span>#16A066 → emerald-500</td><td class="token-role">Reward / success</td><td class="token-usage">confirm btn, success toast</td></tr>
+        <tr><td class="token-name">--accent-reward-bg</td><td class="token-value"><span class="token-swatch-inline" style="background:#EDFAF3"></span>#EDFAF3 → emerald-50</td><td class="token-role">Reward background</td><td class="token-usage">clean-run banner, zero-anomaly card</td></tr>
+        <tr><td class="token-name">--accent-agent</td><td class="token-value"><span class="token-swatch-inline" style="background:#6651D4"></span>#6651D4 → violet-500</td><td class="token-role">Agentic / processing</td><td class="token-usage">pulse dot, data-flow bar, agent chip</td></tr>
+        <tr><td class="token-name">--accent-agent-bg</td><td class="token-value"><span class="token-swatch-inline" style="background:#F3F1FD"></span>#F3F1FD → violet-50</td><td class="token-role">Agent context bg</td><td class="token-usage">agent status bar bg</td></tr>
+        <tr><td class="token-name">--accent-utility</td><td class="token-value"><span class="token-swatch-inline" style="background:#0D9488"></span>#0D9488 → teal-600</td><td class="token-role">Legacy utility</td><td class="token-usage">secondary links, data table accents</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── 03 SEVERITY ── -->
+  <section id="severity">
+    <div class="section-header">
+      <span class="section-number">03</span>
+      <span class="section-title">Severity States</span>
+      <span class="section-desc">Medium severity now uses amber-family for brand cohesion. Favorable promoted to vibrant emerald.</span>
+    </div>
+
+    <div class="severity-grid">
+      <div class="severity-card" style="background:var(--severity-high-bg); border-color:var(--severity-high-border)">
+        <div class="severity-label" style="color:var(--severity-high-text)">● High</div>
+        <div class="severity-example" style="color:var(--severity-high-text)">Duplicate vendor detected. $24,800 flagged across 3 invoices.</div>
+        <div class="severity-tokens" style="color:var(--severity-high-text)">--severity-high-bg: #FEF0F0<br/>--severity-high-text: #B91C1C<br/>--severity-high-border: #FECACA</div>
+      </div>
+      <div class="severity-card" style="background:var(--severity-medium-bg); border-color:var(--severity-medium-border)">
+        <div class="severity-label" style="color:var(--severity-medium-text)">◐ Medium</div>
+        <div class="severity-example" style="color:var(--severity-medium-text)">Approval workflow delay. 3 items pending &gt;48h review.</div>
+        <div class="severity-tokens" style="color:var(--severity-medium-text)">--severity-medium-bg: amber-50<br/>--severity-medium-text: amber-700<br/>--severity-medium-border: amber-200</div>
+      </div>
+      <div class="severity-card" style="background:var(--severity-normal-bg); border-color:var(--severity-normal-border)">
+        <div class="severity-label" style="color:var(--severity-normal-text)">○ Normal</div>
+        <div class="severity-example" style="color:var(--severity-normal-text)">Monthly close in progress. 14 of 18 checks complete.</div>
+        <div class="severity-tokens" style="color:var(--severity-normal-text)">--severity-normal-bg: neutral-100<br/>--severity-normal-text: neutral-600<br/>--severity-normal-border: neutral-200</div>
+      </div>
+      <div class="severity-card" style="background:var(--severity-favorable-bg); border-color:var(--severity-favorable-border)">
+        <div class="severity-label" style="color:var(--severity-favorable-text)">✓ Favorable</div>
+        <div class="severity-example" style="color:var(--severity-favorable-text)">Zero anomalies this period. Reconciliation complete.</div>
+        <div class="severity-tokens" style="color:var(--severity-favorable-text)">--severity-favorable-bg: emerald-50<br/>--severity-favorable-text: emerald-700<br/>--severity-favorable-border: emerald-200</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px; display:flex; align-items:center; gap:8px;">
+      <div class="badge badge-high">High</div>
+      <div class="badge badge-medium">Medium</div>
+      <div class="badge" style="background:var(--severity-normal-bg); color:var(--severity-normal-text); border-color:var(--severity-normal-border)">Normal</div>
+      <div class="badge badge-favorable">Favorable</div>
+      <span style="font-size:12px; color:var(--text-tertiary); margin-left:8px;">Badge size tokens: 10px / weight 600 / letter-spacing 0.04em / uppercase</span>
+    </div>
+  </section>
+
+  <!-- ── 04 MOTION ── -->
+  <section id="motion">
+    <div class="section-header">
+      <span class="section-number">04</span>
+      <span class="section-title">Motion Tokens</span>
+      <span class="section-desc">CSS-only. Restrained but intentional — each curve chosen for the interaction type, not decoration.</span>
+    </div>
+
+    <!-- DURATION TABLE -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-secondary); margin-bottom:12px;">Durations</div>
+      <div class="motion-token-table">
+        <div class="mtt-header">Token</div>
+        <div class="mtt-header">Value</div>
+        <div class="mtt-header">Use for</div>
+        <div class="mtt-cell"><span class="mtt-name mono">--duration-instant</span></div>
+        <div class="mtt-cell"><span class="mtt-value mono">80ms</span></div>
+        <div class="mtt-cell mtt-desc">Icon swaps, toggle indicators, instant feedback</div>
+        <div class="mtt-cell"><span class="mtt-name mono">--duration-fast</span></div>
+        <div class="mtt-cell"><span class="mtt-value mono">140ms</span></div>
+        <div class="mtt-cell mtt-desc">Button hover/press, chip highlights, row hover</div>
+        <div class="mtt-cell"><span class="mtt-name mono">--duration-base</span></div>
+        <div class="mtt-cell"><span class="mtt-value mono">220ms</span></div>
+        <div class="mtt-cell mtt-desc">Card lift, panel open, dropdown reveal, tab switch</div>
+        <div class="mtt-cell"><span class="mtt-name mono">--duration-slow</span></div>
+        <div class="mtt-cell"><span class="mtt-value mono">380ms</span></div>
+        <div class="mtt-cell mtt-desc">Page transitions, modal enter/exit, drawer slide</div>
+        <div class="mtt-cell"><span class="mtt-name mono">--duration-reward</span></div>
+        <div class="mtt-cell"><span class="mtt-value mono">650ms</span></div>
+        <div class="mtt-cell mtt-desc">Success confirm, zero-anomaly reveal, confetti beat</div>
+      </div>
+    </div>
+
+    <!-- EASING -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-secondary); margin-bottom:12px;">Easing Curves — hover the track to preview</div>
+      <div class="easing-grid">
+        <div class="easing-card" data-easing="out">
+          <div class="easing-card-name">--ease-out</div>
+          <div class="easing-card-value">cubic-bezier(0.16, 1, 0.3, 1)</div>
+          <div class="easing-preview">
+            <div class="easing-track"></div>
+            <div class="easing-dot"></div>
+          </div>
+          <div class="easing-use">Default for hover, reveal, expand. Snappy entry.</div>
+        </div>
+        <div class="easing-card" data-easing="in-out">
+          <div class="easing-card-name">--ease-in-out</div>
+          <div class="easing-card-value">cubic-bezier(0.45, 0, 0.55, 1)</div>
+          <div class="easing-preview">
+            <div class="easing-track"></div>
+            <div class="easing-dot"></div>
+          </div>
+          <div class="easing-use">Page transitions, drawer slides. Deliberate, balanced.</div>
+        </div>
+        <div class="easing-card" data-easing="spring">
+          <div class="easing-card-name">--ease-spring</div>
+          <div class="easing-card-value">cubic-bezier(0.34, 1.56, 0.64, 1)</div>
+          <div class="easing-preview">
+            <div class="easing-track"></div>
+            <div class="easing-dot"></div>
+          </div>
+          <div class="easing-use">Reward moments only. Slight overshoot. Do not overuse.</div>
+        </div>
+        <div class="easing-card" data-easing="linear">
+          <div class="easing-card-name">--ease-linear</div>
+          <div class="easing-card-value">linear</div>
+          <div class="easing-preview">
+            <div class="easing-track"></div>
+            <div class="easing-dot"></div>
+          </div>
+          <div class="easing-use">Progress bars, data flow animations, loaders.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCALE & SHADOWS -->
+    <div class="grid-2" style="margin-bottom:28px;">
+      <div>
+        <div style="font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-secondary); margin-bottom:12px;">Scale Values</div>
+        <div class="motion-token-table">
+          <div class="mtt-header">Token</div><div class="mtt-header">Value</div><div class="mtt-header">Use for</div>
+          <div class="mtt-cell"><span class="mtt-name mono">--scale-hover</span></div><div class="mtt-cell"><span class="mtt-value mono">1.015</span></div><div class="mtt-cell mtt-desc">Button, card, interactive element hover</div>
+          <div class="mtt-cell"><span class="mtt-name mono">--scale-press</span></div><div class="mtt-cell"><span class="mtt-value mono">0.970</span></div><div class="mtt-cell mtt-desc">Button active/pressed</div>
+          <div class="mtt-cell"><span class="mtt-name mono">--scale-reward</span></div><div class="mtt-cell"><span class="mtt-value mono">1.040</span></div><div class="mtt-cell mtt-desc">Success pulse — use once, not on hover</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-secondary); margin-bottom:12px;">Accent Shadows</div>
+        <div class="motion-token-table">
+          <div class="mtt-header">Token</div><div class="mtt-header" style="grid-column:span 2">Effect</div>
+          <div class="mtt-cell"><span class="mtt-name mono">--shadow-amber</span></div><div class="mtt-cell" style="grid-column:span 2; align-items:center; gap:10px;"><span style="display:inline-block; width:32px; height:16px; background:var(--amber-500); border-radius:3px; box-shadow:var(--shadow-amber)"></span><span class="mtt-desc" style="font-size:11px;">Primary btn hover glow</span></div>
+          <div class="mtt-cell"><span class="mtt-name mono">--shadow-emerald</span></div><div class="mtt-cell" style="grid-column:span 2; align-items:center; gap:10px;"><span style="display:inline-block; width:32px; height:16px; background:var(--emerald-500); border-radius:3px; box-shadow:var(--shadow-emerald)"></span><span class="mtt-desc" style="font-size:11px;">Reward state glow</span></div>
+          <div class="mtt-cell"><span class="mtt-name mono">--shadow-violet</span></div><div class="mtt-cell" style="grid-column:span 2; align-items:center; gap:10px;"><span style="display:inline-block; width:32px; height:16px; background:var(--violet-500); border-radius:3px; box-shadow:var(--shadow-violet)"></span><span class="mtt-desc" style="font-size:11px;">Agent focus context</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE DEMOS -->
+    <div style="font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-secondary); margin-bottom:12px;">Live Interaction Demos</div>
+    <div class="motion-grid">
+      <div class="motion-card">
+        <div class="motion-card-title">Primary CTA hover + press</div>
+        <div class="motion-card-desc">scale(1.015) on hover → scale(0.970) on active. Amber glow shadow fires on hover.</div>
+        <div class="motion-demo-area">
+          <button class="demo-btn">Run Reconciliation</button>
+        </div>
+        <div class="motion-tokens-list">
+          <span class="motion-token-chip">duration-fast 140ms</span>
+          <span class="motion-token-chip">ease-out</span>
+          <span class="motion-token-chip">scale-hover 1.015</span>
+          <span class="motion-token-chip">scale-press 0.97</span>
+          <span class="motion-token-chip">shadow-amber</span>
+        </div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-card-title">Card / section lift</div>
+        <div class="motion-card-desc">translateY(-2px) + shadow-md on hover. Base duration for deliberate intent feel.</div>
+        <div class="motion-demo-area">
+          <div class="demo-card-hover">
+            <div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:2px;">AR Aging Report</div>
+            <div style="font-size:11px; color:var(--text-tertiary)">14 items · 3 flagged</div>
+          </div>
+        </div>
+        <div class="motion-tokens-list">
+          <span class="motion-token-chip">duration-base 220ms</span>
+          <span class="motion-token-chip">ease-out</span>
+          <span class="motion-token-chip">translateY(-2px)</span>
+          <span class="motion-token-chip">shadow-md</span>
+        </div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-card-title">Reward / success moment</div>
+        <div class="motion-card-desc">Spring-eased scale pulse (1→1.04→0.99→1) + white flash overlay. Click to trigger.</div>
+        <div class="motion-demo-area">
+          <button class="demo-reward-btn" id="rewardBtn">✓ Reconciliation Complete</button>
+        </div>
+        <div class="motion-tokens-list">
+          <span class="motion-token-chip">duration-reward 650ms</span>
+          <span class="motion-token-chip">ease-spring</span>
+          <span class="motion-token-chip">scale-reward 1.04</span>
+          <span class="motion-token-chip">shadow-emerald</span>
+        </div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-card-title">Agentic / processing pulse</div>
+        <div class="motion-card-desc">Concentric ring expansion, 1.8s loop. Data flow bar uses ease-linear for continuous feel.</div>
+        <div class="motion-demo-area">
+          <div class="demo-agent-row" style="width:100%; padding:0 20px;">
+            <div class="demo-pulse"></div>
+            <div class="demo-agent-bar"></div>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--violet-600)">running</span>
+          </div>
+        </div>
+        <div class="motion-tokens-list">
+          <span class="motion-token-chip">duration-base loop 1.8s</span>
+          <span class="motion-token-chip">ease-out (rings)</span>
+          <span class="motion-token-chip">ease-linear (bar)</span>
+          <span class="motion-token-chip">accent-agent violet-500</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <p class="small-note">Motion reduction: wrap all transition/animation declarations in <code style="font-family:'JetBrains Mono',monospace; font-size:11px">@media (prefers-reduced-motion: no-preference)</code>. Provide instant fallbacks at <code style="font-family:'JetBrains Mono',monospace; font-size:11px">--duration-instant: 0ms</code> for the reduced-motion context.</p>
+    </div>
+  </section>
+
+  <!-- ── 05 TYPOGRAPHY ── -->
+  <section id="type">
+    <div class="section-header">
+      <span class="section-number">05</span>
+      <span class="section-title">Typography Scale</span>
+      <span class="section-desc">Inter for UI, Source Serif 4 for financial display numbers, JetBrains Mono for data/code. Existing stack, sharper hierarchy.</span>
+    </div>
+
+    <div class="type-specimens">
+      <!-- Display -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-role-name">Display</div>
+          <div class="type-specs">
+            <span class="type-spec-chip">Source Serif 4</span>
+            <span class="type-spec-chip">600</span>
+            <span class="type-spec-chip">52px</span>
+            <span class="type-spec-chip">–0.03em</span>
+            <span class="type-spec-chip">lh 1.05</span>
+            <br/>Hero headings, zero-state messaging
+          </div>
+        </div>
+        <div style="font-family:'Source Serif 4',serif; font-size:52px; font-weight:600; letter-spacing:-0.03em; line-height:1.05; color:var(--text-primary)">Clean Books</div>
+      </div>
+      <!-- Hero Number -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-role-name">Hero Number</div>
+          <div class="type-specs">
+            <span class="type-spec-chip">Source Serif 4</span>
+            <span class="type-spec-chip">600</span>
+            <span class="type-spec-chip">44px</span>
+            <span class="type-spec-chip">–0.025em</span>
+            <span class="type-spec-chip">tabular-nums</span>
+            <br/>KPI figures, dashboard metrics
+          </div>
+        </div>
+        <div style="font-family:'Source Serif 4',serif; font-size:44px; font-weight:600; letter-spacing:-0.025em; font-variant-numeric:tabular-nums; color:var(--text-primary)">$4,287,450</div>
+      </div>
+      <!-- H1 -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-role-name">Heading 1</div>
+          <div class="type-specs">
+            <span class="type-spec-chip">Inter</span>
+            <span class="type-spec-chip">700</span>
+            <span class="type-spec-chip">30px</span>
+            <span class="type-spec-chip">–0.025em</span>
+            <span class="type-spec-chip">lh 1.2</span>
+            <br/>Page titles, modal headers
+          </div>
+        </div>
+        <div style="font-family:'Inter',sans-serif; font-size:30px; font-weight:700; letter-spacing:-0.025em; line-height:1.2; color:var(--text-primary)">Accounts Receivable</div>
+      </div>
+      <!-- H2 -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-role-name">Heading 2</div>
+          <div class="type-specs">
+            <span class="type-spec-chip">Inter</span>
+            <span class="type-spec-chip">600</span>
+            <span class="type-spec-chip">22px</span>
+            <span class="type-spec-chip">–0.018em</span>
+            <span class="type-spec-chip">lh 1.3</span>
+            <br/>Section headers, card titles
+          </div>
+        </div>
+        <div style="font-family:'Inter',sans-serif; font-size:22px; font-weight:600; letter-spacing:-0.018em; line-height:1.3; color:var(--text-primary)">Q2 Variance Report</div>
+      </div>
+      <!-- H3 -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-role-name">Heading 3</div>
+          <div class="type-specs">
+            <span class="type-spec-chip">Inter</span>
+            <span class="type-spec-chip">600</span>
+            <span class="type-spec-chip">16px</span>
+            <span class="type-spec-chip">–0.01em</span>
+            <span class="type-spec-chip">lh 1.4</span>
+            <br/>Sub-sections, widget titles
+          </div>
+        </div>
+        <div style="font-family:'Inter',sans-serif; font-size:16px; font-weight:600; letter-spacing:-0.01em; line-height:1.4; color:var(--text-primary)">Reconciliation Status</div>
+      </div>
+      <!-- Body -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-role-name">Body</div>
+          <div class="type-specs">
+            <span class="type-spec-chip">Inter</span>
+            <span class="type-spec-chip">400</span>
+            <span class="type-spec-chip">14px</span>
+            <span class="type-spec-chip">0em</span>
+            <span class="type-spec-chip">lh 1.6</span>
+            <br/>Default UI text, descriptions
+          </div>
+        </div>
+        <div style="font-family:'Inter',sans-serif; font-size:14px; font-weight:400; line-height:1.6; color:var(--text-secondary); max-width:400px">3 invoices from Acme Corp were flagged for duplicate payment risk. Review before approving the batch.</div>
+      </div>
+      <!-- Label -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-role-name">Label / UI</div>
+          <div class="type-specs">
+            <span class="type-spec-chip">Inter</span>
+            <span class="type-spec-chip">500</span>
+            <span class="type-spec-chip">13px</span>
+            <span class="type-spec-chip">0em</span>
+            <span class="type-spec-chip">lh 1.4</span>
+            <br/>Form labels, nav items, buttons
+          </div>
+        </div>
+        <div style="font-family:'Inter',sans-serif; font-size:13px; font-weight:500; line-height:1.4; color:var(--text-primary)">Vendor Name · Invoice Date · Amount Due</div>
+      </div>
+      <!-- Caption -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-role-name">Caption / Meta</div>
+          <div class="type-specs">
+            <span class="type-spec-chip">Inter</span>
+            <span class="type-spec-chip">500</span>
+            <span class="type-spec-chip">11px</span>
+            <span class="type-spec-chip">+0.04em</span>
+            <span class="type-spec-chip">uppercase</span>
+            <br/>Table column headers, badge text
+          </div>
+        </div>
+        <div style="font-family:'Inter',sans-serif; font-size:11px; font-weight:500; letter-spacing:0.04em; text-transform:uppercase; line-height:1.4; color:var(--text-tertiary)">Last updated · Assignee · Status</div>
+      </div>
+      <!-- Data -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-role-name">Data / Mono</div>
+          <div class="type-specs">
+            <span class="type-spec-chip">JetBrains Mono</span>
+            <span class="type-spec-chip">400</span>
+            <span class="type-spec-chip">13px</span>
+            <span class="type-spec-chip">tabular-nums</span>
+            <span class="type-spec-chip">lh 1.5</span>
+            <br/>Account codes, amounts, IDs
+          </div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:400; font-variant-numeric:tabular-nums; line-height:1.5; color:var(--text-primary)">INV-2024-003821 · $12,450.00 · ACC-4499-B</div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <p class="small-note"><strong>Key change from v1:</strong> Source Serif 4 promoted to display/hero-number role. This creates a deliberate contrast between data (mono), UI (Inter), and financial significance (serif) — a visual signal that "this number matters." Use it sparingly: KPI metrics, confirmation totals, zero-state headlines.</p>
+    </div>
+  </section>
+
+  <!-- ── 06 COMPONENTS ── -->
+  <section id="components">
+    <div class="section-header">
+      <span class="section-number">06</span>
+      <span class="section-title">Component Previews</span>
+      <span class="section-desc">Token usage in context. All interactions are live.</span>
+    </div>
+
+    <div class="component-grid">
+      <!-- BUTTONS -->
+      <div class="comp-card">
+        <div class="comp-card-title">Buttons</div>
+        <div class="flex-col">
+          <div><button class="btn-primary">Run Reconciliation</button></div>
+          <div><button class="btn-reward">✓ Confirm & Close</button></div>
+          <div><button class="btn-secondary">Export Report</button></div>
+          <div><button class="btn-ghost">View details</button></div>
+        </div>
+      </div>
+
+      <!-- ANOMALY CARD -->
+      <div class="comp-card">
+        <div class="comp-card-title">Anomaly Cards</div>
+        <div class="flex-col gap-2">
+          <div class="anomaly-card">
+            <div class="anomaly-header">
+              <span class="anomaly-title">Duplicate Vendor</span>
+              <span class="badge badge-high">High</span>
+            </div>
+            <div class="anomaly-value">$24,800</div>
+            <div class="anomaly-sub">3 invoices · Acme Corp</div>
+          </div>
+          <div class="anomaly-card">
+            <div class="anomaly-header">
+              <span class="anomaly-title">Q2 Close Complete</span>
+              <span class="badge badge-favorable">Favorable</span>
+            </div>
+            <div class="anomaly-value" style="color:var(--emerald-600)">0</div>
+            <div class="anomaly-sub">anomalies · period clean</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENT STATUS -->
+      <div class="comp-card">
+        <div class="comp-card-title">Agent Status</div>
+        <div class="flex-col">
+          <div class="agent-status">
+            <div class="agent-dot"></div>
+            <div>
+              <div class="agent-text">Scanning vendor ledger</div>
+              <div class="agent-sub">1,420 / 3,800 records</div>
+            </div>
+          </div>
+          <div class="agent-status" style="background:var(--emerald-50); border-color:oklch(0.60 0.16 152 / 0.2)">
+            <div style="width:8px; height:8px; border-radius:50%; background:var(--emerald-500); flex-shrink:0;"></div>
+            <div>
+              <div class="agent-text" style="color:var(--emerald-700)">Analysis complete</div>
+              <div class="agent-sub" style="color:var(--emerald-500)">No issues found</div>
+            </div>
+          </div>
+          <div style="padding:10px 12px; background:var(--canvas); border:1px solid var(--border); border-radius:var(--radius-md)">
+            <div style="font-size:12px; font-weight:500; color:var(--text-secondary); margin-bottom:6px;">Data flow</div>
+            <div class="demo-agent-row" style="gap:10px;">
+              <div class="demo-pulse"></div>
+              <div class="demo-agent-bar" style="flex:1"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 07 CSS OUTPUT ── -->
+  <section id="css">
+    <div class="section-header">
+      <span class="section-number">07</span>
+      <span class="section-title">CSS Custom Properties</span>
+      <span class="section-desc">Drop into your globals.css or design-tokens.css. Complete and self-contained.</span>
+    </div>
+
+    <div class="css-block-wrapper">
+      <div class="css-block-header">
+        <span class="css-block-title">design-tokens.css</span>
+        <button class="copy-btn" id="copyBtn" onclick="copyCSS()">Copy all</button>
+      </div>
+      <div class="css-block" id="cssContent">
+        <pre id="cssText"><span class="css-comment">/* ─────────────────────────────────────────────</span>
+<span class="css-comment">   IRON LEDGER — DESIGN TOKENS v2</span>
+<span class="css-comment">   April 2026 — warm, vibrant, trust-anchored</span>
+<span class="css-comment">   ───────────────────────────────────────────── */</span>
+
+<span class="css-selector">:root {</span>
+
+  <span class="css-comment">/* NEUTRAL / WARM STONE */</span>
+  <span class="css-prop">--neutral-50</span>:  <span class="css-hex">#FAFAF8</span>;
+  <span class="css-prop">--neutral-100</span>: <span class="css-hex">#F4F3F0</span>;
+  <span class="css-prop">--neutral-200</span>: <span class="css-hex">#E9E8E4</span>;
+  <span class="css-prop">--neutral-300</span>: <span class="css-hex">#D5D3CE</span>;
+  <span class="css-prop">--neutral-400</span>: <span class="css-hex">#BAB8B2</span>;
+  <span class="css-prop">--neutral-500</span>: <span class="css-hex">#9A9892</span>;
+  <span class="css-prop">--neutral-600</span>: <span class="css-hex">#787670</span>;
+  <span class="css-prop">--neutral-700</span>: <span class="css-hex">#5A5853</span>;
+  <span class="css-prop">--neutral-800</span>: <span class="css-hex">#3C3A36</span>;
+  <span class="css-prop">--neutral-900</span>: <span class="css-hex">#252421</span>;
+  <span class="css-prop">--neutral-950</span>: <span class="css-hex">#151412</span>;
+
+  <span class="css-comment">/* AMBER / PRIMARY CTA — oklch(L 0.17 54) */</span>
+  <span class="css-prop">--amber-50</span>:  <span class="css-hex">#FFF8ED</span>;
+  <span class="css-prop">--amber-100</span>: <span class="css-hex">#FFEECE</span>;
+  <span class="css-prop">--amber-200</span>: <span class="css-hex">#FEDA9A</span>;
+  <span class="css-prop">--amber-300</span>: <span class="css-hex">#FDC060</span>;
+  <span class="css-prop">--amber-400</span>: <span class="css-hex">#FBA12A</span>;
+  <span class="css-prop">--amber-500</span>: <span class="css-hex">#F08408</span>; <span class="css-comment">/* primary accent ★ */</span>
+  <span class="css-prop">--amber-600</span>: <span class="css-hex">#C46600</span>;
+  <span class="css-prop">--amber-700</span>: <span class="css-hex">#9A4D00</span>;
+  <span class="css-prop">--amber-800</span>: <span class="css-hex">#763900</span>;
+  <span class="css-prop">--amber-900</span>: <span class="css-hex">#572900</span>;
+  <span class="css-prop">--amber-950</span>: <span class="css-hex">#371800</span>;
+
+  <span class="css-comment">/* EMERALD / REWARD — oklch(L 0.16 152) */</span>
+  <span class="css-prop">--emerald-50</span>:  <span class="css-hex">#EDFAF3</span>;
+  <span class="css-prop">--emerald-100</span>: <span class="css-hex">#D1F4E4</span>;
+  <span class="css-prop">--emerald-200</span>: <span class="css-hex">#A3E8CA</span>;
+  <span class="css-prop">--emerald-300</span>: <span class="css-hex">#68D4A8</span>;
+  <span class="css-prop">--emerald-400</span>: <span class="css-hex">#34BB83</span>;
+  <span class="css-prop">--emerald-500</span>: <span class="css-hex">#16A066</span>; <span class="css-comment">/* reward accent ★ */</span>
+  <span class="css-prop">--emerald-600</span>: <span class="css-hex">#0F7F50</span>;
+  <span class="css-prop">--emerald-700</span>: <span class="css-hex">#0A613C</span>;
+  <span class="css-prop">--emerald-800</span>: <span class="css-hex">#07472C</span>;
+  <span class="css-prop">--emerald-900</span>: <span class="css-hex">#04311E</span>;
+  <span class="css-prop">--emerald-950</span>: <span class="css-hex">#021E12</span>;
+
+  <span class="css-comment">/* VIOLET / AGENTIC — oklch(L 0.16 282) */</span>
+  <span class="css-prop">--violet-50</span>:  <span class="css-hex">#F3F1FD</span>;
+  <span class="css-prop">--violet-100</span>: <span class="css-hex">#E5DFFB</span>;
+  <span class="css-prop">--violet-200</span>: <span class="css-hex">#CABEF7</span>;
+  <span class="css-prop">--violet-300</span>: <span class="css-hex">#A897F0</span>;
+  <span class="css-prop">--violet-400</span>: <span class="css-hex">#8570E6</span>;
+  <span class="css-prop">--violet-500</span>: <span class="css-hex">#6651D4</span>; <span class="css-comment">/* agentic accent ★ */</span>
+  <span class="css-prop">--violet-600</span>: <span class="css-hex">#4F3DAE</span>;
+  <span class="css-prop">--violet-700</span>: <span class="css-hex">#3A2C87</span>;
+  <span class="css-prop">--violet-800</span>: <span class="css-hex">#281D63</span>;
+  <span class="css-prop">--violet-900</span>: <span class="css-hex">#1A1244</span>;
+  <span class="css-prop">--violet-950</span>: <span class="css-hex">#0E0928</span>;
+
+  <span class="css-comment">/* TEAL — utility only, demoted from primary */</span>
+  <span class="css-prop">--teal-400</span>: <span class="css-hex">#2DD4BF</span>;
+  <span class="css-prop">--teal-500</span>: <span class="css-hex">#14B8A6</span>;
+  <span class="css-prop">--teal-600</span>: <span class="css-hex">#0D9488</span>;
+  <span class="css-prop">--teal-700</span>: <span class="css-hex">#0F766E</span>;
+
+  <span class="css-comment">/* SEMANTIC — SURFACE */</span>
+  <span class="css-prop">--canvas</span>:         <span class="css-val">var(--neutral-50)</span>;
+  <span class="css-prop">--surface</span>:        <span class="css-hex">#FFFFFF</span>;
+  <span class="css-prop">--border</span>:         <span class="css-val">var(--neutral-200)</span>;
+  <span class="css-prop">--border-strong</span>:  <span class="css-val">var(--neutral-300)</span>;
+
+  <span class="css-comment">/* SEMANTIC — TEXT */</span>
+  <span class="css-prop">--text-primary</span>:   <span class="css-val">var(--neutral-900)</span>;
+  <span class="css-prop">--text-secondary</span>: <span class="css-val">var(--neutral-600)</span>;
+  <span class="css-prop">--text-tertiary</span>:  <span class="css-val">var(--neutral-500)</span>;
+  <span class="css-prop">--text-disabled</span>:  <span class="css-val">var(--neutral-400)</span>;
+  <span class="css-prop">--text-inverse</span>:   <span class="css-hex">#FFFFFF</span>;
+
+  <span class="css-comment">/* SEMANTIC — ACCENT */</span>
+  <span class="css-prop">--accent-primary</span>:       <span class="css-val">var(--amber-500)</span>;
+  <span class="css-prop">--accent-primary-dark</span>:  <span class="css-val">var(--amber-600)</span>;
+  <span class="css-prop">--accent-primary-bg</span>:    <span class="css-val">var(--amber-50)</span>;
+  <span class="css-prop">--accent-primary-text</span>:  <span class="css-val">var(--amber-700)</span>;
+  <span class="css-prop">--accent-reward</span>:        <span class="css-val">var(--emerald-500)</span>;
+  <span class="css-prop">--accent-reward-dark</span>:   <span class="css-val">var(--emerald-600)</span>;
+  <span class="css-prop">--accent-reward-bg</span>:     <span class="css-val">var(--emerald-50)</span>;
+  <span class="css-prop">--accent-reward-text</span>:   <span class="css-val">var(--emerald-700)</span>;
+  <span class="css-prop">--accent-agent</span>:         <span class="css-val">var(--violet-500)</span>;
+  <span class="css-prop">--accent-agent-dark</span>:    <span class="css-val">var(--violet-600)</span>;
+  <span class="css-prop">--accent-agent-bg</span>:      <span class="css-val">var(--violet-50)</span>;
+  <span class="css-prop">--accent-agent-text</span>:    <span class="css-val">var(--violet-700)</span>;
+  <span class="css-prop">--accent-utility</span>:       <span class="css-val">var(--teal-600)</span>;
+  <span class="css-prop">--accent-utility-bg</span>:    <span class="css-hex">#F0FDFA</span>;
+  <span class="css-prop">--accent-utility-text</span>:  <span class="css-val">var(--teal-700)</span>;
+
+  <span class="css-comment">/* SEMANTIC — SEVERITY */</span>
+  <span class="css-prop">--severity-high-bg</span>:          <span class="css-hex">#FEF0F0</span>;
+  <span class="css-prop">--severity-high-text</span>:        <span class="css-hex">#B91C1C</span>;
+  <span class="css-prop">--severity-high-border</span>:      <span class="css-hex">#FECACA</span>;
+  <span class="css-prop">--severity-medium-bg</span>:        <span class="css-val">var(--amber-50)</span>;
+  <span class="css-prop">--severity-medium-text</span>:      <span class="css-val">var(--amber-700)</span>;
+  <span class="css-prop">--severity-medium-border</span>:    <span class="css-val">var(--amber-200)</span>;
+  <span class="css-prop">--severity-normal-bg</span>:        <span class="css-val">var(--neutral-100)</span>;
+  <span class="css-prop">--severity-normal-text</span>:      <span class="css-val">var(--neutral-600)</span>;
+  <span class="css-prop">--severity-normal-border</span>:    <span class="css-val">var(--neutral-200)</span>;
+  <span class="css-prop">--severity-favorable-bg</span>:     <span class="css-val">var(--emerald-50)</span>;
+  <span class="css-prop">--severity-favorable-text</span>:   <span class="css-val">var(--emerald-700)</span>;
+  <span class="css-prop">--severity-favorable-border</span>: <span class="css-val">var(--emerald-200)</span>;
+
+  <span class="css-comment">/* SHADOWS */</span>
+  <span class="css-prop">--shadow-xs</span>:      <span class="css-val">0 1px 2px oklch(0.14 0.01 60 / 0.06)</span>;
+  <span class="css-prop">--shadow-sm</span>:      <span class="css-val">0 2px 6px oklch(0.14 0.01 60 / 0.08), 0 1px 2px oklch(0.14 0.01 60 / 0.04)</span>;
+  <span class="css-prop">--shadow-md</span>:      <span class="css-val">0 4px 16px oklch(0.14 0.01 60 / 0.10), 0 2px 4px oklch(0.14 0.01 60 / 0.05)</span>;
+  <span class="css-prop">--shadow-lg</span>:      <span class="css-val">0 8px 32px oklch(0.14 0.01 60 / 0.12), 0 4px 8px oklch(0.14 0.01 60 / 0.06)</span>;
+  <span class="css-prop">--shadow-xl</span>:      <span class="css-val">0 20px 60px oklch(0.14 0.01 60 / 0.16), 0 8px 16px oklch(0.14 0.01 60 / 0.08)</span>;
+  <span class="css-prop">--shadow-amber</span>:   <span class="css-val">0 4px 20px oklch(0.68 0.17 54 / 0.28)</span>;
+  <span class="css-prop">--shadow-emerald</span>: <span class="css-val">0 4px 20px oklch(0.60 0.16 152 / 0.24)</span>;
+  <span class="css-prop">--shadow-violet</span>:  <span class="css-val">0 4px 20px oklch(0.58 0.16 282 / 0.24)</span>;
+
+  <span class="css-comment">/* MOTION — DURATION */</span>
+  <span class="css-prop">--duration-instant</span>: <span class="css-val">80ms</span>;
+  <span class="css-prop">--duration-fast</span>:    <span class="css-val">140ms</span>;
+  <span class="css-prop">--duration-base</span>:    <span class="css-val">220ms</span>;
+  <span class="css-prop">--duration-slow</span>:    <span class="css-val">380ms</span>;
+  <span class="css-prop">--duration-reward</span>:  <span class="css-val">650ms</span>;
+
+  <span class="css-comment">/* MOTION — EASING */</span>
+  <span class="css-prop">--ease-out</span>:    <span class="css-val">cubic-bezier(0.16, 1, 0.3, 1)</span>;
+  <span class="css-prop">--ease-in-out</span>: <span class="css-val">cubic-bezier(0.45, 0, 0.55, 1)</span>;
+  <span class="css-prop">--ease-spring</span>: <span class="css-val">cubic-bezier(0.34, 1.56, 0.64, 1)</span>;
+  <span class="css-prop">--ease-linear</span>: <span class="css-val">linear</span>;
+
+  <span class="css-comment">/* MOTION — SCALE */</span>
+  <span class="css-prop">--scale-hover</span>:  <span class="css-val">1.015</span>;
+  <span class="css-prop">--scale-press</span>:  <span class="css-val">0.970</span>;
+  <span class="css-prop">--scale-reward</span>: <span class="css-val">1.040</span>;
+
+  <span class="css-comment">/* FOCUS RINGS */</span>
+  <span class="css-prop">--ring-focus</span>:  <span class="css-val">0 0 0 3px oklch(0.68 0.17 54 / 0.30)</span>;
+  <span class="css-prop">--ring-reward</span>: <span class="css-val">0 0 0 3px oklch(0.60 0.16 152 / 0.30)</span>;
+  <span class="css-prop">--ring-agent</span>:  <span class="css-val">0 0 0 3px oklch(0.58 0.16 282 / 0.30)</span>;
+
+  <span class="css-comment">/* RADIUS */</span>
+  <span class="css-prop">--radius-xs</span>:   <span class="css-val">3px</span>;
+  <span class="css-prop">--radius-sm</span>:   <span class="css-val">5px</span>;
+  <span class="css-prop">--radius-md</span>:   <span class="css-val">8px</span>;
+  <span class="css-prop">--radius-lg</span>:   <span class="css-val">12px</span>;
+  <span class="css-prop">--radius-xl</span>:   <span class="css-val">16px</span>;
+  <span class="css-prop">--radius-pill</span>: <span class="css-val">999px</span>;
+<span class="css-selector">}</span>
+
+<span class="css-comment">/* Motion safety */</span>
+<span class="css-selector">@media (prefers-reduced-motion: reduce) {</span>
+  <span class="css-selector">:root {</span>
+    <span class="css-prop">--duration-instant</span>: <span class="css-val">0ms</span>;
+    <span class="css-prop">--duration-fast</span>:    <span class="css-val">0ms</span>;
+    <span class="css-prop">--duration-base</span>:    <span class="css-val">0ms</span>;
+    <span class="css-prop">--duration-slow</span>:    <span class="css-val">0ms</span>;
+    <span class="css-prop">--duration-reward</span>:  <span class="css-val">0ms</span>;
+  <span class="css-selector">}</span>
+<span class="css-selector">}</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 08 TAILWIND MAP ── -->
+  <section id="tailwind">
+    <div class="section-header">
+      <span class="section-number">08</span>
+      <span class="section-title">Tailwind Config Map</span>
+      <span class="section-desc">Extend your tailwind.config.js theme.extend.colors and theme.extend.transitionDuration with these mappings.</span>
+    </div>
+
+    <div class="tw-table" style="margin-bottom:20px;">
+      <div class="tw-row header">
+        <div class="tw-header-cell">Tailwind class</div>
+        <div class="tw-header-cell">CSS var</div>
+        <div class="tw-header-cell">Usage</div>
+      </div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">bg-canvas</div><div class="tw-cell tw-css-var">--canvas</div><div class="tw-cell tw-usage">App background</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">bg-surface</div><div class="tw-cell tw-css-var">--surface</div><div class="tw-cell tw-usage">Cards, panels</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">border-border</div><div class="tw-cell tw-css-var">--border</div><div class="tw-cell tw-usage">Default border</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">text-primary</div><div class="tw-cell tw-css-var">--text-primary</div><div class="tw-cell tw-usage">Body text</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">text-secondary</div><div class="tw-cell tw-css-var">--text-secondary</div><div class="tw-cell tw-usage">Supporting text</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">bg-accent-primary</div><div class="tw-cell tw-css-var">--accent-primary</div><div class="tw-cell tw-usage">Primary btn</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">bg-accent-reward</div><div class="tw-cell tw-css-var">--accent-reward</div><div class="tw-cell tw-usage">Success/confirm</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">bg-accent-agent</div><div class="tw-cell tw-css-var">--accent-agent</div><div class="tw-cell tw-usage">Agentic UI</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">duration-fast</div><div class="tw-cell tw-css-var">--duration-fast → 140ms</div><div class="tw-cell tw-usage">Hover states</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">duration-base</div><div class="tw-cell tw-css-var">--duration-base → 220ms</div><div class="tw-cell tw-usage">Card transitions</div></div>
+      <div class="tw-row"><div class="tw-cell tw-token-name">ease-spring</div><div class="tw-cell tw-css-var">--ease-spring</div><div class="tw-cell tw-usage">Reward moments</div></div>
+    </div>
+
+    <div class="css-block-wrapper">
+      <div class="css-block-header">
+        <span class="css-block-title">tailwind.config.js — theme.extend snippet</span>
+        <button class="copy-btn" onclick="copyTW()">Copy</button>
+      </div>
+      <div class="css-block">
+        <pre><span class="css-comment">// tailwind.config.js</span>
+<span class="css-selector">module.exports</span> = {
+  theme: {
+    extend: {
+      colors: {
+        canvas:  <span class="css-hex">'var(--canvas)'</span>,
+        surface: <span class="css-hex">'var(--surface)'</span>,
+        border:  { DEFAULT: <span class="css-hex">'var(--border)'</span>, strong: <span class="css-hex">'var(--border-strong)'</span> },
+        text: {
+          primary:   <span class="css-hex">'var(--text-primary)'</span>,
+          secondary: <span class="css-hex">'var(--text-secondary)'</span>,
+          tertiary:  <span class="css-hex">'var(--text-tertiary)'</span>,
+          disabled:  <span class="css-hex">'var(--text-disabled)'</span>,
+          inverse:   <span class="css-hex">'var(--text-inverse)'</span>,
+        },
+        accent: {
+          primary: { DEFAULT: <span class="css-hex">'var(--accent-primary)'</span>, dark: <span class="css-hex">'var(--accent-primary-dark)'</span>, bg: <span class="css-hex">'var(--accent-primary-bg)'</span>, text: <span class="css-hex">'var(--accent-primary-text)'</span> },
+          reward:  { DEFAULT: <span class="css-hex">'var(--accent-reward)'</span>,  dark: <span class="css-hex">'var(--accent-reward-dark)'</span>,  bg: <span class="css-hex">'var(--accent-reward-bg)'</span>,  text: <span class="css-hex">'var(--accent-reward-text)'</span> },
+          agent:   { DEFAULT: <span class="css-hex">'var(--accent-agent)'</span>,   dark: <span class="css-hex">'var(--accent-agent-dark)'</span>,   bg: <span class="css-hex">'var(--accent-agent-bg)'</span>,   text: <span class="css-hex">'var(--accent-agent-text)'</span> },
+          utility: { DEFAULT: <span class="css-hex">'var(--accent-utility)'</span>, bg: <span class="css-hex">'var(--accent-utility-bg)'</span>, text: <span class="css-hex">'var(--accent-utility-text)'</span> },
+        },
+        severity: {
+          high:      { bg: <span class="css-hex">'var(--severity-high-bg)'</span>,      text: <span class="css-hex">'var(--severity-high-text)'</span>,      border: <span class="css-hex">'var(--severity-high-border)'</span> },
+          medium:    { bg: <span class="css-hex">'var(--severity-medium-bg)'</span>,    text: <span class="css-hex">'var(--severity-medium-text)'</span>,    border: <span class="css-hex">'var(--severity-medium-border)'</span> },
+          normal:    { bg: <span class="css-hex">'var(--severity-normal-bg)'</span>,    text: <span class="css-hex">'var(--severity-normal-text)'</span>,    border: <span class="css-hex">'var(--severity-normal-border)'</span> },
+          favorable: { bg: <span class="css-hex">'var(--severity-favorable-bg)'</span>, text: <span class="css-hex">'var(--severity-favorable-text)'</span>, border: <span class="css-hex">'var(--severity-favorable-border)'</span> },
+        },
+        amber:   { <span class="css-comment">/* 50-950 as above */</span> },
+        emerald: { <span class="css-comment">/* 50-950 as above */</span> },
+        violet:  { <span class="css-comment">/* 50-950 as above */</span> },
+        teal:    { 400: <span class="css-hex">'#2DD4BF'</span>, 500: <span class="css-hex">'#14B8A6'</span>, 600: <span class="css-hex">'#0D9488'</span>, 700: <span class="css-hex">'#0F766E'</span> },
+      },
+      transitionDuration: {
+        instant: <span class="css-hex">'80ms'</span>,
+        fast:    <span class="css-hex">'140ms'</span>,
+        base:    <span class="css-hex">'220ms'</span>,
+        slow:    <span class="css-hex">'380ms'</span>,
+        reward:  <span class="css-hex">'650ms'</span>,
+      },
+      transitionTimingFunction: {
+        <span class="css-hex">'ease-out-snappy'</span>: <span class="css-hex">'cubic-bezier(0.16, 1, 0.3, 1)'</span>,
+        <span class="css-hex">'ease-spring'</span>:     <span class="css-hex">'cubic-bezier(0.34, 1.56, 0.64, 1)'</span>,
+      },
+      boxShadow: {
+        xs:      <span class="css-hex">'var(--shadow-xs)'</span>,
+        sm:      <span class="css-hex">'var(--shadow-sm)'</span>,
+        md:      <span class="css-hex">'var(--shadow-md)'</span>,
+        lg:      <span class="css-hex">'var(--shadow-lg)'</span>,
+        xl:      <span class="css-hex">'var(--shadow-xl)'</span>,
+        amber:   <span class="css-hex">'var(--shadow-amber)'</span>,
+        emerald: <span class="css-hex">'var(--shadow-emerald)'</span>,
+        violet:  <span class="css-hex">'var(--shadow-violet)'</span>,
+      },
+      borderRadius: {
+        xs: <span class="css-hex">'3px'</span>, sm: <span class="css-hex">'5px'</span>, md: <span class="css-hex">'8px'</span>, lg: <span class="css-hex">'12px'</span>, xl: <span class="css-hex">'16px'</span>,
+      },
+      fontFamily: {
+        sans:  [<span class="css-hex">'Inter'</span>, <span class="css-hex">'system-ui'</span>, <span class="css-hex">'sans-serif'</span>],
+        serif: [<span class="css-hex">'Source Serif 4'</span>, <span class="css-hex">'Georgia'</span>, <span class="css-hex">'serif'</span>],
+        mono:  [<span class="css-hex">'JetBrains Mono'</span>, <span class="css-hex">'Menlo'</span>, <span class="css-hex">'monospace'</span>],
+      },
+    }
+  }
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 09 CHANGELOG ── -->
+  <section id="changelog">
+    <div class="section-header">
+      <span class="section-number">09</span>
+      <span class="section-title">Changelog from v1</span>
+      <span class="section-desc">What changed, what stayed, what was retired.</span>
+    </div>
+
+    <div class="change-grid">
+      <div class="change-dot-col">
+        <div class="change-dot" style="background:var(--amber-100); border-color:var(--amber-500)"></div>
+        <div class="change-line"></div>
+      </div>
+      <div class="change-content">
+        <div class="change-type" style="color:var(--amber-700)">NEW — Amber Scale</div>
+        <div class="change-text">Added full 50–950 amber scale as the new primary action color. Replaces teal as the hero CTA color. Semantic tokens: <code class="mono" style="font-size:11px">--accent-primary</code>, <code class="mono" style="font-size:11px">--accent-primary-dark</code>, <code class="mono" style="font-size:11px">--accent-primary-bg</code>, <code class="mono" style="font-size:11px">--accent-primary-text</code>.</div>
+      </div>
+      <div class="change-dot-col">
+        <div class="change-dot" style="background:var(--emerald-100); border-color:var(--emerald-500)"></div>
+        <div class="change-line"></div>
+      </div>
+      <div class="change-content">
+        <div class="change-type" style="color:var(--emerald-700)">NEW — Emerald Scale</div>
+        <div class="change-text">New 50–950 emerald scale for reward moments and success states. Warmer and more saturated than the previous <code class="mono" style="font-size:11px">#166534</code>-family. Used for <code class="mono" style="font-size:11px">--severity-favorable</code> and confirm/close actions.</div>
+      </div>
+      <div class="change-dot-col">
+        <div class="change-dot" style="background:var(--violet-100); border-color:var(--violet-500)"></div>
+        <div class="change-line"></div>
+      </div>
+      <div class="change-content">
+        <div class="change-type" style="color:var(--violet-700)">NEW — Violet Scale</div>
+        <div class="change-text">New 50–950 violet scale exclusively for agentic and processing UI states. Pulse animations, data flow bars, processing indicators. Semantic tokens: <code class="mono" style="font-size:11px">--accent-agent</code> family.</div>
+      </div>
+      <div class="change-dot-col">
+        <div class="change-dot" style="background:var(--neutral-200); border-color:var(--neutral-500)"></div>
+        <div class="change-line"></div>
+      </div>
+      <div class="change-content">
+        <div class="change-type" style="color:var(--text-secondary)">REVISED — Neutral Scale</div>
+        <div class="change-text">Canvas/surface base unchanged (<code class="mono" style="font-size:11px">#FAFAF8</code> ≈ original). Mid-range tones slightly warmer (+hue 60 vs 0). Border tokens now use <code class="mono" style="font-size:11px">--neutral-200</code> and <code class="mono" style="font-size:11px">--neutral-300</code> for clear hierarchy.</div>
+      </div>
+      <div class="change-dot-col">
+        <div class="change-dot" style="background:#FEF0F0; border-color:#B91C1C"></div>
+        <div class="change-line"></div>
+      </div>
+      <div class="change-content">
+        <div class="change-type" style="color:#B91C1C">REVISED — Severity / Medium</div>
+        <div class="change-text">Medium severity migrated from old <code class="mono" style="font-size:11px">#FEF3C7 / #B45309</code> to amber-family tokens for brand cohesion. High severity background lightened slightly to <code class="mono" style="font-size:11px">#FEF0F0</code> (less aggressive). Favorable now uses emerald instead of old <code class="mono" style="font-size:11px">#ECFDF5 / #166534</code>.</div>
+      </div>
+      <div class="change-dot-col">
+        <div class="change-dot" style="background:var(--teal-500); border-color:var(--teal-700); opacity:0.5"></div>
+        <div class="change-line"></div>
+      </div>
+      <div class="change-content">
+        <div class="change-type" style="color:var(--teal-700)">DEMOTED — Teal</div>
+        <div class="change-text">Teal (<code class="mono" style="font-size:11px">#0D9488</code>) retired from primary accent role. Kept as <code class="mono" style="font-size:11px">--accent-utility</code> for secondary links, data table header text, inline highlights. Not for buttons or primary UI chrome.</div>
+      </div>
+      <div class="change-dot-col">
+        <div class="change-dot" style="background:var(--violet-100); border-color:var(--violet-400)"></div>
+        <div class="change-line"></div>
+      </div>
+      <div class="change-content">
+        <div class="change-type" style="color:var(--violet-700)">NEW — Motion Token Set</div>
+        <div class="change-text">5 duration tokens (80–650ms), 4 easing curves, 3 scale values, 3 accent shadows, and <code class="mono" style="font-size:11px">@media (prefers-reduced-motion)</code> safety layer. Zero Framer Motion dependency — pure CSS custom properties.</div>
+      </div>
+      <div class="change-dot-col">
+        <div class="change-dot" style="background:var(--amber-50); border-color:var(--amber-400)"></div>
+      </div>
+      <div class="change-content">
+        <div class="change-type" style="color:var(--amber-700)">REVISED — Typography</div>
+        <div class="change-text">Source Serif 4 promoted to display/hero-number role (was underused). Inter weight scale tightened: 700 for H1, 600 for H2–H3, 500 for labels/UI. JetBrains Mono now specified for all data cells with <code class="mono" style="font-size:11px">font-variant-numeric: tabular-nums</code>.</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer style="border-top:1px solid var(--border); padding:32px 64px; background:var(--surface); display:flex; align-items:center; justify-content:space-between; margin-top:32px;">
+  <div>
+    <div style="font-family:'Source Serif 4',serif; font-size:16px; font-weight:600; letter-spacing:-0.01em; color:var(--text-primary)">IronLedger</div>
+    <div style="font-size:12px; color:var(--text-tertiary); margin-top:2px;">Design Tokens v2 — April 2026</div>
+  </div>
+  <div style="display:flex; gap:32px; align-items:center;">
+    <div style="text-align:center;">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-tertiary); letter-spacing:.04em; text-transform:uppercase; margin-bottom:6px;">Primary</div>
+      <div style="width:32px; height:32px; border-radius:var(--radius-sm); background:var(--amber-500); margin:0 auto; box-shadow:var(--shadow-amber)"></div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-tertiary); letter-spacing:.04em; text-transform:uppercase; margin-bottom:6px;">Reward</div>
+      <div style="width:32px; height:32px; border-radius:var(--radius-sm); background:var(--emerald-500); margin:0 auto; box-shadow:var(--shadow-emerald)"></div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-tertiary); letter-spacing:.04em; text-transform:uppercase; margin-bottom:6px;">Agentic</div>
+      <div style="width:32px; height:32px; border-radius:var(--radius-sm); background:var(--violet-500); margin:0 auto; box-shadow:var(--shadow-violet)"></div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-tertiary); letter-spacing:.04em; text-transform:uppercase; margin-bottom:6px;">Utility</div>
+      <div style="width:32px; height:32px; border-radius:var(--radius-sm); background:var(--teal-600); margin:0 auto; opacity:0.5"></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Reward button demo
+document.getElementById('rewardBtn').addEventListener('click', function() {
+  this.classList.remove('triggered');
+  void this.offsetWidth; // reflow
+  this.classList.add('triggered');
+  setTimeout(() => this.classList.remove('triggered'), 700);
+});
+
+// Copy CSS
+function copyCSS() {
+  const raw = `/* ─────────────────────────────────────────────
+   IRON LEDGER — DESIGN TOKENS v2
+   April 2026 — warm, vibrant, trust-anchored
+   ───────────────────────────────────────────── */
+
+:root {
+
+  /* NEUTRAL / WARM STONE */
+  --neutral-50:  #FAFAF8;
+  --neutral-100: #F4F3F0;
+  --neutral-200: #E9E8E4;
+  --neutral-300: #D5D3CE;
+  --neutral-400: #BAB8B2;
+  --neutral-500: #9A9892;
+  --neutral-600: #787670;
+  --neutral-700: #5A5853;
+  --neutral-800: #3C3A36;
+  --neutral-900: #252421;
+  --neutral-950: #151412;
+
+  /* AMBER / PRIMARY CTA — oklch(L 0.17 54) */
+  --amber-50:  #FFF8ED;
+  --amber-100: #FFEECE;
+  --amber-200: #FEDA9A;
+  --amber-300: #FDC060;
+  --amber-400: #FBA12A;
+  --amber-500: #F08408;
+  --amber-600: #C46600;
+  --amber-700: #9A4D00;
+  --amber-800: #763900;
+  --amber-900: #572900;
+  --amber-950: #371800;
+
+  /* EMERALD / REWARD — oklch(L 0.16 152) */
+  --emerald-50:  #EDFAF3;
+  --emerald-100: #D1F4E4;
+  --emerald-200: #A3E8CA;
+  --emerald-300: #68D4A8;
+  --emerald-400: #34BB83;
+  --emerald-500: #16A066;
+  --emerald-600: #0F7F50;
+  --emerald-700: #0A613C;
+  --emerald-800: #07472C;
+  --emerald-900: #04311E;
+  --emerald-950: #021E12;
+
+  /* VIOLET / AGENTIC — oklch(L 0.16 282) */
+  --violet-50:  #F3F1FD;
+  --violet-100: #E5DFFB;
+  --violet-200: #CABEF7;
+  --violet-300: #A897F0;
+  --violet-400: #8570E6;
+  --violet-500: #6651D4;
+  --violet-600: #4F3DAE;
+  --violet-700: #3A2C87;
+  --violet-800: #281D63;
+  --violet-900: #1A1244;
+  --violet-950: #0E0928;
+
+  /* TEAL — utility only, demoted from primary */
+  --teal-400: #2DD4BF;
+  --teal-500: #14B8A6;
+  --teal-600: #0D9488;
+  --teal-700: #0F766E;
+
+  /* SEMANTIC — SURFACE */
+  --canvas:         var(--neutral-50);
+  --surface:        #FFFFFF;
+  --border:         var(--neutral-200);
+  --border-strong:  var(--neutral-300);
+
+  /* SEMANTIC — TEXT */
+  --text-primary:   var(--neutral-900);
+  --text-secondary: var(--neutral-600);
+  --text-tertiary:  var(--neutral-500);
+  --text-disabled:  var(--neutral-400);
+  --text-inverse:   #FFFFFF;
+
+  /* SEMANTIC — ACCENT */
+  --accent-primary:       var(--amber-500);
+  --accent-primary-dark:  var(--amber-600);
+  --accent-primary-bg:    var(--amber-50);
+  --accent-primary-text:  var(--amber-700);
+  --accent-reward:        var(--emerald-500);
+  --accent-reward-dark:   var(--emerald-600);
+  --accent-reward-bg:     var(--emerald-50);
+  --accent-reward-text:   var(--emerald-700);
+  --accent-agent:         var(--violet-500);
+  --accent-agent-dark:    var(--violet-600);
+  --accent-agent-bg:      var(--violet-50);
+  --accent-agent-text:    var(--violet-700);
+  --accent-utility:       var(--teal-600);
+  --accent-utility-bg:    #F0FDFA;
+  --accent-utility-text:  var(--teal-700);
+
+  /* SEMANTIC — SEVERITY */
+  --severity-high-bg:          #FEF0F0;
+  --severity-high-text:        #B91C1C;
+  --severity-high-border:      #FECACA;
+  --severity-medium-bg:        var(--amber-50);
+  --severity-medium-text:      var(--amber-700);
+  --severity-medium-border:    var(--amber-200);
+  --severity-normal-bg:        var(--neutral-100);
+  --severity-normal-text:      var(--neutral-600);
+  --severity-normal-border:    var(--neutral-200);
+  --severity-favorable-bg:     var(--emerald-50);
+  --severity-favorable-text:   var(--emerald-700);
+  --severity-favorable-border: var(--emerald-200);
+
+  /* SHADOWS */
+  --shadow-xs:      0 1px 2px oklch(0.14 0.01 60 / 0.06);
+  --shadow-sm:      0 2px 6px oklch(0.14 0.01 60 / 0.08), 0 1px 2px oklch(0.14 0.01 60 / 0.04);
+  --shadow-md:      0 4px 16px oklch(0.14 0.01 60 / 0.10), 0 2px 4px oklch(0.14 0.01 60 / 0.05);
+  --shadow-lg:      0 8px 32px oklch(0.14 0.01 60 / 0.12), 0 4px 8px oklch(0.14 0.01 60 / 0.06);
+  --shadow-xl:      0 20px 60px oklch(0.14 0.01 60 / 0.16), 0 8px 16px oklch(0.14 0.01 60 / 0.08);
+  --shadow-amber:   0 4px 20px oklch(0.68 0.17 54 / 0.28);
+  --shadow-emerald: 0 4px 20px oklch(0.60 0.16 152 / 0.24);
+  --shadow-violet:  0 4px 20px oklch(0.58 0.16 282 / 0.24);
+
+  /* MOTION — DURATION */
+  --duration-instant: 80ms;
+  --duration-fast:    140ms;
+  --duration-base:    220ms;
+  --duration-slow:    380ms;
+  --duration-reward:  650ms;
+
+  /* MOTION — EASING */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-linear: linear;
+
+  /* MOTION — SCALE */
+  --scale-hover:  1.015;
+  --scale-press:  0.970;
+  --scale-reward: 1.040;
+
+  /* FOCUS RINGS */
+  --ring-focus:  0 0 0 3px oklch(0.68 0.17 54 / 0.30);
+  --ring-reward: 0 0 0 3px oklch(0.60 0.16 152 / 0.30);
+  --ring-agent:  0 0 0 3px oklch(0.58 0.16 282 / 0.30);
+
+  /* RADIUS */
+  --radius-xs:   3px;
+  --radius-sm:   5px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-pill: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0ms;
+    --duration-fast:    0ms;
+    --duration-base:    0ms;
+    --duration-slow:    0ms;
+    --duration-reward:  0ms;
+  }
+}`;
+  navigator.clipboard.writeText(raw).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy all'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function copyTW() {
+  const el = event.target;
+  navigator.clipboard.writeText('// See doc for full tailwind.config.js snippet').then(() => {
+    el.textContent = '✓ Copied'; el.classList.add('copied');
+    setTimeout(() => { el.textContent = 'Copy'; el.classList.remove('copied'); }, 2000);
+  });
+}
+
+// Nav active state — disabled in print version
+
+// Auto-print: wait for fonts then trigger
+document.fonts.ready.then(() => {
+  setTimeout(() => window.print(), 500);
+});
+</script>
+</body>
+</html>

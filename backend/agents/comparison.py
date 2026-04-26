@@ -97,23 +97,28 @@ class ComparisonAgent:
                 "comparison progress update failed", extra={"error": str(exc)}
             )
 
-        # 1. Fetch current period entries
+        # 1. Fetch prior flag counts once — avoids N+1 queries inside the loop
+        prior_flag_counts = self._anomalies.list_account_flag_counts_before(
+            company_id, period, lookback_months=6
+        )
+
+        # 2. Fetch current period entries
         current_entries = self._entries.list_for_period(company_id, period)
 
-        # 2. Fetch historical entries (up to 6 months prior)
+        # 3. Fetch historical entries (up to 6 months prior)
         history = self._entries.list_history(company_id, period, lookback_months=6)
 
-        # 3. Resolve account metadata
+        # 4. Resolve account metadata
         accounts_map = self._accounts.get_accounts_by_id(company_id)
 
-        # 4. Group history by account_id
+        # 5. Group history by account_id
         history_by_account: dict[str, list[float]] = {}
         for entry in history:
             history_by_account.setdefault(entry.account_id, []).append(
                 float(entry.actual_amount)
             )
 
-        # 5. Process each current entry
+        # 6. Process each current entry
         summaries: dict[str, AccountSummary] = {}
         flagged_anomalies: list[Anomaly] = []
 
@@ -159,6 +164,12 @@ class ComparisonAgent:
                     f"{account_name} is {abs(result['variance_pct']):.1f}% "
                     f"{direction} the {periods_label}."
                 )
+                prior = prior_flag_counts.get(entry.account_id, 0)
+                is_recurring = prior >= 2
+                if is_recurring:
+                    description += (
+                        f" Flagged in {prior} of the past 6 months — recurring pattern."
+                    )
                 flagged_anomalies.append(
                     Anomaly(
                         id=str(uuid.uuid4()),
@@ -169,10 +180,11 @@ class ComparisonAgent:
                         severity=result["severity"],
                         description=description,
                         variance_pct=result["variance_pct"],
+                        is_recurring=is_recurring,
                     )
                 )
 
-        # 6. Persist anomalies
+        # 7. Persist anomalies
         self._anomalies.write_many(flagged_anomalies)
 
         # Update progress: comparison complete

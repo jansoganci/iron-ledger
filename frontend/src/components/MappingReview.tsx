@@ -274,7 +274,7 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
                         unsure && !value ? "bg-severity-medium-bg/30" : ""
                       )}
                     >
-                      <td className="px-4 py-2 font-mono text-xs text-text-primary">
+                      <td className="px-4 py-2 font-data text-xs text-text-primary">
                         {item.source_pattern}
                       </td>
                       <td className="px-4 py-2">

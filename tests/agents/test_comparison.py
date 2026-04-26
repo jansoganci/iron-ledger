@@ -1,10 +1,15 @@
-"""Unit tests for comparison.py — Track 4 tiered materiality thresholds."""
+"""Unit tests for comparison.py — tiered materiality thresholds and recurrence detection."""
 
 from __future__ import annotations
 
+from datetime import date
+from decimal import Decimal
+from unittest.mock import MagicMock
+
 import pytest
 
-from backend.agents.comparison import calculate_variance
+from backend.agents.comparison import ComparisonAgent, calculate_variance
+from backend.domain.entities import MonthlyEntry
 
 
 # ---------------------------------------------------------------------------
@@ -157,3 +162,110 @@ def test_unknown_category_treated_as_tier1() -> None:
     )
     # $20K delta, 20% — clears Tier 1 pct (10%) but NOT dollar ($50K) → no flag
     assert result["flag"] is False
+
+
+# ---------------------------------------------------------------------------
+# ComparisonAgent — recurring anomaly detection
+# ---------------------------------------------------------------------------
+
+COMPANY_ID = "00000000-0000-0000-0000-000000000001"
+ACCT_ID = "00000000-0000-0000-0000-000000000002"
+PERIOD = date(2026, 3, 1)
+
+
+def _make_entry(account_id: str, amount: float) -> MonthlyEntry:
+    return MonthlyEntry(
+        id="entry-1",
+        company_id=COMPANY_ID,
+        account_id=account_id,
+        period=PERIOD,
+        actual_amount=Decimal(str(amount)),
+    )
+
+
+def _make_history_entry(account_id: str, amount: float, period: date) -> MonthlyEntry:
+    return MonthlyEntry(
+        id="hist-1",
+        company_id=COMPANY_ID,
+        account_id=account_id,
+        period=period,
+        actual_amount=Decimal(str(amount)),
+    )
+
+
+def _make_agent(prior_flag_counts: dict[str, int]) -> ComparisonAgent:
+    """Build a ComparisonAgent with all repo dependencies mocked."""
+    entries_repo = MagicMock()
+    anomalies_repo = MagicMock()
+    runs_repo = MagicMock()
+    accounts_repo = MagicMock()
+
+    # Current entry: PAYROLL account is $360K (flagged vs $300K mean)
+    entries_repo.list_for_period.return_value = [_make_entry(ACCT_ID, 360_000.0)]
+
+    # History: two months at $300K gives mean = $300K
+    entries_repo.list_history.return_value = [
+        _make_history_entry(ACCT_ID, 300_000.0, date(2026, 1, 1)),
+        _make_history_entry(ACCT_ID, 300_000.0, date(2026, 2, 1)),
+    ]
+
+    accounts_repo.get_accounts_by_id.return_value = {
+        ACCT_ID: {"name": "Engineering Salaries", "category": "PAYROLL"}
+    }
+
+    anomalies_repo.list_account_flag_counts_before.return_value = prior_flag_counts
+    anomalies_repo.write_many.return_value = None
+
+    runs_repo.get_by_id.return_value = {"status": "comparing"}
+    runs_repo.update_status.return_value = None
+    runs_repo.set_pandas_summary.return_value = None
+
+    return ComparisonAgent(entries_repo, anomalies_repo, runs_repo, accounts_repo)
+
+
+def test_recurrence_suffix_appended_when_prior_count_is_2() -> None:
+    agent = _make_agent({ACCT_ID: 2})
+    agent.run("run-1", COMPANY_ID, PERIOD)
+
+    written: list = agent._anomalies.write_many.call_args[0][0]
+    assert len(written) == 1
+    assert (
+        "Flagged in 2 of the past 6 months — recurring pattern."
+        in written[0].description
+    )
+
+
+def test_recurrence_suffix_appended_when_prior_count_exceeds_2() -> None:
+    agent = _make_agent({ACCT_ID: 4})
+    agent.run("run-1", COMPANY_ID, PERIOD)
+
+    written: list = agent._anomalies.write_many.call_args[0][0]
+    assert (
+        "Flagged in 4 of the past 6 months — recurring pattern."
+        in written[0].description
+    )
+
+
+def test_recurrence_suffix_not_appended_when_prior_count_is_1() -> None:
+    agent = _make_agent({ACCT_ID: 1})
+    agent.run("run-1", COMPANY_ID, PERIOD)
+
+    written: list = agent._anomalies.write_many.call_args[0][0]
+    assert "recurring pattern" not in written[0].description
+
+
+def test_recurrence_suffix_not_appended_when_no_prior_flags() -> None:
+    agent = _make_agent({})
+    agent.run("run-1", COMPANY_ID, PERIOD)
+
+    written: list = agent._anomalies.write_many.call_args[0][0]
+    assert "recurring pattern" not in written[0].description
+
+
+def test_list_account_flag_counts_called_once_not_per_entry() -> None:
+    agent = _make_agent({})
+    agent.run("run-1", COMPANY_ID, PERIOD)
+
+    agent._anomalies.list_account_flag_counts_before.assert_called_once_with(
+        COMPANY_ID, PERIOD, lookback_months=6
+    )

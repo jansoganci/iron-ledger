@@ -52,6 +52,7 @@ class Anomaly:
     description: str
     variance_pct: Decimal | None = None
     status: str = "open"
+    is_recurring: bool = False
     created_at: datetime | None = None
 
 
@@ -67,6 +68,11 @@ class Report:
     mail_sent_at: datetime | None = None
     reconciliations: list[dict] | None = None
     opus_upgraded: bool = False
+    report_type: str = "monthly"
+    quarter: int | None = None
+    year: int | None = None
+    is_stale: bool = False
+    quarterly_data: dict | None = None
     created_at: datetime | None = None
 
 

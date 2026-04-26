@@ -1,38 +1,40 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { Mail, X } from "lucide-react";
 import { useState } from "react";
-import { apiFetch } from "../lib/api";
-import { useToast } from "./ToastProvider";
+import { formatPeriod } from "../lib/formatters";
 import { cn } from "../lib/utils";
 
 interface MailButtonProps {
   reportId: string;
+  summary: string;
+  companyName: string;
+  period: string;
+  anomalyCount: number;
 }
 
-export function MailButton({ reportId }: MailButtonProps) {
+export function MailButton({ summary, companyName, period, anomalyCount }: MailButtonProps) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const toast = useToast();
 
-  async function handleSend() {
+  function buildMailto(to: string): string {
+    const periodLabel = formatPeriod(period);
+    const subject = `IronLedger Close Package - ${companyName} - ${periodLabel}`;
+    const body = [
+      `Period: ${periodLabel}`,
+      `Anomalies detected: ${anomalyCount}`,
+      "",
+      summary,
+      "",
+      "Please attach the Excel close package from IronLedger before sending.",
+    ].join("\n");
+    return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
+  function handleOpen() {
     if (!email) return;
-    setIsSending(true);
-    try {
-      await apiFetch("/mail/send", {
-        method: "POST",
-        json: { report_id: reportId, to_email: email },
-      });
-      toast.success(`Report emailed to ${email}.`);
-      setOpen(false);
-      setEmail("");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "The email couldn't be sent. Please try again."
-      );
-    } finally {
-      setIsSending(false);
-    }
+    window.location.href = buildMailto(email);
+    setOpen(false);
+    setEmail("");
   }
 
   return (
@@ -83,16 +85,14 @@ export function MailButton({ reportId }: MailButtonProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="cfo@company.com"
-              disabled={isSending}
               autoComplete="email"
               className={cn(
                 "w-full rounded-md border border-border bg-surface px-3 py-2",
                 "text-sm text-text-primary placeholder:text-text-secondary",
-                "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1",
-                isSending && "opacity-60 cursor-not-allowed"
+                "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
               )}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleSend();
+                if (e.key === "Enter") handleOpen();
               }}
             />
           </div>
@@ -107,16 +107,16 @@ export function MailButton({ reportId }: MailButtonProps) {
               Cancel
             </Dialog.Close>
             <button
-              onClick={handleSend}
-              disabled={!email || isSending}
+              onClick={handleOpen}
+              disabled={!email}
               className={cn(
                 "rounded-md bg-accent px-4 py-2 text-sm font-medium text-white",
-                "hover:bg-accent/90 transition-colors",
+                "hover:bg-accent/90 hover:scale-[1.015] active:scale-[0.97] transition-all",
                 "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
-                (!email || isSending) && "opacity-50 cursor-not-allowed"
+                !email && "opacity-50 cursor-not-allowed scale-100"
               )}
             >
-              {isSending ? "Sending…" : "Send"}
+              Open in Email
             </button>
           </div>
         </Dialog.Content>

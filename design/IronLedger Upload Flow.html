@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IronLedger — Upload Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,600;1,8..60,300;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+:root {
+  --neutral-50: #FAFAF8; --neutral-100: #F4F3F0; --neutral-200: #E9E8E4;
+  --neutral-300: #D5D3CE; --neutral-400: #BAB8B2; --neutral-500: #9A9892;
+  --neutral-600: #787670; --neutral-700: #5A5853; --neutral-900: #252421;
+  --amber-50: #FFF8ED; --amber-100: #FFEECE; --amber-200: #FEDA9A;
+  --amber-400: #FBA12A; --amber-500: #F08408; --amber-600: #C46600; --amber-700: #9A4D00;
+  --emerald-50: #EDFAF3; --emerald-100: #D1F4E4; --emerald-200: #A3E8CA;
+  --emerald-300: #68D4A8; --emerald-400: #34BB83; --emerald-500: #16A066;
+  --emerald-600: #0F7F50; --emerald-700: #0A613C;
+  --violet-50: #F3F1FD; --violet-100: #E5DFFB; --violet-200: #CABEF7;
+  --violet-300: #A897F0; --violet-400: #8570E6; --violet-500: #6651D4;
+  --violet-600: #4F3DAE; --violet-700: #3A2C87;
+  --canvas: #FAFAF8; --surface: #FFFFFF;
+  --border: #E9E8E4; --border-strong: #D5D3CE;
+  --text-primary: #252421; --text-secondary: #787670; --text-tertiary: #9A9892;
+  --shadow-sm: 0 2px 6px oklch(0.14 0.01 60 / 0.08), 0 1px 2px oklch(0.14 0.01 60 / 0.04);
+  --shadow-md: 0 4px 16px oklch(0.14 0.01 60 / 0.10), 0 2px 4px oklch(0.14 0.01 60 / 0.05);
+  --shadow-lg: 0 8px 32px oklch(0.14 0.01 60 / 0.12);
+  --shadow-amber: 0 4px 20px oklch(0.68 0.17 54 / 0.30);
+  --shadow-emerald: 0 6px 28px oklch(0.60 0.16 152 / 0.28);
+  --shadow-violet: 0 4px 20px oklch(0.58 0.16 282 / 0.24);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--canvas);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── KEYFRAMES ── */
+@keyframes flowRight {
+  from { transform: translateX(-280px); opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  to   { transform: translateX(110vw); opacity: 0; }
+}
+@keyframes floatUp {
+  0%   { transform: translateY(0) scale(1); opacity: 0; }
+  8%   { opacity: 1; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateY(-100vh) scale(0.5); opacity: 0; }
+}
+@keyframes stepPulse {
+  0%   { box-shadow: 0 0 0 0 oklch(0.58 0.16 282 / 0.35); }
+  70%  { box-shadow: 0 0 0 8px oklch(0.58 0.16 282 / 0); }
+  100% { box-shadow: 0 0 0 0 oklch(0.58 0.16 282 / 0); }
+}
+@keyframes messageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes cardReveal {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes cleanCircleExpand {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.08); opacity: 1; }
+  80%  { transform: scale(0.97); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes cleanCheckIn {
+  0%   { opacity: 0; transform: scale(0.4); }
+  60%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes cleanRingPulse {
+  0%   { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+@keyframes shimmerSweep {
+  from { background-position: -200% center; }
+  to   { background-position: 200% center; }
+}
+@keyframes progressFill {
+  from { width: 0%; }
+}
+@keyframes uploadProg {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes connectorFill {
+  from { height: 0%; }
+  to   { height: 100%; }
+}
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes dotBlink {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes dragPulse {
+  0%, 100% { border-color: var(--amber-400); background: var(--amber-50); }
+  50% { border-color: var(--amber-500); background: var(--amber-100); }
+}
+
+/* ── LAYOUT ── */
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+.app-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── DEMO NAV ── */
+.demo-nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.demo-nav::-webkit-scrollbar { display: none; }
+.demo-nav-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.demo-pill {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 140ms var(--ease-out);
+  font-family: 'Inter', sans-serif;
+}
+.demo-pill:hover { background: var(--neutral-100); color: var(--text-primary); }
+.demo-pill.active { background: var(--violet-50); color: var(--violet-700); border-color: var(--violet-200); }
+
+/* ── SHARED CARD ── */
+.upload-card {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── DROPZONE EMPTY ── */
+.dropzone-wrap { max-width: 540px; width: 100%; }
+.dz-wordmark {
+  font-family: 'Source Serif 4', serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  text-align: center;
+  margin-bottom: 28px;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+.dropzone {
+  border: 2px dashed var(--border-strong);
+  border-radius: 14px;
+  padding: 52px 40px 44px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 180ms var(--ease-out);
+  background: var(--surface);
+  position: relative;
+}
+.dropzone:hover, .dropzone.over {
+  border-color: var(--amber-400);
+  background: var(--amber-50);
+}
+.dropzone.over {
+  animation: dragPulse 1s ease-in-out infinite;
+}
+.dz-icon {
+  width: 56px; height: 56px;
+  margin: 0 auto 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--neutral-100);
+  border-radius: 14px;
+  transition: all 180ms var(--ease-out);
+}
+.dropzone:hover .dz-icon, .dropzone.over .dz-icon {
+  background: var(--amber-100);
+}
+.dz-headline {
+  font-family: 'Source Serif 4', serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  line-height: 1.15;
+}
+.dz-sub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+.dz-badges {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.dz-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  border: 1px solid;
+}
+.dz-badge-excel { background: #F0FDF4; color: #166534; border-color: #A3E8CA; }
+.dz-badge-csv   { background: #EFF6FF; color: #1E40AF; border-color: #BFDBFE; }
+.dz-click-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.dz-click-hint span { color: var(--amber-600); font-weight: 500; cursor: pointer; }
+.dz-click-hint span:hover { text-decoration: underline; }
+.dz-drag-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 180ms;
+}
+.dropzone.over .dz-drag-overlay { opacity: 1; }
+
+/* ── DROPZONE WITH FILES ── */
+.dz-files-card { max-width: 540px; width: 100%; }
+.dz-files-header {
+  padding: 24px 24px 0;
+  margin-bottom: 16px;
+}
+.dz-files-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.dz-files-sub { font-size: 13px; color: var(--text-secondary); }
+.file-list { padding: 0 16px; display: flex; flex-direction: column; gap: 6px; }
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: all 140ms var(--ease-out);
+}
+.file-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+.file-icon-wrap {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.file-icon-excel { background: #DCFCE7; }
+.file-icon-csv   { background: #DBEAFE; }
+.file-name {
+  font-size: 13px; font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-size {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.file-remove {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary);
+  transition: all 100ms var(--ease-out);
+  flex-shrink: 0;
+}
+.file-remove:hover { background: #FEF0F0; color: #B91C1C; }
+.dz-add-more {
+  margin: 10px 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 140ms var(--ease-out);
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.dz-add-more:hover { border-color: var(--amber-400); color: var(--amber-700); background: var(--amber-50); }
+.dz-actions {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.btn-primary {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 20px;
+  background: var(--amber-500);
+  color: white;
+  font-size: 14px; font-weight: 600;
+  border-radius: 8px;
+  border: none; cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: all 140ms var(--ease-out);
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover { background: var(--amber-600); box-shadow: var(--shadow-amber); transform: scale(1.012); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-secondary {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 12px 16px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 13px; font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: all 140ms var(--ease-out);
+  white-space: nowrap;
+}
+.btn-secondary:hover { background: var(--canvas); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+.btn-secondary:active { transform: scale(0.97); }
+
+/* ── UPLOADING STATE ── */
+.uploading-wrap { max-width: 480px; width: 100%; }
+.upload-header {
+  padding: 28px 28px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.upload-title { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.upload-sub { font-size: 13px; color: var(--text-secondary); }
+.upload-items { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.upload-item { display: flex; flex-direction: column; gap: 6px; }
+.upload-item-row { display: flex; align-items: center; justify-content: space-between; }
+.upload-item-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.upload-item-pct { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-tertiary); }
+.upload-bar-track {
+  height: 3px;
+  background: var(--neutral-200);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.upload-bar-fill {
+  height: 100%;
+  background: var(--amber-500);
+  border-radius: 2px;
+  transform-origin: left;
+  animation: uploadProg linear forwards;
+}
+
+/* ── PROCESSING ── */
+.processing-stage {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: linear-gradient(160deg, var(--violet-50) 0%, var(--canvas) 40%, var(--canvas) 70%, var(--violet-50) 100%);
+  overflow: hidden;
+}
+.processing-card {
+  position: relative;
+  z-index: 10;
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border);
+  width: 100%;
+  max-width: 500px;
+  padding: 32px;
+}
+.proc-header { margin-bottom: 32px; }
+.proc-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--violet-500);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.proc-eyebrow-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--violet-500);
+  animation: dotBlink 1.4s ease-in-out infinite;
+}
+.proc-title {
+  font-family: 'Source Serif 4', serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.proc-hint {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.proc-steps { display: flex; flex-direction: column; }
+.proc-step {
+  display: flex;
+  gap: 14px;
+  position: relative;
+}
+.proc-step-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+.proc-step-icon {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 300ms var(--ease-out);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.proc-step-icon.pending {
+  background: var(--neutral-100);
+  border: 1.5px solid var(--border);
+}
+.proc-step-icon.active {
+  background: var(--violet-500);
+  border: none;
+  animation: stepPulse 1.8s ease-out infinite;
+  box-shadow: var(--shadow-violet);
+}
+.proc-step-icon.done {
+  background: var(--emerald-500);
+  border: none;
+}
+.proc-connector {
+  width: 2px;
+  background: var(--border);
+  flex: 1;
+  min-height: 16px;
+  position: relative;
+  overflow: hidden;
+  margin: 2px 0;
+}
+.proc-connector-fill {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  background: var(--emerald-400);
+  animation: connectorFill 400ms var(--ease-out) forwards;
+}
+.proc-step-body {
+  padding-bottom: 24px;
+  padding-top: 6px;
+  flex: 1;
+  min-height: 36px;
+}
+.proc-step:last-child .proc-step-body { padding-bottom: 0; }
+.proc-step-label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 4px;
+  transition: color 200ms;
+}
+.proc-step-label.pending { color: var(--text-tertiary); }
+.proc-step-label.active  { color: var(--text-primary); }
+.proc-step-label.done    { color: var(--emerald-700); }
+.proc-microcopy-wrap {
+  min-height: 20px;
+  overflow: hidden;
+}
+.proc-microcopy {
+  font-size: 13px;
+  color: var(--violet-600);
+  font-family: 'JetBrains Mono', monospace;
+  animation: messageIn 220ms var(--ease-out) both;
+}
+.proc-done-note {
+  font-size: 12px;
+  color: var(--emerald-600);
+  font-weight: 500;
+}
+.proc-footer {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.proc-time-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.proc-skip {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  font-family: 'Inter', sans-serif;
+  transition: all 120ms;
+}
+.proc-skip:hover { color: var(--text-primary); background: var(--canvas); }
+
+/* DATA FLOW BG */
+.dataflow-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+/* ── REVEAL — ANOMALIES ── */
+.reveal-wrap { max-width: 700px; width: 100%; }
+.reveal-header {
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.reveal-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+.reveal-title {
+  font-family: 'Source Serif 4', serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.reveal-meta { font-size: 13px; color: var(--text-secondary); }
+.reveal-summary {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.reveal-stat {
+  flex: 1;
+  padding: 16px 20px;
+  border-right: 1px solid var(--border);
+}
+.reveal-stat:last-child { border-right: none; }
+.reveal-stat-label { font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 4px; }
+.reveal-stat-value { font-family: 'Source Serif 4', serif; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.reveal-stat-value.red { color: #B91C1C; }
+.reveal-stat-value.amber { color: var(--amber-700); }
+.reveal-stat-value.green { color: var(--emerald-600); }
+.reveal-body { background: var(--canvas); padding: 16px 20px; border-radius: 0 0 16px 16px; }
+.reveal-list-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 12px;
+}
+.anomaly-list { display: flex; flex-direction: column; gap: 8px; }
+.anomaly-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 180ms var(--ease-out);
+  animation: cardReveal 300ms var(--ease-out) both;
+}
+.anomaly-row:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.sev-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.sev-dot.high { background: #B91C1C; }
+.sev-dot.medium { background: var(--amber-500); }
+.sev-dot.normal { background: var(--neutral-400); }
+.anomaly-main { flex: 1; }
+.anomaly-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.anomaly-detail { font-size: 12px; color: var(--text-secondary); }
+.anomaly-right { text-align: right; flex-shrink: 0; }
+.anomaly-amount {
+  font-family: 'Source Serif 4', serif;
+  font-size: 16px; font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin-bottom: 3px;
+}
+.severity-badge {
+  display: inline-block;
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+.sev-badge-high { background: #FEF0F0; color: #B91C1C; border-color: #FECACA; }
+.sev-badge-medium { background: var(--amber-50); color: var(--amber-700); border-color: var(--amber-200); }
+.sev-badge-normal { background: var(--neutral-100); color: var(--neutral-600); border-color: var(--neutral-200); }
+.reveal-actions {
+  padding: 14px 20px 20px;
+  background: var(--canvas);
+  border-radius: 0 0 16px 16px;
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: -1px;
+}
+
+/* ── REVEAL — CLEAN ── */
+.clean-stage {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: linear-gradient(160deg, var(--emerald-50) 0%, var(--canvas) 35%, var(--canvas) 70%, var(--emerald-50) 100%);
+  position: relative;
+  overflow: hidden;
+}
+.clean-card {
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow-emerald), 0 0 0 1px var(--emerald-100);
+  width: 100%;
+  max-width: 460px;
+  padding: 48px 40px;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+  animation: fadeSlideUp 400ms var(--ease-out) both;
+}
+.clean-ring-wrap {
+  position: relative;
+  width: 80px; height: 80px;
+  margin: 0 auto 28px;
+}
+.clean-ring-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--emerald-300);
+  animation: cleanRingPulse 1.6s var(--ease-out) 0.4s infinite;
+}
+.clean-ring-pulse-2 {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  border: 1px solid var(--emerald-200);
+  animation: cleanRingPulse 1.6s var(--ease-out) 0.7s infinite;
+}
+.clean-circle {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--emerald-500);
+  display: flex; align-items: center; justify-content: center;
+  animation: cleanCircleExpand 500ms var(--ease-spring) 100ms both;
+  box-shadow: var(--shadow-emerald);
+  position: relative;
+  z-index: 1;
+}
+.clean-check {
+  animation: cleanCheckIn 350ms var(--ease-spring) 450ms both;
+}
+.clean-shimmer-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, transparent 0%, var(--emerald-300) 40%, var(--emerald-200) 50%, var(--emerald-300) 60%, transparent 100%);
+  background-size: 200% auto;
+  border-radius: 20px 20px 0 0;
+  animation: shimmerSweep 2.5s ease-in-out 0.8s infinite;
+}
+.clean-title {
+  font-family: 'Source Serif 4', serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  animation: fadeSlideUp 400ms var(--ease-out) 500ms both;
+}
+.clean-sub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 28px;
+  animation: fadeSlideUp 400ms var(--ease-out) 620ms both;
+}
+.clean-stats {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  border: 1px solid var(--emerald-100);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 28px;
+  animation: fadeSlideUp 400ms var(--ease-out) 720ms both;
+}
+.clean-stat {
+  flex: 1;
+  padding: 14px 12px;
+  border-right: 1px solid var(--emerald-100);
+}
+.clean-stat:last-child { border-right: none; }
+.clean-stat-label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--emerald-600); margin-bottom: 3px; }
+.clean-stat-value { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 500; color: var(--text-primary); }
+.btn-reward {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 24px;
+  background: var(--emerald-500);
+  color: white;
+  font-size: 14px; font-weight: 600;
+  border-radius: 8px;
+  border: none; cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  width: 100%;
+  transition: all 200ms var(--ease-spring);
+  box-shadow: var(--shadow-sm);
+  animation: fadeSlideUp 400ms var(--ease-out) 820ms both;
+}
+.btn-reward:hover { background: var(--emerald-600); box-shadow: var(--shadow-emerald); transform: scale(1.015); }
+.btn-reward:active { transform: scale(0.97); }
+
+/* ── EMPTY DASHBOARD ── */
+.empty-dash {
+  width: 100%;
+  max-width: 900px;
+}
+.dash-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 580px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.dash-sidebar {
+  background: var(--neutral-900);
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dash-logo {
+  padding: 4px 20px 20px;
+  font-family: 'Source Serif 4', serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: -0.01em;
+  border-bottom: 1px solid oklch(1 0 0 / 0.08);
+  margin-bottom: 8px;
+}
+.dash-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: oklch(1 0 0 / 0.4);
+  cursor: pointer;
+  border-radius: 0;
+  transition: all 120ms;
+}
+.dash-nav-item:hover { color: oklch(1 0 0 / 0.7); background: oklch(1 0 0 / 0.05); }
+.dash-nav-item.active { color: white; background: oklch(1 0 0 / 0.08); }
+.dash-main {
+  background: var(--canvas);
+  display: flex;
+  flex-direction: column;
+}
+.dash-top-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dash-page-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.dash-empty-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+.empty-state {
+  text-align: center;
+  max-width: 380px;
+}
+.empty-visual {
+  width: 80px; height: 80px;
+  margin: 0 auto 24px;
+  background: var(--neutral-100);
+  border-radius: 20px;
+  border: 1.5px dashed var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+}
+.empty-headline {
+  font-family: 'Source Serif 4', serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  line-height: 1.3;
+}
+.empty-sub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+.empty-cta { max-width: 200px; margin: 0 auto; }
+
+/* ── TWEAKS PANEL ── */
+.tweaks-panel {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  padding: 16px;
+  z-index: 500;
+  width: 240px;
+  display: none;
+}
+.tweaks-panel.open { display: block; }
+.tweaks-title {
+  font-size: 12px; font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.tweaks-close {
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  border: none; background: var(--canvas);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 14px; line-height: 1;
+}
+.tweaks-close:hover { background: var(--neutral-200); }
+.tweak-group { margin-bottom: 14px; }
+.tweak-label { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.tweak-options { display: flex; gap: 4px; flex-wrap: wrap; }
+.tweak-opt {
+  font-size: 11px; font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: all 100ms;
+}
+.tweak-opt:hover { background: var(--canvas); }
+.tweak-opt.active { background: var(--violet-50); color: var(--violet-700); border-color: var(--violet-200); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .dash-shell { grid-template-columns: 1fr; }
+  .dash-sidebar { display: none; }
+  .reveal-summary { flex-wrap: wrap; }
+  .reveal-stat { min-width: 50%; }
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* ── DATA ── */
+const STEPS = [
+  { key: 'parse', label: 'File validation',
+    messages: ['Reading file structure…', 'Detected 847 rows across 12 columns…', 'Column headers mapped'] },
+  { key: 'map', label: 'Column mapping',
+    messages: ['Matching GL account codes…', 'Normalizing 48 vendor names…', 'Date formats reconciled'] },
+  { key: 'xref', label: 'Cross-referencing',
+    messages: ['Scanning for duplicate entries…', 'Cross-checking GL codes…', 'Found 3 variance patterns'] },
+  { key: 'report', label: 'Report generation',
+    messages: ['Structuring findings…', 'Calculating exposure amounts…', 'Report is ready'] },
+];
+const STEP_MS = [2800, 3200, 3400, 1600];
+const MSG_MS  = 900;
+
+const MOCK_FILES = [
+  { id: 1, name: 'Q2_GL_Export_Final.xlsx', size: '2.4 MB', type: 'excel' },
+  { id: 2, name: 'Vendor_Transactions_June.csv', size: '847 KB', type: 'csv' },
+];
+
+const ANOMALIES = [
+  { id:1, sev:'high',   title:'Duplicate vendor payment',    amount:'$24,800', detail:'3 invoices · Acme Industrial Supply', code:'AP-4421' },
+  { id:2, sev:'medium', title:'Approval threshold breach',   amount:'$8,200',  detail:'2 items pending >48h · no signoff',   code:'PO-8832' },
+  { id:3, sev:'medium', title:'Missing GL reference',        amount:'$3,450',  detail:'4 line items · no account code',      code:'GL-UNKN' },
+  { id:4, sev:'normal', title:'FX rounding variance',        amount:'$0.84',   detail:'Within tolerance · auto-resolved',    code:'FX-0091' },
+];
+
+/* ── ICONS ── */
+const UploadIcon = ({size=24,color='currentColor'}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+    <polyline points="17 8 12 3 7 8"/>
+    <line x1="12" y1="3" x2="12" y2="15"/>
+  </svg>
+);
+const FileXlsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <rect x="3" y="2" width="11" height="14" rx="1.5" fill="#DCFCE7" stroke="#16A066" strokeWidth="1.2"/>
+    <path d="M11 2v4h4" stroke="#16A066" strokeWidth="1.2"/>
+    <path d="M6 9h8M6 12h6" stroke="#16A066" strokeWidth="1" opacity="0.6"/>
+  </svg>
+);
+const FileCsvIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <rect x="3" y="2" width="11" height="14" rx="1.5" fill="#DBEAFE" stroke="#1E40AF" strokeWidth="1.2"/>
+    <path d="M11 2v4h4" stroke="#1E40AF" strokeWidth="1.2"/>
+    <path d="M6 9h8M6 12h6" stroke="#1E40AF" strokeWidth="1" opacity="0.6"/>
+  </svg>
+);
+const CheckIcon = ({size=14,color='white',weight=2}) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke={color} strokeWidth={weight} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2.5 7l3 3 6-6"/>
+  </svg>
+);
+const ClockIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+    <circle cx="6.5" cy="6.5" r="5.5"/><path d="M6.5 4v3l2 1.5"/>
+  </svg>
+);
+const PlusIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M7 2v10M2 7h10"/>
+  </svg>
+);
+const XIcon = ({size=12}) => (
+  <svg width={size} height={size} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M2 2l8 8M10 2l-8 8"/>
+  </svg>
+);
+const ArrowIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 8h10M9 4l4 4-4 4"/>
+  </svg>
+);
+const StepFileIcon = ({color}) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 1.5h7l3.5 3.5V14a.5.5 0 01-.5.5H3a.5.5 0 01-.5-.5V2a.5.5 0 01.5-.5z"/>
+    <path d="M10 1.5V5h3.5"/>
+  </svg>
+);
+const StepTableIcon = ({color}) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round">
+    <rect x="1.5" y="1.5" width="13" height="13" rx="1.5"/>
+    <path d="M1.5 5.5h13M1.5 9.5h13M5.5 5.5v9M10.5 5.5v9"/>
+  </svg>
+);
+const StepCompareIcon = ({color}) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.5">
+    <circle cx="6" cy="8" r="4.5"/>
+    <circle cx="10" cy="8" r="4.5"/>
+  </svg>
+);
+const StepReportIcon = ({color}) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 1.5h7l3.5 3.5V14a.5.5 0 01-.5.5H3a.5.5 0 01-.5-.5V2a.5.5 0 01.5-.5z"/>
+    <path d="M10 1.5V5h3.5"/><path d="M5 9.5l2 2 4-4"/>
+  </svg>
+);
+
+const STEP_ICONS = [StepFileIcon, StepTableIcon, StepCompareIcon, StepReportIcon];
+
+/* ── DATA FLOW BACKGROUND ── */
+const DataFlowBg = () => {
+  const items = useMemo(() => [
+    ...Array.from({length:18}, (_,i) => ({
+      id: `bar-${i}`,
+      type: 'bar',
+      top: `${3 + i * 5.4}%`,
+      width: 60 + (i * 23 % 160),
+      opacity: 0.06 + (i % 5) * 0.025,
+      duration: 1.8 + (i % 7) * 0.4,
+      delay: (i * 0.45) % 4.5,
+      color: i%3===0 ? 'var(--violet-400)' : i%3===1 ? 'var(--violet-300)' : 'var(--neutral-300)',
+      h: i%4===0 ? 2 : 1,
+    })),
+    ...Array.from({length:10}, (_,i) => ({
+      id: `dot-${i}`,
+      type: 'dot',
+      left: `${8 + i * 9}%`,
+      size: 2 + (i%2),
+      opacity: 0.12 + (i%4)*0.04,
+      duration: 5 + (i%5),
+      delay: (i*0.8) % 6,
+    })),
+  ], []);
+
+  return (
+    <div className="dataflow-bg">
+      {items.map(item => item.type === 'bar' ? (
+        <div key={item.id} style={{
+          position:'absolute', left:0, top:item.top,
+          width:item.width, height:item.h,
+          background:item.color, opacity:item.opacity,
+          borderRadius:2,
+          animation:`flowRight ${item.duration}s linear ${item.delay}s infinite`,
+        }} />
+      ) : (
+        <div key={item.id} style={{
+          position:'absolute', bottom:'-20px', left:item.left,
+          width:item.size, height:item.size,
+          borderRadius:'50%',
+          background:'var(--violet-400)', opacity:item.opacity,
+          animation:`floatUp ${item.duration}s ease-out ${item.delay}s infinite`,
+        }} />
+      ))}
+    </div>
+  );
+};
+
+/* ── UPLOAD PROGRESS SIMULATION ── */
+function useUploadProgress(active) {
+  const [prog, setProg] = useState({0:0,1:0});
+  const rafRef = useRef(null);
+  const startRef = useRef(null);
+
+  useEffect(() => {
+    if (!active) { setProg({0:0,1:0}); return; }
+    startRef.current = Date.now();
+    const total = [1800, 2600];
+    const tick = () => {
+      const elapsed = Date.now() - startRef.current;
+      setProg({
+        0: Math.min(100, Math.round((elapsed / total[0]) * 100)),
+        1: Math.min(100, Math.round(((elapsed - 400) / total[1]) * 100)),
+      });
+      if (elapsed < Math.max(...total) + 200) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [active]);
+
+  return prog;
+}
+
+/* ── STATE NAMES ── */
+const STATES = [
+  { key:'empty',            label:'1 · Dropzone empty' },
+  { key:'files',            label:'2 · Files selected' },
+  { key:'uploading',        label:'3 · Uploading' },
+  { key:'processing',       label:'4 · Processing' },
+  { key:'reveal-anomalies', label:'5 · Reveal — anomalies' },
+  { key:'reveal-clean',     label:'6 · Reveal — clean' },
+  { key:'empty-dashboard',  label:'7 · Empty dashboard' },
+];
+
+/* ── TWEAKS DEFAULTS ── */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "resultType": "anomalies",
+  "autoPlay": true
+}/*EDITMODE-END*/;
+
+/* ── TWEAKS PANEL ── */
+function TweaksPanel({tweaks, setTweak, open, onClose}) {
+  return (
+    <div className={`tweaks-panel ${open?'open':''}`}>
+      <div className="tweaks-title">
+        Tweaks
+        <button className="tweaks-close" onClick={onClose}><XIcon size={12}/></button>
+      </div>
+      <div className="tweak-group">
+        <div className="tweak-label">Result type</div>
+        <div className="tweak-options">
+          {['anomalies','clean'].map(v => (
+            <button key={v} className={`tweak-opt ${tweaks.resultType===v?'active':''}`}
+              onClick={()=>setTweak('resultType',v)}>{v}</button>
+          ))}
+        </div>
+      </div>
+      <div className="tweak-group">
+        <div className="tweak-label">Processing</div>
+        <div className="tweak-options">
+          <button className={`tweak-opt ${tweaks.autoPlay?'active':''}`}
+            onClick={()=>setTweak('autoPlay',!tweaks.autoPlay)}>
+            {tweaks.autoPlay ? 'auto-play on' : 'auto-play off'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── DROPZONE EMPTY ── */
+function DropzoneEmpty({onFiles}) {
+  const [over, setOver] = useState(false);
+  const inputRef = useRef(null);
+
+  return (
+    <div className="dropzone-wrap">
+      <div className="dz-wordmark">IronLedger</div>
+      <div
+        className={`dropzone ${over?'over':''}`}
+        onDragOver={e=>{e.preventDefault();setOver(true);}}
+        onDragLeave={()=>setOver(false)}
+        onDrop={e=>{e.preventDefault();setOver(false);onFiles(MOCK_FILES);}}
+        onClick={()=>inputRef.current?.click()}
+      >
+        <div className="dz-icon">
+          <UploadIcon size={26} color={over ? 'var(--amber-600)' : 'var(--neutral-500)'} />
+        </div>
+        <div className="dz-headline">Drop your chaos here.</div>
+        <div className="dz-sub">
+          Your messy GL exports, vendor files,<br/>reconciliation sheets — all of it. We'll handle it.
+        </div>
+        <div className="dz-badges">
+          <span className="dz-badge dz-badge-excel">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="11" height="11" rx="1.5" fill="#16A066" opacity=".15"/><path d="M3 4l2.5 5M8 4l-2.5 5M3 9h7" stroke="#16A066" strokeWidth="1.4" strokeLinecap="round"/></svg>
+            .xlsx
+          </span>
+          <span className="dz-badge dz-badge-csv">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="11" height="11" rx="1.5" fill="#1E40AF" opacity=".12"/><path d="M3 3.5h7M3 6.5h7M3 9.5h5" stroke="#1E40AF" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            .csv
+          </span>
+        </div>
+        <div className="dz-click-hint">or <span>click to browse</span> your files</div>
+        <input ref={inputRef} type="file" style={{display:'none'}} accept=".xlsx,.csv" onChange={()=>onFiles(MOCK_FILES)} />
+      </div>
+    </div>
+  );
+}
+
+/* ── DROPZONE WITH FILES ── */
+function DropzoneFiles({files, onUpload, onBack}) {
+  const [fileList, setFileList] = useState(files);
+  const remove = id => setFileList(fl => fl.filter(f=>f.id!==id));
+
+  return (
+    <div className="upload-card dz-files-card">
+      <div className="dz-files-header">
+        <div className="dz-files-title">Ready to analyze</div>
+        <div className="dz-files-sub">{fileList.length} file{fileList.length!==1?'s':''} selected · drop more to add</div>
+      </div>
+      <div className="file-list">
+        {fileList.map(f => (
+          <div className="file-card" key={f.id}>
+            <div className={`file-icon-wrap file-icon-${f.type}`}>
+              {f.type==='excel' ? <FileXlsIcon/> : <FileCsvIcon/>}
+            </div>
+            <span className="file-name">{f.name}</span>
+            <span className="file-size">{f.size}</span>
+            <button className="file-remove" onClick={()=>remove(f.id)}><XIcon/></button>
+          </div>
+        ))}
+        <div className="dz-add-more" onClick={()=>setFileList(fl=>[...fl,{id:Date.now(),name:'Additional_File.csv',size:'1.1 MB',type:'csv'}])}>
+          <PlusIcon />
+          <span>Drop more files or click to add</span>
+        </div>
+      </div>
+      <div className="dz-actions">
+        <button className="btn-secondary" onClick={onBack}>← Back</button>
+        <button className="btn-primary" onClick={onUpload}>
+          Upload &amp; Analyze <ArrowIcon/>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── UPLOADING ── */
+function Uploading({files, onDone}) {
+  const prog = useUploadProgress(true);
+  const done = prog[0]===100 && prog[1]===100;
+
+  useEffect(() => {
+    if (done) { const t = setTimeout(onDone, 300); return ()=>clearTimeout(t); }
+  }, [done]);
+
+  return (
+    <div className="upload-card uploading-wrap">
+      <div className="upload-header">
+        <div className="upload-title">Uploading files…</div>
+        <div className="upload-sub">Securely transferring to IronLedger</div>
+      </div>
+      <div className="upload-items">
+        {files.map((f,i) => (
+          <div className="upload-item" key={f.id}>
+            <div className="upload-item-row">
+              <span className="upload-item-name">{f.name}</span>
+              <span className="upload-item-pct">{Math.max(0,prog[i]||0)}%</span>
+            </div>
+            <div className="upload-bar-track">
+              <div className="upload-bar-fill" style={{
+                width:`${Math.max(0,prog[i]||0)}%`,
+                transition:'width 80ms linear',
+              }}/>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{padding:'16px 20px 20px', borderTop:'1px solid var(--border)', marginTop:4}}>
+        <div style={{display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--text-tertiary)'}}>
+          <div style={{width:12, height:12, border:'1.5px solid var(--amber-500)', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite'}}></div>
+          {done ? 'Transfer complete — starting analysis' : 'Uploading securely via TLS 1.3'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── PROCESSING ── */
+function Processing({resultType, onComplete, autoPlay}) {
+  const [activeStep, setActiveStep] = useState(0);
+  const [done, setDone] = useState([]);
+  const [msgIdx, setMsgIdx] = useState(0);
+  const [msgKey, setMsgKey] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+
+  // Step advancement
+  useEffect(() => {
+    if (!autoPlay) return;
+    if (activeStep >= STEPS.length) return;
+    const t = setTimeout(() => {
+      if (activeStep < STEPS.length - 1) {
+        setDone(d => [...d, activeStep]);
+        setActiveStep(s => s + 1);
+        setMsgIdx(0); setMsgKey(k=>k+1);
+      } else {
+        setDone(d => [...d, activeStep]);
+        setActiveStep(STEPS.length);
+        setTimeout(() => onComplete(resultType), 800);
+      }
+    }, STEP_MS[activeStep]);
+    return () => clearTimeout(t);
+  }, [activeStep, autoPlay]);
+
+  // Message cycling
+  useEffect(() => {
+    if (activeStep >= STEPS.length) return;
+    const msgs = STEPS[activeStep].messages;
+    if (msgIdx >= msgs.length - 1) return;
+    const t = setInterval(() => {
+      setMsgIdx(i => {
+        if (i < msgs.length - 1) { setMsgKey(k=>k+1); return i+1; }
+        return i;
+      });
+    }, MSG_MS);
+    return () => clearInterval(t);
+  }, [activeStep, msgIdx]);
+
+  // Elapsed time display
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(e=>e+1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const getStepState = idx => {
+    if (done.includes(idx)) return 'done';
+    if (idx === activeStep && activeStep < STEPS.length) return 'active';
+    return 'pending';
+  };
+
+  return (
+    <div className="processing-stage">
+      <DataFlowBg />
+      <div className="processing-card">
+        <div className="proc-header">
+          <div className="proc-eyebrow">
+            <span className="proc-eyebrow-dot"></span>
+            IronLedger Agent · Running
+          </div>
+          <div className="proc-title">Analyzing your files.</div>
+          <div className="proc-hint"><ClockIcon/> Usually under 2 minutes</div>
+        </div>
+
+        <div className="proc-steps">
+          {STEPS.map((step, idx) => {
+            const Icon = STEP_ICONS[idx];
+            const state = getStepState(idx);
+            const isLast = idx === STEPS.length - 1;
+            const isDone = done.includes(idx);
+            const isActive = state === 'active';
+            const connFill = done.includes(idx);
+
+            return (
+              <div className="proc-step" key={step.key}>
+                <div className="proc-step-left">
+                  <div className={`proc-step-icon ${state}`}>
+                    {isDone
+                      ? <CheckIcon size={14} color="white" weight={2.2}/>
+                      : <Icon color={isActive ? 'white' : 'var(--neutral-400)'}/>
+                    }
+                  </div>
+                  {!isLast && (
+                    <div className="proc-connector">
+                      {isDone && <div className="proc-connector-fill"/>}
+                    </div>
+                  )}
+                </div>
+                <div className="proc-step-body">
+                  <div className={`proc-step-label ${state}`}>{step.label}</div>
+                  {isActive && (
+                    <div className="proc-microcopy-wrap">
+                      <div className="proc-microcopy" key={msgKey}>
+                        {step.messages[msgIdx]}
+                      </div>
+                    </div>
+                  )}
+                  {isDone && (
+                    <div className="proc-done-note">
+                      {step.messages[step.messages.length-1]}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="proc-footer">
+          <div className="proc-time-hint">
+            <div style={{width:8,height:8,borderRadius:'50%',background:'var(--violet-400)',opacity:.7}}></div>
+            {elapsed < 10 ? 'Just started' : `${elapsed}s elapsed`}
+          </div>
+          <button className="proc-skip" onClick={()=>onComplete(resultType)}>
+            Skip to result →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── REVEAL: ANOMALIES ── */
+function RevealAnomalies({onReset}) {
+  const highCount = ANOMALIES.filter(a=>a.sev==='high').length;
+  const exposure = '$36,451';
+
+  return (
+    <div className="reveal-wrap">
+      <div className="upload-card" style={{borderRadius:16}}>
+        <div className="reveal-header">
+          <div className="reveal-eyebrow">Analysis complete · 2 files · 847 rows</div>
+          <div className="reveal-title">We found some things.</div>
+          <div className="reveal-meta">4 issues detected · Review before closing this period</div>
+        </div>
+        <div className="reveal-summary">
+          <div className="reveal-stat">
+            <div className="reveal-stat-label">Anomalies</div>
+            <div className="reveal-stat-value red">4</div>
+          </div>
+          <div className="reveal-stat">
+            <div className="reveal-stat-label">Total exposure</div>
+            <div className="reveal-stat-value amber">{exposure}</div>
+          </div>
+          <div className="reveal-stat">
+            <div className="reveal-stat-label">High severity</div>
+            <div className="reveal-stat-value red">{highCount}</div>
+          </div>
+          <div className="reveal-stat">
+            <div className="reveal-stat-label">Auto-resolved</div>
+            <div className="reveal-stat-value green">1</div>
+          </div>
+        </div>
+
+        <div className="reveal-body">
+          <div className="reveal-list-label">Findings</div>
+          <div className="anomaly-list">
+            {ANOMALIES.map((a, i) => (
+              <div className="anomaly-row" key={a.id} style={{animationDelay:`${i*80}ms`}}>
+                <div className={`sev-dot ${a.sev}`}></div>
+                <div className="anomaly-main">
+                  <div className="anomaly-title">{a.title}</div>
+                  <div className="anomaly-detail">{a.detail}
+                    <span style={{fontFamily:'JetBrains Mono,monospace',fontSize:10,marginLeft:8,color:'var(--text-tertiary)'}}>{a.code}</span>
+                  </div>
+                </div>
+                <div className="anomaly-right">
+                  <div className="anomaly-amount">{a.amount}</div>
+                  <span className={`severity-badge sev-badge-${a.sev}`}>{a.sev}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="reveal-actions">
+          <button className="btn-primary" style={{flex:1}}>Export Report <ArrowIcon/></button>
+          <button className="btn-secondary">View full report</button>
+          <button className="btn-secondary" onClick={onReset} style={{color:'var(--text-tertiary)',borderColor:'var(--border)'}}>
+            New upload
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── REVEAL: CLEAN ── */
+function RevealClean({onReset}) {
+  return (
+    <div className="clean-stage">
+      <div className="clean-card">
+        <div className="clean-shimmer-bar"/>
+        <div className="clean-ring-wrap">
+          <div className="clean-ring-pulse"/>
+          <div className="clean-ring-pulse-2"/>
+          <div className="clean-circle">
+            <div className="clean-check">
+              <CheckIcon size={32} color="white" weight={2.5}/>
+            </div>
+          </div>
+        </div>
+        <div className="clean-title">Zero anomalies detected.</div>
+        <div className="clean-sub">
+          847 transactions reviewed. Everything checks out.<br/>
+          Your Q2 close narrative is verified.
+        </div>
+        <div className="clean-stats">
+          <div className="clean-stat">
+            <div className="clean-stat-label">Rows</div>
+            <div className="clean-stat-value">847</div>
+          </div>
+          <div className="clean-stat">
+            <div className="clean-stat-label">Vendors</div>
+            <div className="clean-stat-value">48</div>
+          </div>
+          <div className="clean-stat">
+            <div className="clean-stat-label">Period</div>
+            <div className="clean-stat-value">Q2 '26</div>
+          </div>
+        </div>
+        <button className="btn-reward">Download Clean Report <ArrowIcon/></button>
+        <div style={{marginTop:12,textAlign:'center'}}>
+          <button onClick={onReset} style={{fontSize:12,color:'var(--emerald-600)',background:'none',border:'none',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
+            Upload another file →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── EMPTY DASHBOARD ── */
+function EmptyDashboard({onUpload}) {
+  return (
+    <div className="empty-dash">
+      <div className="dash-shell">
+        <div className="dash-sidebar">
+          <div className="dash-logo">IronLedger</div>
+          {['Dashboard','Reports','Anomalies','Vendors','Settings'].map((item,i)=>(
+            <div key={item} className={`dash-nav-item ${i===0?'active':''}`}>
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                {i===0 && <><rect x="1.5" y="1.5" width="5" height="5" rx="1"/><rect x="8.5" y="1.5" width="5" height="5" rx="1"/><rect x="1.5" y="8.5" width="5" height="5" rx="1"/><rect x="8.5" y="8.5" width="5" height="5" rx="1"/></>}
+                {i===1 && <><path d="M2 12V5l5.5-3.5L13 5v7"/><path d="M5.5 12V9h4v3"/></>}
+                {i===2 && <><circle cx="7.5" cy="7.5" r="5.5"/><path d="M7.5 5v3l2 1"/></>}
+                {i===3 && <><path d="M3 2.5h9"/><path d="M3 5.5h9"/><path d="M3 8.5h6"/><path d="M3 11.5h4"/></>}
+                {i===4 && <><circle cx="7.5" cy="7.5" r="5.5"/><circle cx="7.5" cy="7.5" r="2"/></>}
+              </svg>
+              {item}
+            </div>
+          ))}
+        </div>
+        <div className="dash-main">
+          <div className="dash-top-bar">
+            <div className="dash-page-title">Dashboard</div>
+            <button className="btn-primary" style={{padding:'8px 16px',fontSize:13,borderRadius:6}} onClick={onUpload}>
+              + New upload
+            </button>
+          </div>
+          <div className="dash-empty-body">
+            <div className="empty-state">
+              <div className="empty-visual">
+                <UploadIcon size={32} color="var(--neutral-400)"/>
+              </div>
+              <div className="empty-headline">
+                Drop your chaos here.<br/>
+                <em style={{fontStyle:'italic',color:'var(--amber-600)'}}>We'll handle it.</em>
+              </div>
+              <div className="empty-sub">
+                Upload your first GL export or vendor file
+                and we'll turn it into a verified close narrative.
+              </div>
+              <div className="empty-cta">
+                <button className="btn-primary" style={{width:'100%',justifyContent:'center'}} onClick={onUpload}>
+                  Upload files <ArrowIcon/>
+                </button>
+              </div>
+              <div style={{marginTop:16,fontSize:12,color:'var(--text-tertiary)'}}>
+                Accepts .xlsx and .csv · Up to 50MB
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── APP ── */
+function App() {
+  const [view, setView] = useState('empty');
+  const [files, setFiles] = useState(MOCK_FILES);
+  const [tweaks, setTweaksState] = useState(TWEAK_DEFAULTS);
+  const [tweaksOpen, setTweaksOpen] = useState(false);
+
+  const setTweak = (key, val) => {
+    const next = {...tweaks, [key]:val};
+    setTweaksState(next);
+    window.parent.postMessage({type:'__edit_mode_set_keys', edits:next},'*');
+  };
+
+  // Tweaks protocol
+  useEffect(() => {
+    const handler = ({data}) => {
+      if (data?.type === '__activate_edit_mode')   setTweaksOpen(true);
+      if (data?.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({type:'__edit_mode_available'},'*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const needsFullHeight = view === 'processing' || view === 'reveal-clean';
+
+  return (
+    <div className="app-shell">
+      {/* Demo nav */}
+      <nav className="demo-nav">
+        <span className="demo-nav-label">States</span>
+        {STATES.map(s => (
+          <button key={s.key} className={`demo-pill ${view===s.key?'active':''}`}
+            onClick={()=>setView(s.key)}>{s.label}</button>
+        ))}
+      </nav>
+
+      {/* Stage */}
+      {needsFullHeight ? (
+        view==='processing' ? (
+          <Processing
+            resultType={tweaks.resultType}
+            autoPlay={tweaks.autoPlay}
+            onComplete={rt => setView(`reveal-${rt}`)}
+          />
+        ) : (
+          <RevealClean onReset={()=>setView('empty')}/>
+        )
+      ) : (
+        <div className="stage">
+          {view==='empty' && <DropzoneEmpty onFiles={f=>{setFiles(f);setView('files');}}/>}
+          {view==='files' && <DropzoneFiles files={files} onUpload={()=>setView('uploading')} onBack={()=>setView('empty')}/>}
+          {view==='uploading' && <Uploading files={files} onDone={()=>setView('processing')}/>}
+          {view==='reveal-anomalies' && <RevealAnomalies onReset={()=>setView('empty')}/>}
+          {view==='empty-dashboard' && <EmptyDashboard onUpload={()=>setView('empty')}/>}
+        </div>
+      )}
+
+      <TweaksPanel tweaks={tweaks} setTweak={setTweak} open={tweaksOpen} onClose={()=>{setTweaksOpen(false);window.parent.postMessage({type:'__edit_mode_dismissed'},'*');}}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

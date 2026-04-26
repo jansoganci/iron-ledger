@@ -26,7 +26,7 @@ export function MetricCard({ label, value, subtext, icon }: MetricCardProps) {
         </span>
       </div>
       <div
-        className="text-2xl font-semibold text-text-primary tabular-nums"
+        className="font-hero-num text-2xl font-semibold text-text-primary"
         data-numeric
       >
         {value}

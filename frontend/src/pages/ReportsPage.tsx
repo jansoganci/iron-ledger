@@ -5,6 +5,7 @@ import {
   ChevronUp,
   ChevronsUpDown,
   FileText,
+  Plus,
   Search,
   Upload as UploadIcon,
 } from "lucide-react";
@@ -22,20 +23,22 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ReportListItem } from "../components/HistoryList";
+import {
+  getReportLabel,
+  getReportLink,
+  ReportListItem,
+} from "../components/HistoryList";
 import { useCompany } from "../hooks/useCompany";
 import { apiFetch } from "../lib/api";
-import { formatPeriod } from "../lib/formatters";
 import { cn } from "../lib/utils";
 
 /**
  * Reports page — the filing cabinet.
  *
- * Dense sortable table (@tanstack/react-table). Click column headers to sort;
- * click a row to open the report. Search filters by formatted period label.
+ * Monthly / Quarterly tabs (same pattern as Dashboard). Dense sortable table
+ * (@tanstack/react-table); click column headers to sort, click a row to open.
  *
- * Mobile (<768px) redirected to /upload by AppShell's deep-link guard — this page
- * is desktop + tablet only, matching the Dashboard rule in docs/design.md §Responsive.
+ * Mobile (<768px) redirected to /upload by AppShell's deep-link guard.
  */
 
 interface ReportsListResponse {
@@ -60,19 +63,50 @@ function anomalyText(n: number): string {
   return `${n} ${n === 1 ? "anomaly" : "anomalies"}`;
 }
 
-// Custom filter: match against the formatted period label ("Mar 2026"),
-// not the raw ISO value, so users can search the way they see the data.
+// Custom filter: match against the Period column label
 const periodLabelFilter: FilterFn<ReportListItem> = (row, _columnId, value) => {
-  const q = String(value).trim().toLowerCase();
-  if (!q) return true;
-  return formatPeriod(row.original.period).toLowerCase().includes(q);
+  try {
+    const q = String(value).trim().toLowerCase();
+    if (!q) return true;
+    const label = getReportLabel(row.original);
+    return label.toLowerCase().includes(q);
+  } catch (error) {
+    console.error("Error in periodLabelFilter:", error, row.original);
+    return false;
+  }
 };
 
 const columnHelper = createColumnHelper<ReportListItem>();
 
+/** Returns the last N completed quarters as { label, path } */
+function recentQuarters(count = 4): { label: string; path: string }[] {
+  const now = new Date();
+  const results = [];
+  let year = now.getFullYear();
+  // Start from the previous completed quarter (current quarter is in progress)
+  let quarter = Math.ceil((now.getMonth() + 1) / 3) - 1;
+  if (quarter === 0) {
+    quarter = 4;
+    year -= 1;
+  }
+  for (let i = 0; i < count; i++) {
+    results.push({
+      label: `Q${quarter} ${year}`,
+      path: `/report/quarterly/${year}-Q${quarter}`,
+    });
+    quarter -= 1;
+    if (quarter === 0) {
+      quarter = 4;
+      year -= 1;
+    }
+  }
+  return results;
+}
+
 export default function ReportsPage() {
   const { data: company } = useCompany();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<"monthly" | "quarterly">("monthly");
 
   const { data, isLoading } = useQuery<ReportsListResponse>({
     queryKey: ["reports-list", "full"],
@@ -86,11 +120,23 @@ export default function ReportsPage() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [query, setQuery] = useState("");
 
+  // Filter by active tab — useMemo so the array reference is stable
+  const reports = useMemo(() => {
+    const all = data?.reports ?? [];
+    return all.filter((r) => r.report_type === activeTab);
+  }, [data?.reports, activeTab]);
+
   function updateQuery(next: string) {
     setQuery(next);
-    setColumnFilters(
-      next.trim() ? [{ id: "period", value: next }] : []
-    );
+    setColumnFilters(next.trim() ? [{ id: "period", value: next }] : []);
+  }
+
+  function switchTab(tab: "monthly" | "quarterly") {
+    if (tab === activeTab) return;
+    setActiveTab(tab);
+    setQuery("");
+    setColumnFilters([]);
+    setSorting([{ id: "period", desc: true }]);
   }
 
   const columns = useMemo<ColumnDef<ReportListItem, any>[]>(
@@ -119,9 +165,9 @@ export default function ReportsPage() {
         header: "Period",
         enableSorting: true,
         filterFn: periodLabelFilter,
-        cell: ({ getValue }) => (
+        cell: ({ row }) => (
           <span className="text-sm font-medium text-text-primary">
-            {formatPeriod(getValue() as string)}
+            {getReportLabel(row.original)}
           </span>
         ),
       }),
@@ -175,10 +221,8 @@ export default function ReportsPage() {
     []
   );
 
-  const tableData = data?.reports ?? [];
-
   const table = useReactTable({
-    data: tableData,
+    data: reports,
     columns,
     state: { sorting, columnFilters },
     onSortingChange: setSorting,
@@ -188,11 +232,11 @@ export default function ReportsPage() {
     getFilteredRowModel: getFilteredRowModel(),
   });
 
-  const totalCount = tableData.length;
+  const totalCount = reports.length;
   const rows = table.getRowModel().rows;
   const shownCount = rows.length;
 
-  const openRow = (period: string) => navigate(`/report/${period}`);
+  const openRow = (report: ReportListItem) => navigate(getReportLink(report));
 
   return (
     <div className="px-4 py-6 md:py-8">
@@ -218,9 +262,59 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Controls row — search only; sorting is now via column headers */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
+        {/* Search */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-text-primary">
+              All reports
+            </h2>
+            
+            {/* Tabs */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => switchTab("monthly")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === "monthly"
+                    ? "bg-accent text-white"
+                    : "text-text-secondary hover:text-text-primary hover:bg-surface"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => switchTab("quarterly")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === "quarterly"
+                    ? "bg-accent text-white"
+                    : "text-text-secondary hover:text-text-primary hover:bg-surface"
+                }`}
+              >
+                Quarterly
+              </button>
+            </div>
+          </div>
+
+          {/* Quarter picker — only shown when quarterly tab is active */}
+          {activeTab === "quarterly" && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-text-secondary shrink-0">Generate:</span>
+              {recentQuarters(4).map((q) => (
+                <Link
+                  key={q.path}
+                  to={q.path}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-surface text-text-secondary hover:text-text-primary hover:border-accent transition-colors"
+                >
+                  <Plus className="h-3 w-3" aria-hidden />
+                  {q.label}
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Search */}
+          <div className="relative">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary pointer-events-none"
               aria-hidden
@@ -240,13 +334,11 @@ export default function ReportsPage() {
         {isLoading ? (
           <ReportsTableSkeleton />
         ) : totalCount === 0 ? (
-          <NoReportsEmptyState />
+          activeTab === "quarterly" ? <NoQuarterlyReportsEmptyState /> : <NoReportsEmptyState />
         ) : shownCount === 0 ? (
           <NoMatchesEmptyState />
         ) : (
-          <div
-            className="rounded-lg border border-border bg-surface overflow-hidden"
-          >
+          <div className="rounded-lg border border-border bg-surface overflow-hidden">
             <table className="w-full text-left">
               <thead className="border-b border-border bg-canvas">
                 {table.getHeaderGroups().map((hg) => (
@@ -306,18 +398,18 @@ export default function ReportsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {rows.map((row) => {
-                  const period = row.original.period;
+                  const label = getReportLabel(row.original);
                   return (
                     <tr
                       key={row.id}
                       tabIndex={0}
                       role="link"
-                      aria-label={`Open report for ${formatPeriod(period)}`}
-                      onClick={() => openRow(period)}
+                      aria-label={`Open report for ${label}`}
+                      onClick={() => openRow(row.original)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          openRow(period);
+                          openRow(row.original);
                         }
                       }}
                       className="cursor-pointer hover:bg-canvas transition-colors focus:outline-none focus:bg-canvas focus:ring-2 focus:ring-accent focus:ring-inset"
@@ -332,8 +424,7 @@ export default function ReportsPage() {
                             className={cn(
                               "px-4 py-3 align-middle",
                               cell.column.id === "severity" && "w-8",
-                              cell.column.id === "action" &&
-                                "w-8 text-right",
+                              cell.column.id === "action" && "w-8 text-right",
                               isNumericCol && "text-right"
                             )}
                           >
@@ -360,7 +451,7 @@ export default function ReportsPage() {
             role="status"
             aria-live="polite"
           >
-            {shownCount} of {totalCount} match “{query.trim()}”
+            {shownCount} of {totalCount} match "{query.trim()}"
           </p>
         )}
       </div>
@@ -373,12 +464,7 @@ export default function ReportsPage() {
 function SortIcon({ dir }: { dir: false | "asc" | "desc" }) {
   if (dir === "asc") return <ChevronUp className="h-3 w-3" aria-hidden />;
   if (dir === "desc") return <ChevronDown className="h-3 w-3" aria-hidden />;
-  return (
-    <ChevronsUpDown
-      className="h-3 w-3 opacity-50"
-      aria-hidden
-    />
-  );
+  return <ChevronsUpDown className="h-3 w-3 opacity-50" aria-hidden />;
 }
 
 function ReportsTableSkeleton() {
@@ -421,6 +507,34 @@ function NoReportsEmptyState() {
         <UploadIcon className="h-4 w-4" aria-hidden />
         Upload first period
       </Link>
+    </div>
+  );
+}
+
+function NoQuarterlyReportsEmptyState() {
+  const quarters = recentQuarters(4);
+  return (
+    <div className="rounded-lg border border-border bg-surface p-8 text-center">
+      <FileText
+        className="h-8 w-8 text-text-secondary mx-auto mb-2 opacity-60"
+        aria-hidden
+      />
+      <p className="text-sm font-medium text-text-primary">No quarterly reports yet</p>
+      <p className="text-sm text-text-secondary mt-1 mb-5">
+        Select a quarter below to generate your first quarterly summary.
+      </p>
+      <div className="flex flex-wrap justify-center gap-2">
+        {quarters.map((q) => (
+          <Link
+            key={q.path}
+            to={q.path}
+            className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            {q.label}
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

@@ -81,6 +81,17 @@ class AnomaliesRepo(Protocol):
 
     def write_many(self, anomalies: list[Anomaly]) -> None: ...
 
+    def list_account_flag_counts_before(
+        self,
+        company_id: str,
+        before_period: date,
+        lookback_months: int = 6,
+    ) -> dict[str, int]: ...
+
+    # Returns {account_id: count_of_distinct_prior_periods_flagged} for the
+    # lookback window [before_period - lookback_months, before_period).
+    # Severity 'low' rows are excluded so noise doesn't inflate recurrence counts.
+
 
 @runtime_checkable
 class ReportsRepo(Protocol):
@@ -94,6 +105,28 @@ class ReportsRepo(Protocol):
 
     # Powers GET /reports and the Dashboard HistoryList.
     # Ordered by period DESC. `limit` is capped at 50 by the route.
+
+    def write_quarterly(self, report: Report) -> Report: ...
+
+    # Write a quarterly report. Uses report_type='quarterly', year, quarter fields.
+    # On UNIQUE constraint violation, overwrites existing via UPDATE.
+
+    def get_quarterly(
+        self, company_id: str, year: int, quarter: int
+    ) -> Report | None: ...
+
+    # Fetch a persisted quarterly report. Returns None if not yet generated.
+
+    def mark_quarterly_stale(
+        self, company_id: str, year: int, quarter: int
+    ) -> None: ...
+
+    # Mark a quarterly report as stale when underlying monthly data changes.
+
+    def delete_quarterly(self, company_id: str, year: int, quarter: int) -> None: ...
+
+    # Delete a quarterly report row. Idempotent — no error if row is absent.
+    # Caller must delete before calling write_quarterly to avoid UNIQUE violations.
 
 
 @runtime_checkable

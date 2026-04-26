@@ -2,10 +2,165 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────
+   IRONLEDGER — DESIGN TOKENS v2 (CSS Custom Properties)
+   Single source of truth for any component using inline styles or
+   non-Tailwind CSS. Tailwind classes resolve from tailwind.config.js.
+   ───────────────────────────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
+
+  /* Neutral / Warm Stone */
+  --neutral-50:  #FAFAF8;
+  --neutral-100: #F4F3F0;
+  --neutral-200: #E9E8E4;
+  --neutral-300: #D5D3CE;
+  --neutral-400: #BAB8B2;
+  --neutral-500: #9A9892;
+  --neutral-600: #787670;
+  --neutral-700: #5A5853;
+  --neutral-800: #3C3A36;
+  --neutral-900: #252421;
+  --neutral-950: #151412;
+
+  /* Amber / Primary CTA */
+  --amber-50:  #FFF8ED;
+  --amber-100: #FFEECE;
+  --amber-200: #FEDA9A;
+  --amber-300: #FDC060;
+  --amber-400: #FBA12A;
+  --amber-500: #F08408;
+  --amber-600: #C46600;
+  --amber-700: #9A4D00;
+  --amber-800: #763900;
+  --amber-900: #572900;
+  --amber-950: #371800;
+
+  /* Emerald / Reward + Favorable */
+  --emerald-50:  #EDFAF3;
+  --emerald-100: #D1F4E4;
+  --emerald-200: #A3E8CA;
+  --emerald-300: #68D4A8;
+  --emerald-400: #34BB83;
+  --emerald-500: #16A066;
+  --emerald-600: #0F7F50;
+  --emerald-700: #0A613C;
+  --emerald-800: #07472C;
+  --emerald-900: #04311E;
+  --emerald-950: #021E12;
+
+  /* Violet / Agentic */
+  --violet-50:  #F3F1FD;
+  --violet-100: #E5DFFB;
+  --violet-200: #CABEF7;
+  --violet-300: #A897F0;
+  --violet-400: #8570E6;
+  --violet-500: #6651D4;
+  --violet-600: #4F3DAE;
+  --violet-700: #3A2C87;
+  --violet-800: #281D63;
+  --violet-900: #1A1244;
+  --violet-950: #0E0928;
+
+  /* Teal / Utility (demoted — legacy) */
+  --teal-400: #2DD4BF;
+  --teal-500: #14B8A6;
+  --teal-600: #0D9488;
+  --teal-700: #0F766E;
+
+  /* Semantic Surface */
+  --canvas:          var(--neutral-50);
+  --surface:         #FFFFFF;
+  --surface-raised:  #FFFFFF;
+  --surface-overlay: #FFFFFF;
+  --border:          var(--neutral-200);
+  --border-strong:   var(--neutral-300);
+
+  /* Semantic Text */
+  --text-primary:   var(--neutral-900);
+  --text-secondary: var(--neutral-600);
+  --text-tertiary:  var(--neutral-500);
+  --text-disabled:  var(--neutral-400);
+  --text-inverse:   #FFFFFF;
+
+  /* Semantic Accent */
+  --accent-primary:      var(--amber-500);
+  --accent-primary-dark: var(--amber-600);
+  --accent-primary-bg:   var(--amber-50);
+  --accent-primary-text: var(--amber-700);
+
+  --accent-reward:      var(--emerald-500);
+  --accent-reward-dark: var(--emerald-600);
+  --accent-reward-bg:   var(--emerald-50);
+  --accent-reward-text: var(--emerald-700);
+
+  --accent-agent:      var(--violet-500);
+  --accent-agent-dark: var(--violet-600);
+  --accent-agent-bg:   var(--violet-50);
+  --accent-agent-text: var(--violet-700);
+
+  --accent-utility:      var(--teal-600);
+  --accent-utility-bg:   #F0FDFA;
+  --accent-utility-text: var(--teal-700);
+
+  /* Severity Tokens (v2) */
+  --severity-high-bg:       #FEF0F0;
+  --severity-high-text:     #B91C1C;
+  --severity-high-border:   #FECACA;
+
+  --severity-medium-bg:     var(--amber-50);   /* amber-family (was yellow) */
+  --severity-medium-text:   var(--amber-700);
+  --severity-medium-border: var(--amber-200);
+
+  --severity-normal-bg:     var(--neutral-100);
+  --severity-normal-text:   var(--neutral-600);
+  --severity-normal-border: var(--neutral-200);
+
+  --severity-favorable-bg:     var(--emerald-50);  /* emerald-family */
+  --severity-favorable-text:   var(--emerald-700);
+  --severity-favorable-border: var(--emerald-200);
+
+  /* Shadow Tokens */
+  --shadow-xs:  0 1px 2px oklch(0.14 0.01 60 / 0.06);
+  --shadow-sm:  0 2px 6px oklch(0.14 0.01 60 / 0.08), 0 1px 2px oklch(0.14 0.01 60 / 0.04);
+  --shadow-md:  0 4px 16px oklch(0.14 0.01 60 / 0.10), 0 2px 4px oklch(0.14 0.01 60 / 0.05);
+  --shadow-lg:  0 8px 32px oklch(0.14 0.01 60 / 0.12), 0 4px 8px oklch(0.14 0.01 60 / 0.06);
+  --shadow-xl:  0 20px 60px oklch(0.14 0.01 60 / 0.16), 0 8px 16px oklch(0.14 0.01 60 / 0.08);
+  --shadow-amber:   0 4px 20px oklch(0.68 0.17 54 / 0.28);
+  --shadow-emerald: 0 4px 20px oklch(0.60 0.16 152 / 0.24);
+  --shadow-violet:  0 4px 20px oklch(0.58 0.16 282 / 0.24);
+
+  /* Motion Tokens */
+  --duration-instant: 80ms;
+  --duration-fast:    140ms;
+  --duration-base:    220ms;
+  --duration-slow:    380ms;
+  --duration-reward:  650ms;
+
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-linear: linear;
+
+  --scale-hover:  1.015;
+  --scale-press:  0.970;
+  --scale-reward: 1.040;
+
+  /* Radius Tokens */
+  --radius-xs:   3px;
+  --radius-sm:   5px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-pill: 999px;
+
+  /* Focus Ring Tokens */
+  --ring-focus:  0 0 0 3px oklch(0.68 0.17 54 / 0.30);  /* amber */
+  --ring-reward: 0 0 0 3px oklch(0.60 0.16 152 / 0.30); /* emerald */
+  --ring-agent:  0 0 0 3px oklch(0.58 0.16 282 / 0.30); /* violet */
 }
 
+/* ── GLOBAL BASE ─────────────────────────────────────────────────────────── */
 html,
 body,
 #root {
@@ -13,11 +168,28 @@ body,
 }
 
 body {
-  background-color: #fafaf9;
-  color: #1a1a1a;
+  background-color: var(--canvas);       /* #FAFAF8 warm stone */
+  color: var(--text-primary);            /* #252421 */
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── TYPOGRAPHY UTILITIES ────────────────────────────────────────────────── */
+
+/* Hero numbers — KPI values, report totals. Source Serif 4, tabular. */
+.font-hero-num {
+  font-family: "Source Serif 4", Georgia, Cambria, serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.022em;
+}
+
+/* Data cells — amounts, codes, IDs. JetBrains Mono. */
+.font-data {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 /* Tabular numerals per design.md — applied to any numeric cell or value */
@@ -26,7 +198,48 @@ body {
   font-feature-settings: "tnum";
 }
 
-/* Toast slide-in / fade-out. Radix wires these via data-state attributes. */
+/* ── FOCUS RING UTILITIES ─────────────────────────────────────────────────── */
+
+/* Primary (amber) focus ring — used on most interactive elements */
+.focus-ring-primary:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+/* Reward (emerald) focus ring — emerald-accent buttons */
+.focus-ring-reward:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-reward);
+}
+
+/* Agent (violet) focus ring — agent UI */
+.focus-ring-agent:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-agent);
+}
+
+/* ── AGENT ANIMATION KEYFRAMES ───────────────────────────────────────────── */
+@keyframes agent-ring {
+  0%   { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes agent-flow {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── TOAST ANIMATIONS ────────────────────────────────────────────────────── */
 @keyframes toast-slide-in-right {
   from {
     transform: translateX(100%);
@@ -49,81 +262,115 @@ body {
 }
 
 .toast-root[data-state="open"] {
-  animation: toast-slide-in-right 150ms ease-out;
+  animation: toast-slide-in-right var(--duration-fast) var(--ease-out);
 }
 .toast-root[data-state="closed"] {
-  animation: toast-fade-out 150ms ease-out forwards;
+  animation: toast-fade-out var(--duration-fast) var(--ease-out) forwards;
 }
 
-/* Mobile/tablet navigation drawer — slide in from left, fade overlay */
+/* ── DRAWER ANIMATIONS ───────────────────────────────────────────────────── */
 @keyframes drawer-slide-in-left {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
 }
 
 @keyframes drawer-slide-out-left {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-100%);
-  }
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
 }
 
 @keyframes drawer-overlay-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes drawer-overlay-fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
 .drawer-content[data-state="open"] {
-  animation: drawer-slide-in-left 180ms ease-out;
+  animation: drawer-slide-in-left var(--duration-base) var(--ease-out);
 }
 .drawer-content[data-state="closed"] {
-  animation: drawer-slide-out-left 150ms ease-in forwards;
+  animation: drawer-slide-out-left var(--duration-fast) var(--ease-in-out) forwards;
 }
 .drawer-overlay[data-state="open"] {
-  animation: drawer-overlay-fade-in 180ms ease-out;
+  animation: drawer-overlay-fade-in var(--duration-base) var(--ease-out);
 }
 .drawer-overlay[data-state="closed"] {
-  animation: drawer-overlay-fade-out 150ms ease-in forwards;
+  animation: drawer-overlay-fade-out var(--duration-fast) var(--ease-in-out) forwards;
 }
 
-/* Onboarding step transition — key-based remount triggers this */
+/* ── STEP TRANSITIONS ────────────────────────────────────────────────────── */
 @keyframes step-fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 .step-fade-in {
-  animation: step-fade-in 0.2s ease;
+  animation: step-fade-in var(--duration-base) var(--ease-out);
 }
 
-/* Respect prefers-reduced-motion: skip slide, fade only */
+/* ── LOADING PROGRESS ANIMATIONS ────────────────────────────────────────── */
+@keyframes step-pulse {
+  0%   { box-shadow: 0 0 0 0 oklch(0.58 0.16 282 / 0.40); }
+  70%  { box-shadow: 0 0 0 8px oklch(0.58 0.16 282 / 0); }
+  100% { box-shadow: 0 0 0 0 oklch(0.58 0.16 282 / 0); }
+}
+@keyframes dot-blink {
+  0%, 100% { opacity: 0.25; }
+  50%       { opacity: 1; }
+}
+@keyframes circle-expand {
+  0%   { transform: scale(0);    opacity: 0; }
+  60%  { transform: scale(1.08); opacity: 1; }
+  80%  { transform: scale(0.97);             }
+  100% { transform: scale(1);    opacity: 1; }
+}
+@keyframes connector-fill {
+  from { height: 0%; }
+  to   { height: 100%; }
+}
+
+.step-icon-active {
+  animation: step-pulse 1.8s ease-out infinite;
+  box-shadow: var(--shadow-violet);
+}
+.step-dot-blink {
+  animation: dot-blink 1.4s ease-in-out infinite;
+}
+.step-icon-done {
+  animation: circle-expand var(--duration-base) var(--ease-out) both;
+}
+.step-connector-fill {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  background: var(--emerald-400);
+  animation: connector-fill 400ms var(--ease-out) forwards;
+}
+.step-microcopy-in {
+  animation: msg-in var(--duration-base) var(--ease-out) both;
+}
+
+/* ── PREFERS-REDUCED-MOTION ──────────────────────────────────────────────── */
+/* Respect user accessibility preference: skip slides, use fade only */
 @media (prefers-reduced-motion: reduce) {
   .toast-root[data-state="open"],
   .toast-root[data-state="closed"],
   .drawer-content[data-state="open"],
   .drawer-content[data-state="closed"],
   .drawer-overlay[data-state="open"],
-  .drawer-overlay[data-state="closed"] {
-    animation-duration: 0ms;
+  .drawer-overlay[data-state="closed"],
+  .step-fade-in,
+  .step-icon-active,
+  .step-dot-blink,
+  .step-icon-done,
+  .step-connector-fill,
+  .step-microcopy-in {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
+
   *,
   *::before,
   *::after {

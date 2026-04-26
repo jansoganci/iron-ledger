@@ -77,12 +77,12 @@ export function AnomalyCard({
           <div>
             <span className="text-text-secondary text-xs block">This month</span>
             <ProvenanceTooltip sourceFile={source_file} sourceColumn={source_column}>
-              {formatCurrency(current)}
+              <span className="font-hero-num">{formatCurrency(current)}</span>
             </ProvenanceTooltip>
           </div>
           <div>
             <span className="text-text-secondary text-xs block">Avg.</span>
-            <span data-numeric className="text-text-primary">
+            <span data-numeric className="font-data text-text-primary">
               {formatCurrency(historical_avg)}
             </span>
           </div>
@@ -91,7 +91,7 @@ export function AnomalyCard({
             <span
               data-numeric
               className={cn(
-                "font-medium",
+                "font-data font-medium",
                 direction === "favorable" && "text-favorable-fg",
                 direction === "unfavorable" && severity === "high" && "text-severity-high-fg",
                 direction === "unfavorable" && severity === "medium" && "text-severity-medium-fg",

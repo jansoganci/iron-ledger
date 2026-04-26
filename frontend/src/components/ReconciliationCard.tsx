@@ -2,11 +2,7 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "../lib/utils";
 import { formatCurrency } from "../lib/formatters";
-import {
-  ClassificationBadge,
-  type Classification,
-} from "./ClassificationBadge";
-import { ProvenanceTooltip } from "./ProvenanceTooltip";
+import type { Classification } from "./ClassificationBadge";
 
 export interface ReconciliationSource {
   source_file: string;
@@ -25,19 +21,39 @@ export interface ReconciliationItem {
   sources?: ReconciliationSource[];
 }
 
-interface ReconciliationCardProps extends ReconciliationItem {}
+interface ReconciliationCardProps extends ReconciliationItem {
+  severity?: "high" | "medium" | "low";
+}
+
+// Plain-English status labels — no jargon
+const STATUS_LABEL: Record<string, string> = {
+  missing_je:                  "Not confirmed by your uploaded records",
+  categorical_misclassification: "May be in the wrong category",
+  timing_cutoff:               "Likely a timing difference",
+  accrual_mismatch:            "Invoice may need to be spread monthly",
+  stale_reference:             "Reference data may be outdated",
+  structural_explained:        "Expected — no action needed",
+};
+
+const AMOUNT_COLOR: Record<string, string> = {
+  high:   "text-severity-high-fg",
+  medium: "text-severity-medium-fg",
+  low:    "text-text-secondary",
+};
 
 export function ReconciliationCard({
   account,
   classification,
   delta,
-  gl_amount,
-  non_gl_total,
   narrative,
   suggested_action,
-  sources,
+  severity = "low",
 }: ReconciliationCardProps) {
   const [copied, setCopied] = useState(false);
+
+  const isExplained = classification === "structural_explained";
+  const statusLabel = classification ? STATUS_LABEL[classification] : null;
+  const amountColor = isExplained ? "text-favorable-fg" : (AMOUNT_COLOR[severity] ?? "text-text-secondary");
 
   function handleCopy() {
     navigator.clipboard.writeText(suggested_action ?? "").then(() => {
@@ -46,113 +62,58 @@ export function ReconciliationCard({
     });
   }
 
-  // Primary source file for provenance (first source, if any)
-  const primarySource = sources?.[0] ?? null;
-
   return (
-    <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
+    <div
+      className={cn(
+        "rounded-lg border border-border p-4 space-y-3",
+        isExplained ? "bg-severity-normal-bg opacity-70" : "bg-surface"
+      )}
+    >
+      {/* Header: account name + amount */}
+      <div className="flex items-start justify-between gap-4">
+        <h3 className="text-sm font-medium text-text-primary leading-snug">
           {account}
         </h3>
-        {classification && (
-          <ClassificationBadge
-            classification={classification}
-            className="shrink-0"
-          />
-        )}
-      </div>
-
-      {/* Numbers row */}
-      <div className="flex flex-wrap gap-4 text-sm">
-        <div>
-          <span className="text-text-secondary text-xs block">GL</span>
-          <ProvenanceTooltip sourceFile={null}>
-            <span className="text-text-primary tabular-nums">
-              {formatCurrency(gl_amount)}
-            </span>
-          </ProvenanceTooltip>
-        </div>
-        <div>
-          <span className="text-text-secondary text-xs block">Source</span>
-          <ProvenanceTooltip
-            sourceFile={primarySource?.source_file ?? null}
-            sourceColumn={primarySource?.source_column}
-          >
-            <span className="text-text-primary tabular-nums">
-              {formatCurrency(non_gl_total)}
-            </span>
-          </ProvenanceTooltip>
-        </div>
-        <div>
-          <span className="text-text-secondary text-xs block">Gap</span>
-          <span
-            className={cn(
-              "tabular-nums font-medium",
-              Math.abs(delta) > 0
-                ? "text-severity-high-fg"
-                : "text-favorable-fg"
-            )}
-          >
+        <div className="text-right shrink-0">
+          <p className={cn("text-base font-semibold tabular-nums", amountColor)}>
             {formatCurrency(Math.abs(delta))}
-          </span>
+          </p>
+          {statusLabel && (
+            <p className="text-[11px] text-text-secondary mt-0.5 leading-tight max-w-[140px] text-right">
+              {statusLabel}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Per-source breakdown chips (when multiple sources) */}
-      {sources && sources.length > 1 && (
-        <div className="flex flex-wrap gap-1.5">
-          {sources.map((s) => (
-            <ProvenanceTooltip
-              key={s.source_file}
-              sourceFile={s.source_file}
-              sourceColumn={s.source_column}
-            >
-              <span className="inline-flex items-center gap-1 rounded-md bg-severity-normal-bg px-2 py-0.5 text-xs text-text-secondary">
-                <span className="font-mono truncate max-w-[120px]" title={s.source_file}>
-                  {s.source_file.split("/").pop()}
-                </span>
-                <span className="text-text-secondary/70">
-                  {formatCurrency(s.amount)}
-                </span>
-              </span>
-            </ProvenanceTooltip>
-          ))}
-        </div>
+      {/* Narrative — only when non-empty */}
+      {narrative && (
+        <p className="text-sm text-text-secondary leading-relaxed">{narrative}</p>
       )}
 
-      {/* Narrative */}
-      <p className="text-sm text-text-secondary">{narrative}</p>
-
-      {/* Suggested action */}
-      <div className="flex items-center justify-between gap-3 rounded-md bg-severity-normal-bg px-3 py-2">
-        <p className="text-xs text-text-secondary flex-1">{suggested_action}</p>
-        <button
-          type="button"
-          onClick={handleCopy}
-          aria-label="Copy suggested action"
-          className={cn(
-            "shrink-0 inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-            copied
-              ? "bg-favorable-bg text-favorable-fg"
-              : "bg-surface text-text-secondary hover:text-text-primary border border-border"
-          )}
-        >
-          {copied ? (
-            <>
-              <Check className="h-3 w-3" aria-hidden />
-              Copied
-            </>
-          ) : (
-            <>
-              <Copy className="h-3 w-3" aria-hidden />
-              Copy
-            </>
-          )}
-        </button>
-      </div>
+      {/* Action — only when non-empty */}
+      {suggested_action && !isExplained && (
+        <div className="group flex items-start justify-between gap-2 pt-1">
+          <p className="text-xs text-text-secondary flex-1">
+            <span className="text-accent font-medium mr-1">→</span>
+            {suggested_action}
+          </p>
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Copy action"
+            className={cn(
+              "shrink-0 rounded p-1 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+              "opacity-0 group-hover:opacity-100",
+              copied ? "text-favorable-fg" : "text-text-secondary hover:text-text-primary"
+            )}
+          >
+            {copied
+              ? <Check className="h-3.5 w-3.5" aria-hidden />
+              : <Copy className="h-3.5 w-3.5" aria-hidden />}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

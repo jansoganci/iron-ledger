@@ -1,6 +1,6 @@
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, Database } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, Database, TrendingUp, X } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useCompany } from "../hooks/useCompany";
 import { ReportSummary } from "../components/ReportSummary";
@@ -36,6 +36,16 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 interface AnomalyResponse extends AnomalyCardData {}
 
+interface Financials {
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+  gross_margin_pct: number;
+  opex: number;
+  net_income: number;
+  net_margin_pct: number;
+}
+
 interface ReportResponse {
   report_id: string;
   company_id: string;
@@ -48,6 +58,7 @@ interface ReportResponse {
   opus_upgraded: boolean;
   anomalies: AnomalyResponse[];
   reconciliations: ReconciliationItem[] | null;
+  financials: Financials | null;
 }
 
 interface RunStatusResponse {
@@ -72,6 +83,7 @@ export default function ReportPage() {
   const initialLowConf = navState.lowConfidenceColumns ?? [];
 
   const [mappingDismissed, setMappingDismissed] = useState(false);
+  const [quarterlyBannerDismissed, setQuarterlyBannerDismissed] = useState(false);
   const [opusStatus, setOpusStatus] = useState<OpusStatus | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAt = useRef<number>(Date.now());
@@ -177,17 +189,93 @@ export default function ReportPage() {
   const showMappingPanel =
     !mappingDismissed && runId && initialLowConf.length > 0;
 
+  // Check if this is a quarter-end month (Mar/Jun/Sep/Dec) to show quarterly banner
+  const isQuarterEnd = () => {
+    if (!period) return false;
+    const month = parseInt(period.split("-")[1]);
+    return [3, 6, 9, 12].includes(month);
+  };
+
+  const getQuarterInfo = () => {
+    if (!period) return { year: 0, quarter: 0 };
+    const [year, month] = period.split("-").map(Number);
+    return { year, quarter: Math.ceil(month / 3) };
+  };
+
+  const showQuarterlyBanner = !quarterlyBannerDismissed && isQuarterEnd() && report;
+
   return (
     <div className="min-h-screen bg-canvas px-4 py-6 md:py-8">
       <div className="max-w-6xl mx-auto space-y-5 pb-8">
-        {/* Back nav */}
-        <button
-          onClick={() => navigate("/upload")}
-          className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          New upload
-        </button>
+        {/* Top nav row: back button left, actions right */}
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={() => navigate("/upload")}
+            className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            New upload
+          </button>
+
+          {report && (
+            <div className="flex items-center gap-2">
+              <MailButton
+                reportId={report.report_id}
+                summary={report.summary}
+                companyName={company?.name ?? ""}
+                period={report.period}
+                anomalyCount={report.anomaly_count}
+              />
+              <button
+                onClick={() => {
+                  const [year, month] = report.period.split("-");
+                  navigate(`/data?year=${year}&month=${month}`);
+                }}
+                className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-text-primary hover:bg-canvas transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <Database className="h-4 w-4" aria-hidden />
+                View data
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Quarterly Summary Banner */}
+        {showQuarterlyBanner && (
+          <div className="rounded-lg border border-accent/30 bg-accent/10 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 flex-1">
+                <TrendingUp className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-medium text-text-primary">
+                    Q{getQuarterInfo().quarter} {getQuarterInfo().year} is complete
+                  </p>
+                  <p className="text-sm text-text-secondary">
+                    Generate a quarterly summary to see trends across the quarter
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const { year, quarter } = getQuarterInfo();
+                    navigate(`/report/quarterly/${year}-Q${quarter}`);
+                  }}
+                  className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 hover:scale-[1.015] active:scale-[0.97] transition-all text-sm font-medium shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+                >
+                  Generate Quarterly Summary
+                </button>
+                <button
+                  onClick={() => setQuarterlyBannerDismissed(true)}
+                  className="p-2 text-text-secondary hover:text-text-primary rounded-lg hover:bg-surface transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Report summary / skeleton */}
         {isLoading ? (
@@ -210,28 +298,12 @@ export default function ReportPage() {
             status={report.is_stale ? "stale" : "verified"}
             opusStatus={opusStatus}
             opusUpgraded={report.opus_upgraded}
+            financials={report.financials}
             onRegenerate={() => navigate(`/upload?period=${report.period}`)}
             reconciliations={report.reconciliations}
             excelDownloadUrl={`/report/${report.company_id}/${report.period}/export.xlsx`}
           />
         ) : null}
-
-        {/* Actions */}
-        {report && (
-          <div className="flex gap-3">
-            <MailButton reportId={report.report_id} />
-            <button
-              onClick={() => {
-                const [year, month] = report.period.split("-");
-                navigate(`/data?year=${year}&month=${month}`);
-              }}
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary hover:bg-canvas transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
-            >
-              <Database className="h-4 w-4" aria-hidden />
-              View data for this period
-            </button>
-          </div>
-        )}
 
         {/* Anomaly cards — grouped by category, 2-col on xl, 1-col below */}
         {isLoading ? (
@@ -242,36 +314,49 @@ export default function ReportPage() {
           </div>
         ) : (
           <>
-            {categoriesToRender.map((cat) => {
-              const items = byCategory[cat];
-              const flagged = items.filter(
-                (a) => a.severity === "high" || a.severity === "medium"
-              );
-              const normal = items.filter((a) => a.severity === "low");
-              const label = CATEGORY_LABELS[cat] ?? cat;
-              return (
-                <section key={cat} className="space-y-2">
-                  <h2 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
-                    {label}
-                  </h2>
-                  {flagged.length > 0 && (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                      {flagged.map((a, i) => (
-                        <AnomalyCard key={`${a.account}-${i}`} {...a} />
-                      ))}
-                    </div>
-                  )}
-                  {flagged.length === 0 && normal.length > 0 && (
-                    <CategoryAllNormalRow items={normal} />
-                  )}
-                </section>
-              );
-            })}
+            {categoriesToRender.length > 0 && (
+              <div className="rounded-xl border border-border bg-surface overflow-hidden">
+                <div className="px-6 py-4 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
+                      Account Variance
+                    </h2>
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-text-secondary">{sortedAnomalies.length} account{sortedAnomalies.length !== 1 ? "s" : ""}</span>
+                  </div>
+                </div>
+                <div className="px-6 py-5 space-y-5">
+                  {categoriesToRender.map((cat) => {
+                    const items = byCategory[cat];
+                    const flagged = items.filter(a => a.severity === "high" || a.severity === "medium");
+                    const normal = items.filter(a => a.severity === "low");
+                    const label = CATEGORY_LABELS[cat] ?? cat;
+                    return (
+                      <section key={cat} className="space-y-2">
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
+                          {label}
+                        </p>
+                        {flagged.length > 0 && (
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                            {flagged.map((a, i) => (
+                              <AnomalyCard key={`${a.account}-${i}`} {...a} />
+                            ))}
+                          </div>
+                        )}
+                        {flagged.length === 0 && normal.length > 0 && (
+                          <CategoryAllNormalRow items={normal} />
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {sortedAnomalies.length === 0 && report && (
-              <div className="rounded-lg border border-favorable-bg bg-favorable-bg px-4 py-6 text-center space-y-1">
+              <div className="rounded-xl border border-border bg-surface px-6 py-8 text-center space-y-1">
                 <p className="text-favorable-fg font-semibold">No anomalies this period.</p>
-                <p className="text-sm text-favorable-fg/80">
+                <p className="text-sm text-text-secondary">
                   Every account is within expected range vs. your history.
                 </p>
               </div>

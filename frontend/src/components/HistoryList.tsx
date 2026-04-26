@@ -1,4 +1,4 @@
-import { ChevronRight, FileText } from "lucide-react";
+import { AlertTriangle, ChevronRight, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatPeriod } from "../lib/formatters";
 
@@ -8,6 +8,22 @@ export interface ReportListItem {
   generated_at: string | null;
   anomaly_count: number;
   error_count: number;
+  report_type: string;
+  quarter?: number;
+  year?: number;
+  is_stale?: boolean;
+}
+
+function inferYearQuarterFromPeriod(
+  period: string
+): { year: number; quarter: number } | null {
+  const [yearPart, monthPart] = period.split("-");
+  const year = Number(yearPart);
+  const month = Number(monthPart);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return null;
+  }
+  return { year, quarter: Math.ceil(month / 3) };
 }
 
 interface HistoryListProps {
@@ -31,6 +47,40 @@ function formatDate(iso: string | null): string {
 function anomalyText(n: number): string {
   if (n === 0) return "No anomalies";
   return `${n} ${n === 1 ? "anomaly" : "anomalies"}`;
+}
+
+export function getReportLink(report: ReportListItem): string {
+  try {
+    if (report.report_type === "quarterly") {
+      const inferred = inferYearQuarterFromPeriod(report.period);
+      const year = report.year ?? inferred?.year;
+      const quarter = report.quarter ?? inferred?.quarter;
+      if (year && quarter) {
+        return `/report/quarterly/${year}-Q${quarter}`;
+      }
+    }
+    return `/report/${report.period}`;
+  } catch (error) {
+    console.error("Error generating report link:", error, report);
+    return `/report/${report.period}`;
+  }
+}
+
+export function getReportLabel(report: ReportListItem): string {
+  try {
+    if (report.report_type === "quarterly") {
+      const inferred = inferYearQuarterFromPeriod(report.period);
+      const year = report.year ?? inferred?.year;
+      const quarter = report.quarter ?? inferred?.quarter;
+      if (year && quarter) {
+        return `Q${quarter} ${year}`;
+      }
+    }
+    return formatPeriod(report.period);
+  } catch (error) {
+    console.error("Error generating report label:", error, report);
+    return report.period || "Unknown";
+  }
 }
 
 /**
@@ -84,12 +134,18 @@ export function HistoryList({ reports, loading }: HistoryListProps) {
         {reports.map((r) => (
           <li key={r.report_id}>
             <Link
-              to={`/report/${r.period}`}
+              to={getReportLink(r)}
               className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-canvas transition-colors focus:outline-none focus:bg-canvas focus:ring-2 focus:ring-accent focus:ring-inset"
             >
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text-primary">
-                  {formatPeriod(r.period)}
+                <div className="text-sm font-medium text-text-primary flex items-center gap-2">
+                  {getReportLabel(r)}
+                  {r.is_stale && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-severity-medium-bg text-severity-medium-fg rounded">
+                      <AlertTriangle className="h-3 w-3" />
+                      Stale
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-text-secondary mt-0.5">
                   {anomalyText(r.anomaly_count)}

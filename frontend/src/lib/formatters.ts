@@ -30,11 +30,11 @@ export function formatVariance(pct: number | null | undefined): string {
   return `${sign}${pct.toFixed(1)}%`;
 }
 
-/** Generate ISO period options (first-of-month) going back N months from today. */
+/** Generate ISO period options (first-of-month) going back N months from today (includes current month). */
 export function recentPeriods(count = 24): { label: string; value: string }[] {
   const options: { label: string; value: string }[] = [];
   const today = new Date();
-  for (let i = 1; i <= count; i++) {
+  for (let i = 0; i < count; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
     options.push({ label: formatPeriod(iso), value: iso });

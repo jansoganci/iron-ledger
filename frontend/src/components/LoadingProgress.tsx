@@ -1,4 +1,4 @@
-import { CheckCircle, Circle, Loader2 } from "lucide-react";
+import { Check, Clock, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -136,6 +136,12 @@ export function LoadingProgress({
   const toast = useToast();
   const [smoothProgress, setSmoothProgress] = useState<Record<number, number>>({});
   const [optimisticProgress, setOptimisticProgress] = useState(40);
+  const [elapsedWarning, setElapsedWarning] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setElapsedWarning(true), 90_000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const isTerminal = (status: string) =>
     status === "complete" ||
@@ -285,93 +291,145 @@ export function LoadingProgress({
   }
 
   return (
-    <div className="w-full md:max-w-sm md:mx-auto space-y-3 px-0 md:px-0">
-      <p className="text-sm font-medium text-text-secondary text-center">
-        Analyzing your file…
-      </p>
+    <div className="w-full">
+      {/* ── Header: eyebrow + title + time hint ─────────────────────────── */}
+      <div className="text-center mb-8">
+        <div className="font-data text-xs text-violet-500 uppercase tracking-[0.10em] flex items-center justify-center gap-1.5 mb-3">
+          <span
+            className="step-dot-blink inline-block w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0"
+            aria-hidden
+          />
+          Agent · Processing
+        </div>
+        <h2 className="font-hero-num text-2xl font-semibold text-text-primary">
+          Analyzing your data
+        </h2>
+        <p className="text-xs text-text-secondary mt-2 flex items-center justify-center gap-1.5">
+          <Clock className="h-3 w-3 shrink-0" aria-hidden />
+          {elapsedWarning
+            ? "Still working — complex files take a bit longer"
+            : "Usually under 2 minutes"}
+        </p>
+      </div>
 
-      {STEPS.map((step, idx) => {
-        const state = getStepState(idx);
-        const displayProgress =
-          isPostDiscoveryOptimistic && idx === activeStep
-            ? optimisticProgress
-            : (smoothProgress[idx] ?? 0);
-        const isCompleting = state === "active" && displayProgress >= 99;
-        
-        return (
-          <div 
-            key={step.status} 
-            className={cn(
-              "space-y-1 transition-all duration-300",
-              state === "active" && "scale-[1.02]"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              {state === "done" ? (
-                <div className="relative">
-                  <CheckCircle 
-                    className={cn(
-                      "h-4 w-4 text-favorable-fg shrink-0 transition-all duration-300",
-                      "animate-in zoom-in-50"
-                    )} 
-                    aria-hidden 
-                  />
-                  <div className="absolute inset-0 h-4 w-4 rounded-full bg-favorable-fg/20 animate-ping" />
-                </div>
-              ) : state === "active" ? (
-                <div className="relative">
-                  <Loader2 
-                    className={cn(
-                      "h-4 w-4 text-accent shrink-0",
-                      isCompleting ? "animate-pulse" : "animate-spin"
-                    )} 
-                    aria-hidden 
-                  />
-                  {!isCompleting && (
-                    <div className="absolute inset-0 h-4 w-4 rounded-full bg-accent/10 animate-pulse" />
-                  )}
-                </div>
-              ) : (
-                <Circle className="h-4 w-4 text-text-secondary shrink-0 opacity-40" aria-hidden />
-              )}
-              <span
-                className={cn(
-                  "text-sm flex-1 transition-all duration-300",
-                  state === "done" && "text-text-secondary line-through",
-                  state === "active" && "text-text-primary font-medium",
-                  state === "pending" && "text-text-secondary"
-                )}
-              >
-                {step.label}
-              </span>
-              {state === "done" && (
-                <span className="text-xs text-favorable-fg font-medium animate-in fade-in slide-in-from-right-2">
-                  100%
-                </span>
-              )}
-              {state === "active" && (
-                <span className="text-xs text-accent font-medium tabular-nums" data-numeric>
-                  {displayProgress}%
-                </span>
-              )}
-            </div>
+      {/* ── Steps ──────────────────────────────────────────────────────── */}
+      <div>
+        {STEPS.map((step, idx) => {
+          const state = getStepState(idx);
+          const isLast = idx === STEPS.length - 1;
+          const displayProgress =
+            isPostDiscoveryOptimistic && idx === activeStep
+              ? optimisticProgress
+              : (smoothProgress[idx] ?? 0);
+          const isCompleting = state === "active" && displayProgress >= 99;
 
-            {state === "active" && (
-              <div className="ml-7 h-1.5 rounded-full bg-border overflow-hidden">
+          return (
+            <div key={step.status} className="flex gap-4">
+              {/* Left col: icon + connector */}
+              <div className="flex flex-col items-center w-9 shrink-0">
                 <div
                   className={cn(
-                    "h-full rounded-full transition-all duration-300 ease-out",
-                    isCompleting 
-                      ? "bg-gradient-to-r from-accent to-favorable-fg animate-pulse" 
-                      : "bg-accent"
+                    "w-9 h-9 rounded-full flex items-center justify-center shrink-0",
+                    "[transition:background-color,box-shadow]",
+                    "[transition-duration:var(--duration-base)]",
+                    state === "pending" && "bg-neutral-100 border border-border",
+                    state === "active" && "bg-violet-500 step-icon-active",
+                    state === "done" && "bg-emerald-500 step-icon-done"
                   )}
-                  style={{ width: `${displayProgress}%` }}
-                />
+                >
+                  {state === "active" && (
+                    <Loader2
+                      className={cn(
+                        "h-4 w-4 text-white shrink-0",
+                        isCompleting ? "animate-pulse" : "animate-spin"
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                  {state === "done" && (
+                    <Check className="h-4 w-4 text-white shrink-0" aria-hidden />
+                  )}
+                </div>
+
+                {!isLast && (
+                  <div className="relative w-0.5 flex-1 min-h-[24px] my-1 bg-border overflow-hidden">
+                    {state === "done" && <div className="step-connector-fill" />}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        );
-      })}
+
+              {/* Right col: label + microcopy + progress bar */}
+              <div className={cn("flex-1 pt-2", !isLast && "pb-6")}>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "text-sm [transition:color_var(--duration-base)]",
+                      state === "done" && "text-emerald-700 line-through",
+                      state === "active" && "text-text-primary font-medium",
+                      state === "pending" && "text-text-secondary"
+                    )}
+                  >
+                    {step.label}
+                  </span>
+                  {state === "active" && (
+                    <span
+                      className="font-data text-xs text-violet-500 ml-auto tabular-nums"
+                      data-numeric
+                    >
+                      {displayProgress}%
+                    </span>
+                  )}
+                  {state === "done" && (
+                    <span className="font-data text-xs text-emerald-600 font-medium ml-auto animate-in fade-in">
+                      ✓
+                    </span>
+                  )}
+                </div>
+
+                {/* Active step microcopy from API */}
+                {state === "active" && data?.step_label && !isPostDiscoveryOptimistic && (
+                  <p
+                    key={data.step_label}
+                    className="font-data text-xs text-violet-600 mt-1 step-microcopy-in truncate"
+                  >
+                    {data.step_label}
+                  </p>
+                )}
+
+                {/* Per-step progress bar */}
+                {state === "active" && (
+                  <div className="mt-2 h-1 rounded-full bg-border overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full",
+                        "[transition:width_var(--duration-base)_var(--ease-out)]",
+                        isCompleting
+                          ? "bg-gradient-to-r from-violet-500 to-emerald-400 animate-pulse"
+                          : "bg-violet-500"
+                      )}
+                      style={{ width: `${displayProgress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Footer: skip button ─────────────────────────────────────────── */}
+      <div className="mt-8 text-center">
+        <button
+          onClick={() => navigate(`/report/${period}`)}
+          className={cn(
+            "text-xs text-text-secondary hover:text-text-primary",
+            "[transition:color_var(--duration-base)]",
+            "focus:outline-none focus-ring-agent rounded-sm px-1"
+          )}
+        >
+          Skip for now →
+        </button>
+      </div>
     </div>
   );
 }

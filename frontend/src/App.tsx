@@ -10,6 +10,7 @@ import RegisterPage from "./pages/RegisterPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import UploadPage from "./pages/UploadPage";
 import ReportPage from "./pages/ReportPage";
+import QuarterlyReportPage from "./pages/QuarterlyReportPage";
 import ProfilePage from "./pages/ProfilePage";
 import DashboardPage from "./pages/DashboardPage";
 import DataPage from "./pages/DataPage";
@@ -100,6 +101,16 @@ export default function App() {
                     <ProtectedRoute>
                       <AppShell>
                         <ReportsPage />
+                      </AppShell>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/report/quarterly/:yearQuarter"
+                  element={
+                    <ProtectedRoute>
+                      <AppShell>
+                        <QuarterlyReportPage />
                       </AppShell>
                     </ProtectedRoute>
                   }

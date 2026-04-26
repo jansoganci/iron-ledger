@@ -61,7 +61,7 @@ export default function ProfilePage() {
             </div>
             <div className="flex items-center justify-between gap-4 px-4 py-3">
               <dt className="text-sm text-text-secondary shrink-0">User ID</dt>
-              <dd className="text-xs text-text-secondary font-mono truncate">
+              <dd className="font-data text-xs text-text-secondary truncate">
                 {user?.id ?? "—"}
               </dd>
             </div>
@@ -141,7 +141,7 @@ export default function ProfilePage() {
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary hover:bg-canvas transition-colors focus:outline-none focus:ring-2 focus:ring-accent min-h-[44px] lg:min-h-[40px]"
+            className="w-full flex items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary hover:bg-canvas transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent min-h-[44px] lg:min-h-[40px]"
           >
             <LogOut className="h-4 w-4" aria-hidden />
             Sign out

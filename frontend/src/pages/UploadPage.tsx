@@ -52,7 +52,7 @@ export default function UploadPage() {
   const { data: company } = useCompany();
 
   const [view, setView] = useState<PageView>("upload");
-  const [period, setPeriod] = useState(monthsAgo(1));
+  const [period, setPeriod] = useState(monthsAgo(0));
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);

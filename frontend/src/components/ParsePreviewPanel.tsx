@@ -16,7 +16,7 @@ function SourceBreakdownChips({ row }: { row: PreviewRow }) {
           title={s.source_file}
           className="inline-flex items-center gap-1 rounded-md bg-severity-normal-bg px-1.5 py-0.5 text-[10px] text-text-secondary max-w-[140px]"
         >
-          <span className="truncate font-mono">{s.source_file.split("/").pop()}</span>
+          <span className="truncate font-data">{s.source_file.split("/").pop()}</span>
           <span className="shrink-0 text-text-secondary/70">{formatCurrency(s.amount)}</span>
         </span>
       ))}

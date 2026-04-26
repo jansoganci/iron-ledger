@@ -215,6 +215,25 @@ class SupabaseEntriesRepo:
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _months_before(d: date, months: int) -> date:
+    """Return the date that is *months* calendar months before *d*.
+
+    Pure Python — no dateutil dependency. Works correctly across year
+    boundaries (e.g. March - 6 → September of prior year).
+    The day component is preserved; periods in this codebase are always
+    the 1st of the month, so clamping is never needed in practice.
+    """
+    month = d.month - months
+    year = d.year + (month - 1) // 12
+    month = ((month - 1) % 12) + 1
+    return date(year, month, d.day)
+
+
+# ---------------------------------------------------------------------------
 # Anomalies
 # ---------------------------------------------------------------------------
 
@@ -244,6 +263,43 @@ class SupabaseAnomaliesRepo:
             self._db.table("anomalies").insert(rows).execute()
         except Exception as exc:
             raise _wrap_db(exc) from exc
+
+    def list_account_flag_counts_before(
+        self,
+        company_id: str,
+        before_period: date,
+        lookback_months: int = 6,
+    ) -> dict[str, int]:
+        """Return {account_id: distinct_period_count} for the lookback window.
+
+        Window: [before_period - lookback_months, before_period).
+        'low' severity rows are excluded — they are noise, not signal.
+        supabase-py's builder has no GROUP BY, so grouping is done in Python
+        after a single SELECT of (account_id, period) pairs.
+        """
+        cutoff = _months_before(before_period, lookback_months)
+        try:
+            resp = (
+                self._db.table("anomalies")
+                .select("account_id, period")
+                .eq("company_id", company_id)
+                .gte("period", str(cutoff))
+                .lt("period", str(before_period))
+                .neq("severity", "low")
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+
+        periods_by_account: dict[str, set[str]] = {}
+        for row in resp.data or []:
+            account_id = row["account_id"]
+            period_val = (
+                row["period"] if isinstance(row["period"], str) else str(row["period"])
+            )
+            periods_by_account.setdefault(account_id, set()).add(period_val)
+
+        return {aid: len(periods) for aid, periods in periods_by_account.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +369,61 @@ class SupabaseReportsRepo:
         except Exception as exc:
             raise _wrap_db(exc) from exc
         return [_row_to_report(r) for r in (resp.data or [])]
+
+    def write_quarterly(self, report: Report) -> Report:
+        """Write a quarterly report. Caller is responsible for deleting any
+        existing row first (delete_quarterly) — per CLAUDE.md, no UPSERT."""
+        try:
+            row = _report_to_row(report)
+            resp = self._db.table("reports").insert(row).execute()
+            return _row_to_report(resp.data[0])
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+
+    def delete_quarterly(self, company_id: str, year: int, quarter: int) -> None:
+        """Delete a quarterly report row. Idempotent — no error if row is absent."""
+        try:
+            self._db.table("reports").delete().eq("company_id", company_id).eq(
+                "report_type", "quarterly"
+            ).eq("year", year).eq("quarter", quarter).execute()
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+
+    def get_quarterly(self, company_id: str, year: int, quarter: int) -> Report | None:
+        """Fetch a persisted quarterly report. Returns None if not generated."""
+        try:
+            resp = (
+                self._db.table("reports")
+                .select("*")
+                .eq("company_id", company_id)
+                .eq("report_type", "quarterly")
+                .eq("year", year)
+                .eq("quarter", quarter)
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        if not resp.data:
+            return None
+        return _row_to_report(resp.data[0])
+
+    def mark_quarterly_stale(self, company_id: str, year: int, quarter: int) -> None:
+        """Mark a quarterly report as stale when underlying monthly data changes.
+
+        This is called when a monthly run completes for a period that falls within
+        this quarter. The frontend will show a "regenerate" banner.
+        """
+        try:
+            self._db.table("reports").update({"is_stale": True}).eq(
+                "company_id", company_id
+            ).eq("report_type", "quarterly").eq("year", year).eq(
+                "quarter", quarter
+            ).execute()
+        except Exception:
+            # Silent fail - stale marking is non-critical
+            # If the row doesn't exist, that's fine (no quarterly report generated yet)
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -948,6 +1059,7 @@ def _row_to_anomaly(r: dict) -> Anomaly:
             else None
         ),
         status=r.get("status", "open"),
+        is_recurring=r.get("is_recurring", False),
         created_at=r.get("created_at"),
     )
 
@@ -963,6 +1075,7 @@ def _anomaly_to_row(a: Anomaly) -> dict:
         "description": a.description,
         "variance_pct": str(a.variance_pct) if a.variance_pct is not None else None,
         "status": a.status,
+        "is_recurring": a.is_recurring,
     }
 
 
@@ -982,8 +1095,24 @@ def _row_to_report(r: dict) -> Report:
         mail_sent_at=r.get("mail_sent_at"),
         reconciliations=r.get("reconciliations"),
         opus_upgraded=r.get("opus_upgraded", False) or False,
+        report_type=r.get("report_type", "monthly"),
+        quarter=r.get("quarter"),
+        year=r.get("year"),
+        is_stale=r.get("is_stale", False),
+        quarterly_data=r.get("quarterly_data"),
         created_at=r.get("created_at"),
     )
+
+
+def _sanitize_for_json(obj: object) -> object:
+    """Recursively convert Decimal → float so JSONB insertion never fails."""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_json(i) for i in obj]
+    return obj
 
 
 def _report_to_row(r: Report) -> dict:
@@ -994,7 +1123,14 @@ def _report_to_row(r: Report) -> dict:
         "summary": r.summary,
         "anomaly_count": r.anomaly_count,
         "error_count": r.error_count,
+        "report_type": r.report_type,
     }
     if r.reconciliations is not None:
         row["reconciliations"] = r.reconciliations
+    if r.quarter is not None:
+        row["quarter"] = r.quarter
+    if r.year is not None:
+        row["year"] = r.year
+    if r.quarterly_data is not None:
+        row["quarterly_data"] = _sanitize_for_json(r.quarterly_data)
     return row

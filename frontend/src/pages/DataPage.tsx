@@ -115,13 +115,27 @@ export default function DataPage() {
 
   const metrics = useMemo(() => {
     if (!filteredData.length) {
-      return { totalAmount: 0, accountCount: 0 };
+      return { totalAmount: 0, accountCount: 0, revenue: 0, cogs: 0, grossProfit: 0, grossMarginPct: 0, opex: 0, netIncome: 0, netMarginPct: 0 };
     }
-    
-    const totalAmount = filteredData.reduce((sum, entry) => sum + entry.amount, 0);
+
+    const totalAmount = filteredData.reduce((sum, e) => sum + e.amount, 0);
     const accountCount = filteredData.length;
-    
-    return { totalAmount, accountCount };
+
+    const revenue = filteredData
+      .filter(e => e.category === "REVENUE" || e.category === "OTHER_INCOME")
+      .reduce((s, e) => s + e.amount, 0);
+    const cogs = filteredData
+      .filter(e => e.category === "COGS")
+      .reduce((s, e) => s + e.amount, 0);
+    const opex = filteredData
+      .filter(e => ["OPEX", "G&A", "R&D"].includes(e.category))
+      .reduce((s, e) => s + e.amount, 0);
+    const grossProfit = revenue - cogs;
+    const netIncome = grossProfit - opex;
+    const grossMarginPct = revenue ? Math.round((grossProfit / revenue) * 1000) / 10 : 0;
+    const netMarginPct   = revenue ? Math.round((netIncome   / revenue) * 1000) / 10 : 0;
+
+    return { totalAmount, accountCount, revenue, cogs, grossProfit, grossMarginPct, opex, netIncome, netMarginPct };
   }, [filteredData]);
 
   const columns = useMemo<ColumnDef<DataEntry, any>[]>(
@@ -156,7 +170,7 @@ export default function DataPage() {
         enableSorting: true,
         sortDescFirst: true,
         cell: ({ getValue }) => (
-          <span className="text-sm tabular-nums text-text-primary" data-numeric>
+          <span className="font-data text-sm text-text-primary" data-numeric>
             {formatCurrency(getValue() as number)}
           </span>
         ),
@@ -168,7 +182,7 @@ export default function DataPage() {
         cell: ({ getValue }) => {
           const value = getValue() as number | null;
           return (
-            <span className="text-sm tabular-nums text-text-secondary" data-numeric>
+            <span className="font-data text-sm text-text-secondary" data-numeric>
               {value !== null ? formatVariance(value) : "—"}
             </span>
           );
@@ -268,12 +282,12 @@ export default function DataPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedCategory(null)}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                  selectedCategory === null
-                    ? "bg-accent text-white"
-                    : "bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-canvas"
-                )}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    selectedCategory === null
+                      ? "bg-accent text-white hover:scale-[1.015] active:scale-[0.97]"
+                      : "bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-canvas"
+                  )}
               >
                 All
               </button>
@@ -282,9 +296,9 @@ export default function DataPage() {
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
                   className={cn(
-                    "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                     selectedCategory === cat
-                      ? "bg-accent text-white"
+                      ? "bg-accent text-white hover:scale-[1.015] active:scale-[0.97]"
                       : "bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-canvas"
                   )}
                 >
@@ -293,32 +307,56 @@ export default function DataPage() {
               ))}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-lg border border-border bg-surface">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div>
-                  <span className="text-xs text-text-secondary">Total Amount</span>
-                  <div className="text-lg font-semibold text-text-primary tabular-nums" data-numeric>
-                    {formatCurrency(metrics.totalAmount)}
-                  </div>
-                </div>
-                <div className="border-l border-border pl-4">
-                  <span className="text-xs text-text-secondary">Accounts</span>
-                  <div className="text-lg font-semibold text-text-primary tabular-nums" data-numeric>
-                    {metrics.accountCount}
-                  </div>
-                </div>
+            {/* KPI strip */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-text-secondary uppercase tracking-widest">
+                  {selectedMonth !== "all"
+                    ? `${MONTHS.find(m => m.value === selectedMonth)?.label} ${selectedYear}`
+                    : `${selectedYear} — Uploaded periods`}
+                </p>
+                <button
+                  onClick={handleExportCSV}
+                  disabled={!filteredData.length}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-canvas transition-colors focus:outline-none focus:ring-2 focus:ring-accent",
+                    !filteredData.length && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  Export CSV
+                </button>
               </div>
-              <button
-                onClick={handleExportCSV}
-                disabled={!filteredData.length}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary hover:bg-canvas transition-colors focus:outline-none focus:ring-2 focus:ring-accent",
-                  !filteredData.length && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                <Download className="h-4 w-4" aria-hidden />
-                Export CSV
-              </button>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: "Revenue", value: metrics.revenue, sub: null },
+                  {
+                    label: "Gross Profit",
+                    value: metrics.grossProfit,
+                    sub: metrics.revenue ? `${metrics.grossMarginPct.toFixed(1)}% margin` : null,
+                    color: metrics.grossMarginPct >= 50 ? "text-favorable-fg" : metrics.grossMarginPct >= 30 ? "text-text-primary" : "text-severity-medium-fg",
+                  },
+                  {
+                    label: "Net Income",
+                    value: metrics.netIncome,
+                    sub: metrics.revenue ? `${metrics.netMarginPct.toFixed(1)}% margin` : null,
+                    color: metrics.netIncome >= 0 ? "text-favorable-fg" : "text-severity-high-fg",
+                  },
+                  { label: "Total OpEx", value: metrics.opex, sub: null },
+                ].map(({ label, value, sub, color }) => (
+                  <div key={label} className="rounded-lg border border-border bg-surface px-5 py-4 shadow-sm">
+                    <p className="text-[11px] font-medium text-text-secondary uppercase tracking-widest mb-1.5">
+                      {label}
+                    </p>
+                    <p className={cn("font-hero-num text-xl font-semibold", color ?? "text-text-primary")}>
+                      {formatCurrency(value)}
+                    </p>
+                    {sub && (
+                      <p className={cn("text-xs mt-0.5", color ?? "text-text-secondary")}>{sub}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         )}
@@ -378,10 +416,10 @@ export default function DataPage() {
                               <button
                                 type="button"
                                 onClick={header.column.getToggleSortingHandler()}
-                                className={cn(
-                                  "inline-flex items-center gap-1 rounded-sm hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                                  isNumericCol && "flex-row-reverse"
-                                )}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors hover:text-text-primary",
+                    isNumericCol && "flex-row-reverse"
+                  )}
                               >
                                 <span>
                                   {flexRender(

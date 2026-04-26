@@ -75,7 +75,7 @@ function NavItemLink({ item, onNavigate }: NavItemLinkProps) {
   const active = isRouteActive(location.pathname, item.to);
 
   const base =
-    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors min-h-[44px] lg:min-h-[40px]";
+    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors min-h-[44px] lg:min-h-[40px]";
 
   if (!item.enabled) {
     return (
@@ -115,8 +115,8 @@ function NavItemLink({ item, onNavigate }: NavItemLinkProps) {
       className={cn(
         base,
         active
-          ? "bg-canvas text-text-primary font-medium"
-          : "text-text-secondary hover:text-text-primary hover:bg-canvas"
+          ? "bg-amber-50 text-amber-700 font-medium border-l-2 border-amber-500 pl-[10px]"
+          : "text-text-secondary hover:text-text-primary hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       )}
     >
       <item.icon className="h-4 w-4 shrink-0" aria-hidden />
@@ -150,7 +150,7 @@ function NavHeader({
   return (
     <div className="flex items-center justify-between px-4 h-14 border-b border-border shrink-0">
       <div className="flex items-baseline gap-2 min-w-0">
-        <span className="text-sm font-semibold text-text-primary">
+        <span className="text-base font-semibold text-text-primary tracking-tight">
           IronLedger
         </span>
         <span className="text-xs text-text-secondary hidden xl:inline">
@@ -191,9 +191,9 @@ function NavFooter({
         aria-current={profileActive ? "page" : undefined}
         aria-label="View profile"
         className={cn(
-          "block rounded-md px-2 py-1.5 min-w-0 min-h-[44px] lg:min-h-[40px] focus:outline-none focus:ring-2 focus:ring-accent transition-colors",
+          "block rounded-md px-2 py-1.5 min-w-0 min-h-[44px] lg:min-h-[40px] transition-colors [transition-duration:var(--duration-base)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
           profileActive
-            ? "bg-canvas"
+            ? "bg-amber-50 border-l-2 border-amber-500 pl-[6px]"
             : "hover:bg-canvas"
         )}
       >
@@ -211,7 +211,7 @@ function NavFooter({
       <button
         type="button"
         onClick={onSignOut}
-        className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-canvas transition-colors min-h-[44px] lg:min-h-[40px] focus:outline-none focus:ring-2 focus:ring-accent"
+        className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-canvas transition-colors [transition-duration:var(--duration-base)] min-h-[44px] lg:min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <LogOut className="h-4 w-4 shrink-0" aria-hidden />
         <span>Sign out</span>
@@ -295,7 +295,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Dialog.Portal>
           </Dialog.Root>
 
-          <span className="text-sm font-semibold text-text-primary">
+          <span className="text-base font-semibold text-text-primary tracking-tight">
             IronLedger
           </span>
         </div>
