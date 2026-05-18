@@ -4,7 +4,11 @@
   "scripts": {
     "dev": "concurrently -n backend,frontend -c blue,green --kill-others-on-fail \"uvicorn backend.main:app --reload --port 8000\" \"npm --prefix frontend run dev\"",
     "dev:backend": "uvicorn backend.main:app --reload --port 8000",
-    "dev:frontend": "npm --prefix frontend run dev"
+    "dev:frontend": "npm --prefix frontend run dev",
+    "video:dev": "npm --prefix video run dev",
+    "video:render": "npm --prefix video run render",
+    "video:still": "npm --prefix video run still",
+    "video:lint": "npm --prefix video run lint"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"

@@ -1,0 +1,37 @@
+{
+  "name": "video",
+  "version": "1.0.0",
+  "description": "MonthProof cinematic product showcase built with Remotion",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@fontsource/inter": "^5.1.0",
+    "@remotion/cli": "4.0.462",
+    "@remotion/tailwind-v4": "4.0.462",
+    "@remotion/transitions": "^4.0.462",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.462",
+    "tailwindcss": "4.0.0"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.462",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "remotion render MonthProofShowcase out/monthproof-showcase.mp4",
+    "still": "remotion still MonthProofShowcase --frame=120 --scale=0.5",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}
