@@ -16,10 +16,9 @@ Technical architecture and system design documents.
 ### 02-planning/
 Project plans, blueprints, and roadmaps.
 
-- `implementation_blueprint.md` - Complete implementation guide
-- `account_mapper_sprint_plan.md` - Account mapping sprint details
-- `landing-plan.md` - Landing page implementation plan
 - `scope.md` - Project scope and requirements
+- `agentic-memory-roadmap.md` - Quarterly reporting and memory roadmap
+- `close-flow-contract.md` - Product contract to complete the close flow without pivoting (no code until this is locked)
 
 ### 03-sprint/
 Sprint planning and daily execution plans.
