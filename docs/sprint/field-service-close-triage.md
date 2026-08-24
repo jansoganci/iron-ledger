@@ -2,6 +2,7 @@
 
 *Planning only. No implementation until this document is approved.*  
 *Date: 24 August 2026. Revised same day (2): direct answers to the two placement/root-cause questions; orchestrator `compute_hints` overwrite added to the class-6 chain; `0010` vs `0011` numbering note.*  
+*Revised same day (3): class-6 diagnosis refresh after PR #2 / PR #4 — see [GÜNCELLEME 24 August 2026](#güncelleme-24-august-2026). Original diagnosis below is not rewritten.*  
 *Source report: field-service SMB month-end close practices (undeposited funds, deferred RMR, alarm-specific accruals, materiality).*  
 *Architecture: IronLedger codebase, product name Month Proof. Same repo, not a second product.*
 
@@ -424,3 +425,98 @@ Approve or amend before any implementation prompt:
 If item 2 is accepted only as prompt wording (no fee hint yet), still do not default unsure two-sided items to `missing_je`.
 
 No implementation until this checkpoint is explicit.
+
+---
+
+## GÜNCELLEME 24 August 2026
+
+Planning only. **No implementation in this turn.** Re-ran the class-6 diagnosis against current code after two stacked slices that were still draft at the time of the original write-up:
+
+- PR #2 (`cursor/is-material-and-gate-d72a`) — consolidator `_is_material` AND-gate
+- PR #4 (`cursor/orphan-coverage-cards-d72a`) — `card_kind=coverage`; GL-only items no longer classified `missing_je`
+
+Code read at PR #4 HEAD `95d0116`. Counts below are from `consolidate()` + `compute_hints()` + `_apply_reconciliation_classifications()` on the historical five-file Sentinel set (`595e0fd`, later deleted in `c0e059e`; restored from git for this run, not re-committed). Reconstruction A: skip Total / Gross Profit / Net Income rows; department `category` aligned to the GL (post-AccountMapper analog). Not a live Claude replay — there is still no stored `reconciliation_classifications` JSON from the 24 Apr 2026 smoke.
+
+### 1. Prompt + fallback — what changed, what did not
+
+| Layer | Original diagnosis | After PR #4 | Same? |
+|-------|--------------------|-------------|-------|
+| Prompt hard rule | “If unsure, default to `missing_je`.” `missing_je` included `is_gl_only` **or** `is_source_only`. | “If unsure **on an exception item**, default to `missing_je`. Never default a coverage / `is_gl_only` item to `missing_je`.” `missing_je` is `is_source_only` or invoice-sized delta. Coverage template is separate; class 6 must not be used for uncovered GL lines. | **Narrowed, not removed.** Unsure two-sided exceptions still default to `missing_je`. |
+| Fallback `_classify_from_hints` | `is_gl_only` **or** `is_source_only` → `missing_je`. Last resort `stale_reference`. No `structural_explained` branch. | `is_gl_only` → `None` (coverage). `is_source_only` → `missing_je`. Then timing / similar-amount / round-fraction. Last resort still `stale_reference`. Still no `structural_explained` branch. | **GL-only path changed.** Last-resort and class-6 hole **unchanged**. |
+| Merge | Claude’s class wins per account; else fallback. | Coverage items: Claude’s class is **cleared**. `classification` stays `None`. | Changed for GL-only only. |
+| Pandas fee hint | None (`ReconciliationHints` has no processor/netting field). | Still none. `hint_computer.py` unchanged on this axis. | Same. |
+| Guardrail | `numbers_used` only. | Same. | Same. |
+
+**Direct answer.** The two-layer contradiction on a *two-sided* fee gap is still there: Claude is told “unsure exception → `missing_je`”; Python last resort is `stale_reference`; neither can emit `structural_explained`. What is no longer true: fallback does **not** stamp `missing_je` on GL-only. Coverage merge also blocks Claude from doing it.
+
+### 2. Sentinel recount after coverage (not a guess)
+
+20 recon items from 21 GL P&L lines (Bank Charges $95 dropped — see §3).
+
+| Shape | Count | After PR #4 writer | After original “28 missing_je” story |
+|-------|-------|--------------------|--------------------------------------|
+| GL-only | **16** | `card_kind=coverage`, `classification=None` (both fallback and Claude-stamps-everything merge) | These *were* the `missing_je` mass |
+| Source-only | **0** | — | Not the 28 |
+| Two-sided exceptions | **4** | See §3 | ≈ the 4 `categorical_misclassification` in the smoke, plus any Claude “unsure → missing_je” on the same four |
+| Not an item | **1** | Bank Charges $95 (`|delta| < $100`) | Would have been a 17th GL-only before the AND-gate |
+
+GL-only 16 (unchanged vs the orphan-policy Reconstruction A): Bad Debt $177, Contractors $700, Depreciation $620, Employee Benefits $1,240, Equipment Rental $390, Insurance $1,150, Licenses & Permits $250, Marketing $2,400, Office Supplies $215, Payroll Taxes $3,675, Professional Fees $875, Rent $3,200, Software Subscriptions $615, Telephone $320, Utilities $480, Vehicle Expense $2,100.
+
+**Remaining `missing_je` population**
+
+- Fallback only (Claude map empty): **0 `missing_je`**. 16 coverage + 3 `timing_cutoff` + 1 `categorical_misclassification`.
+- Claude stamps `missing_je` on every exception name (the remaining prompt default): **4 `missing_je`**, all two-sided. Coverage stays 16 × null.
+- Source-only `missing_je`: **0**.
+
+The archived 28 cannot be replayed as Claude JSON. After coverage, that 28 is **not** still sitting in `missing_je`. At most 4 exception cards can still receive that label, and only if Claude uses the unsure default.
+
+### 3. Of those remaining, how many are fee / netting?
+
+**Zero.** Counted on the four two-sided items only (`is_gl_only=False` and `is_source_only=False`). No pandas fee hint exists, so “fee-hint-li” here means: both sides present **and** the designed gap is processor/platform/netting rather than JE / coding / roster / cutoff.
+
+| Account | GL vs source | Δ | Hints that actually fired | Designed class | Fee/netting? |
+|---------|--------------|---|---------------------------|----------------|--------------|
+| Equipment COGS | 36,100 vs 37,800 | 1,700 | `crosses_period_boundary` (CableMax invoice date 2026-04-03) | `missing_je` (invoice in supplier file, not in GL) or timing | No |
+| Installation Revenue | 15,000 vs 16,500 | 1,500 | `crosses_period_boundary` (balance due April). `is_round_fraction` **false** at account total (16,500 / 15,000 = 1.10, not 0.50) | deposit / `timing_cutoff` | No |
+| Salaries & Wages | 43,500 vs 44,200 | 700 | `similar_amount_in_other_account` (Contractors $700) | `categorical_misclassification` | No |
+| Service Revenue | 3,540 vs 3,825 | 285 | `crosses_period_boundary` (5 rows `Last Billed` = 2026-04-01 — known wide date-hint); also `delta_matches_known_vendor` | `stale_reference` (cancelled contracts) | No |
+
+The only processor-shaped GL line in the five-file set is **Bank Charges $95** (“Merchant processing fees”). PR #2 drops it (`< $100`). Even at $100+ it would be **GL-only coverage**, not class 6: there is no bank/processor source file in this set, so it cannot be a two-sided fee gap.
+
+Fallback on the four (PR #4): 3× `timing_cutoff`, 1× `categorical_misclassification`. Last-resort `stale_reference` did **not** fire. Class 6 did **not** fire.
+
+### 4. Is the original diagnosis still valid?
+
+**Split it.**
+
+| Claim | After PR #2 / #4 |
+|-------|------------------|
+| Class 6 never fires (no fee hint + no fallback branch + prompt unsure default) | **Still true** for any two-sided fee gap that might appear later. |
+| Two writers contradict on two-sided items with no hint (Claude `missing_je` vs Python `stale_reference`) | **Still true.** Coverage did not touch that pair. |
+| Sentinel’s 28 `missing_je` are the class-6 hole / mislabeled fee gaps | **No longer valid.** 16/20 items are coverage (uncovered P&L lines). 0 of the remaining 4 are fee/netting. Relabeling them `structural_explained` would still be the wrong fix. |
+| Consolidator orphan flooding is the *amplifier* of `missing_je` | **Mostly solved** for GL-only by PR #4. AND-gate (PR #2) did not remove those 16 (`delta_pct ≈ 100%`). It only dropped Bank Charges $95. |
+| Implement fee-hint now to clean the Sentinel demo | **This job shrank.** A fee-hint + class-6 fallback branch would change **0** cards on this five-file set. Do not implement class 6 “to fix the 28.” |
+
+The dead class is still a real capability hole for a **future** two-sided gross-vs-net pair (FSM/bank/processor). It is not what the current Sentinel cards are waiting on. Vandelay’s Shopify/Amazon vs bank example in `docs/06-reports/hackathon_findings_report.md` is a different file set; it was not re-run here.
+
+### 5. Updated fix proposal (do not apply)
+
+Keep six classes. Do not route coverage or these four exceptions into class 6.
+
+**Before → after, if a later prompt is approved**
+
+1. **Prompt (`narrative_prompt.txt`) — still worth doing, even without a fee hint.**
+   - Before: “If unsure on an exception item, default to `missing_je`.” That can still stamp all 4 two-sided rows `missing_je` (merge test: Claude map of `missing_je` on every account → 4 exceptions labeled `missing_je`, 16 coverage stay null).
+   - After: unsure + two-sided + no other hint → `stale_reference`. `missing_je` only when `is_source_only` **or** pandas already shows an invoice-sized one-source gap. Coverage unchanged.
+   - Example: Service Revenue Δ$285 stays “reference list out of date,” not “journal entry may be missing.”
+
+2. **Fee hint + fallback class-6 branch — defer until there is a two-sided fixture.**
+   - Before: `_classify_from_hints` never returns `structural_explained`; `ReconciliationHints` has no fee field.
+   - After (when a bank/processor vs GL pair exists): pandas sets e.g. `looks_like_processor_fee` on **two-sided** items only; fallback returns `structural_explained` only if that hint is set; prompt uses class 6 **only** when the hint is on.
+   - Example that would move: not in Sentinel today. Hypothetical: GL deposits $57,500 vs platform sales $61,000, both sides present, delta in a named fee band → class 6. Bank Charges $95 GL-only is **not** that example.
+
+3. **Do not reopen** coverage, `_is_material`, grouping-by-canonical, AccountMapper, or PAYROLL in a class-6 slice.
+
+**Order if later approved:** prompt unsure-default (1) is the only change with a Sentinel effect (the 4 exceptions). Hint + fallback (2) needs a new fixture first or it is a no-op. The 16 coverage cards are already correct; leave them.
+
+**Recommendation for this checkpoint:** treat Sentinel class-6 as **shrunk / not the next slice**. The original “diagnose before fix” still holds for the dead code path, but the 28-count is explained by coverage, not by missing fee classification. No code until this update is accepted.
