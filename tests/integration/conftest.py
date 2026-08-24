@@ -20,6 +20,8 @@ DRONE_CLEAN_PATH = Path("docs/demo_data/Drone Inc - Mar 26.xlsx")
 @pytest.fixture
 def drone_qbo_clean_bytes() -> bytes:
     """The real DRONE March P&L — our one piece of production-shape ground truth."""
+    if not DRONE_CLEAN_PATH.is_file():
+        pytest.skip(f"Demo file missing: {DRONE_CLEAN_PATH}")
     return DRONE_CLEAN_PATH.read_bytes()
 
 
