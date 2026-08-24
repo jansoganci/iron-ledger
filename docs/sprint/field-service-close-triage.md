@@ -229,7 +229,7 @@ These correct the current model. They stay inside the six classes.
 return abs_delta >= _DELTA_DOLLAR_HARD or abs_delta >= _DELTA_DOLLAR_MIN
 ```
 
-`_DELTA_PCT_MIN` is unused. This is the main reason a 41-line GL can emit ~32 recon items.
+`_DELTA_PCT_MIN` is unused. That is a real bug. It is **not** the main reason a 41-line GL emits ~32 recon items — those are mostly GL-only orphans whose `delta_pct` is already ~100%, so the AND-gate **keeps** them. Pre-analysis (approval gate, no code): [pre-analysis-is-material.md](pre-analysis-is-material.md).
 
 **Affects.** `backend/agents/consolidator.py::_is_material` (and tests under `tests/agents/test_consolidator.py`).
 
@@ -389,10 +389,10 @@ When (if) implementation is approved, the first prompt must **not** include:
 
 Suggested implementation order **after approval** (not this task):
 
-1. `_is_material` AND-gate (exception count becomes believable)
-2. Date-hint restriction + deposit vs fee classification/prompt split (`structural_explained` only with a pandas fee hint; do not relabel consolidator orphans)
-3. Payroll substring helper in `backend/tools/` called from `comparison.py` (no category seed, no Haiku)
-4. Checklist grouping / KPI strip only after 1–3, or the UI still shows 32 cards
+1. `_is_material` AND-gate — **only after** [pre-analysis-is-material.md](pre-analysis-is-material.md) is approved. This does **not** by itself make the Sentinel card count believable.
+2. Date-hint restriction + deposit vs fee classification/prompt split (`structural_explained` only with a pandas fee hint; do not relabel consolidator orphans) — own pre-analysis, own approval
+3. Payroll substring helper in `backend/tools/` called from `comparison.py` (no category seed, no Haiku) — own pre-analysis, own approval
+4. Checklist grouping / KPI strip only after 1–3, or the UI still shows ~32 cards until **orphan policy** (GL-only ≠ missing_je) is a separate slice
 
 Do **not** in that prompt: hardcoded flux `$10k`/`$5k`; `0010` onboarding scale (separate Kova 2 spec); bank matcher.
 
