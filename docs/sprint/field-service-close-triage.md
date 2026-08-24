@@ -1,7 +1,7 @@
 # Field-service close research — architecture triage
 
 *Planning only. No implementation until this document is approved.*  
-*Date: 24 August 2026. Revised same day: PAYROLL pattern placement, `structural_explained` diagnosis, flux-via-onboarding bucket, migration `0009` verified.*  
+*Date: 24 August 2026. Revised same day (2): direct answers to the two placement/root-cause questions; orchestrator `compute_hints` overwrite added to the class-6 chain; `0010` vs `0011` numbering note.*  
 *Source report: field-service SMB month-end close practices (undeposited funds, deferred RMR, alarm-specific accruals, materiality).*  
 *Architecture: IronLedger codebase, product name Month Proof. Same repo, not a second product.*
 
@@ -19,7 +19,7 @@ Three buckets, nothing in between.
 
 Each item: **finding → file/function → scope** (`mikro-fix` | `yeni tablo alanı` | `yeni component` | `sadece not`).
 
-**Migration number (verified on disk, 24 Aug 2026).** `supabase/migrations/` contains `0001`–`0009`. Highest file: **`0009_add_report_type_and_quarterly.sql`**. Next write, if any, is **`0010_{snake_case}.sql`**. The earlier `0010` guess is confirmed. Hints live in `reports.reconciliations` JSONB, so a new hint field is Pydantic-only unless we also persist a first-class column.
+**Migration number (verified on disk, 24 Aug 2026).** Nine files in `supabase/migrations/`: `0001_initial_schema` … `0008_opus_upgrade`, highest **`0009_add_report_type_and_quarterly.sql`**. The earlier “next is `0010`” guess is **correct as a sequence number**, wrong if read as “a migration named 0010 already exists.” It does not. Next write, if any, is **`0010_{snake_case}.sql`**. Two later schema items (company monthly scale, optional bank attestation) cannot share one file — they would be `0010` then `0011`. Hints live in `reports.reconciliations` JSONB, so a new hint field is Pydantic-only unless we also persist a first-class column.
 
 ---
 
@@ -32,7 +32,7 @@ Verified in this repo before triage:
 - **AccountMapper already runs before consolidate.** Vendor / employee / customer names are mapped to GL account names, then `consolidator.py` joins on `account`. Do not treat “real files lack a GL Account column” as a new engine. That gap is closed.
 - `SourceFileType`: `general_ledger`, `payroll`, `supplier_invoices`, `contracts`. No bank, no processor, no inventory.
 - Bank transaction matching was explicitly cut (different data shape).
-- Interpreter fallback (`interpreter.py::_classify_from_hints`) never emits `structural_explained`. `is_round_fraction` (documented as a 50% deposit / timing signal) currently falls through to `accrual_mismatch`. Full diagnosis: [structural_explained diagnosis](#structural_explained-diagnosis) below.
+- Interpreter fallback (`interpreter.py::_classify_from_hints`) never emits `structural_explained`. `is_round_fraction` (documented as a 50% deposit / timing signal) currently falls through to `accrual_mismatch`. Runtime chain: consolidator shapes items → `orchestrator.py` overwrites hints via `compute_hints` → Claude + fallback. Full diagnosis: [structural_explained diagnosis](#structural_explained-diagnosis) below.
 
 ---
 
@@ -43,6 +43,32 @@ Three product decisions. Recorded here so the next approval round is about *how*
 1. **PAYROLL detection is pattern-match, not Haiku.** Same mechanism as `backend/tools/pii_sanitizer.py` (`_ALWAYS_DROP`: case-insensitive substring list). A deterministic substring list (`payroll`, `wages`, `salaries`, …) tags an account as payroll-sensitive **under** an existing seeded category (G&A or OPEX). Do **not** insert a row into `account_categories` (immutable). Do **not** fold this into AccountMapper. Placement analysis: [PAYROLL pattern — where](#payroll-pattern--where).
 2. **`structural_explained` fallback is in scope, but diagnose before fix.** Diagnosis is below. Fix is proposed, not applied.
 3. **Flux thresholds: no hardcoded dollar/% in the next slice.** Do not write `$10k/10%` or `$5k/5%` as product constants. Onboarding must collect company monthly scale; materiality is a revenue-scaled dual threshold (dollar floor AND percent) derived from that scale. Bucket call: [Flux via onboarding — bucket](#flux-via-onboarding--bucket).
+
+---
+
+## Direct answers (this round)
+
+Two questions from the assignment, answered before the long-form sections.
+
+### Where should the PAYROLL pattern run — `consolidator.py` or a pre-AccountMapper step?
+
+**Neither as the only site.** Both have a real plus; both fail as the *sole* site.
+
+| | `consolidator.py` (Option A) | Pre-AccountMapper (Option B) |
+|---|---|---|
+| Plus | Already owns canonical GL names after fuzzy merge | Isolated `tools/` step, same shape as PII |
+| Minus | Flux (`comparison.py`) never reads consolidator output; payroll-tight flux would not fire | Pre-map values are `"Jane Doe"` / vendors, not `"wages"` — wrong grain; risks tagging a whole payroll *file* |
+
+**Correct place:** a pure helper `backend/tools/account_tags.py::is_payroll_account(name)` (case-insensitive substring list, no LLM, no I/O), called from **`comparison.py`** on the canonical GL name after mapping. Optional second call from consolidator, still on canonical names, only if recon materiality should also treat payroll tighter. Not inside `AccountMapper.build_draft`. Full plus/minus: [PAYROLL pattern — where](#payroll-pattern--where).
+
+### Is class 6 dead because the prompt lacks a signal, or because consolidator dumps ambiguous cases into the wrong class?
+
+**Both, at different layers. Not one or the other.**
+
+- **Why `structural_explained` never fires, even on a true two-sided fee gap:** pandas has no fee/netting hint; the prompt says “If unsure, default to `missing_je`”; `_classify_from_hints` has no class-6 branch (last resort is `stale_reference`). `guardrail.py` does not check classifications. **This is the primary root cause for the dead class.**
+- **Why Sentinel looks like 28× `missing_je`:** consolidator groups by `(canonical, category)` and flags orphans at `≥ $100`, so most items arrive one-sided. One-sided *is* `missing_je` in the taxonomy. Relabeling those orphans as `structural_explained` would be the wrong fix. **This is the amplifier, not the class-6 hole.**
+
+Full chain (including the orchestrator overwrite of consolidator hints): [structural_explained diagnosis](#structural_explained-diagnosis).
 
 ---
 
@@ -82,7 +108,13 @@ Taxonomy (prompt + `ReconciliationClassification`): the delta is fully explained
 
 **When it SHOULD fire.** Two-sided recon (both GL and a source present) where pandas can support “this gap is the known netting,” e.g. FSM gross vs bank/GL net of processor fees; platform fees deducted before deposit; refunds netted. It should **not** fire on one-sided orphans (those are `missing_je`).
 
-**Chain read.** `guardrail.py` → `interpreter.py` → `narrative_prompt.txt`.
+**Chain read (actual runtime order, not file order).**
+
+1. `consolidator.py::_detect_deltas` shapes items (no classification).
+2. `orchestrator.py` **overwrites** `item.hints = compute_hints(...)` — consolidator’s inline orphan flags are not what Claude sees; `hint_computer.py` recomputes every field.
+3. `interpreter.py` sends items + hints into `narrative_prompt.txt`; Claude writes `reconciliation_classifications`.
+4. After a passing guardrail: Claude’s class wins; else `_classify_from_hints`.
+5. `guardrail.py` only checks `numbers_used`. It cannot create or block a class.
 
 ### Guardrail is not the blocker
 
@@ -113,7 +145,7 @@ Priority in `_classify_from_hints`:
 4. `is_round_fraction` → `accrual_mismatch` (hint_computer docstring says timing/deposit)
 5. else → `stale_reference`
 
-No branch returns `structural_explained`. In the fallback, class 6 is a dead path.
+No branch returns `structural_explained`. `delta_matches_known_vendor` exists on the hint object and is described in the prompt’s `accrual_mismatch` example, but the fallback **does not read it**. In the fallback, class 6 is a dead path. If Claude omits a two-sided item, the Python last resort is `stale_reference` — still not class 6.
 
 ### Consolidator: inflates the missing_je shape
 
@@ -129,7 +161,7 @@ No branch returns `structural_explained`. In the fallback, class 6 is a dead pat
 - Fallback: class 6 has no branch; last resort is `stale_reference`, never `structural_explained`.
 - Guardrail: innocent.
 
-**Primary:** missing pandas hint + fallback hole + prompt default. **Amplifier:** consolidator orphans (most of the 28 `missing_je` are this shape; fixing only the fallback will not turn them into `structural_explained`, and should not).
+**Direct answer to “prompt or consolidator?”** Primary = prompt + missing pandas hint + fallback hole (class 6 cannot fire). Amplifier = consolidator orphans (most of the 28 `missing_je` are this shape; fixing only the fallback will not turn them into `structural_explained`, and should not). A two-sided processor-fee gap that survived grouping would still be classified `missing_je` (Claude, “unsure”) or `stale_reference` (fallback) — never `structural_explained` — until a fee hint exists.
 
 ### Fix proposal (do not apply yet)
 
@@ -147,7 +179,7 @@ Order if later approved: materiality/grouping first (exception count), then hint
 
 **Decision.** No hardcoded `$10k/10%` / `$5k/5%` in the next implementation. Requirement: onboarding collects **monthly scale** (revenue band or typical monthly revenue). `calculate_variance` derives a dual threshold (dollar floor AND percent) from that scale. Tighter bands on payroll (pattern-tag) and revenue stay rule-based in pandas.
 
-**What exists today.** `companies` has `name`, `sector`, `currency` (`0001_initial_schema.sql`). `CompanySetupForm` posts `{ name, sector }` only. No scale field. `comparison.py` uses global constants.
+**What exists today.** `companies` has `name`, `sector`, `currency` (`0001_initial_schema.sql`). `CompanySetupForm` posts `{ name, sector }` only (`frontend/src/components/CompanySetupForm.tsx`). No scale field. `comparison.py` uses global `_TIER1_DOLLAR = 50_000` / `_TIER1_PCT = 10` and `_TIER2_DOLLAR = 10_000` / `_TIER2_PCT = 3` — leave them untouched this slice.
 
 **Bucket call: Kova 2**, not Kova 1.
 
@@ -239,7 +271,7 @@ return abs_delta >= _DELTA_DOLLAR_HARD or abs_delta >= _DELTA_DOLLAR_MIN
 
 **Finding.** Practitioners reconcile cash continuously; month-end is the residue (unbooked fees, cross-period batches, undeposited sweep). The product must not pretend cash is done, and must not start a bank matcher.
 
-**Affects.** `frontend/src/components/ReportSummary.tsx` (or close checklist copy); `backend/tools/excel_export.py` attestation line. Optional persist: `0010_add_bank_attestation.sql` on `reports` or `runs`.
+**Affects.** `frontend/src/components/ReportSummary.tsx` (or close checklist copy); `backend/tools/excel_export.py` attestation line. Optional persist: **`0011_add_bank_attestation.sql`** on `reports` or `runs` (after Kova 2 flux `0010` on `companies`).
 
 **Scope.** `mikro-fix` if display-only. `yeni tablo alanı` if the checkbox is stored. Wording: residue (fees, straddling batches, undeposited ≠ 0) is in-scope as **account-level** recon when those files exist; line-level matching stays out.
 
@@ -291,7 +323,7 @@ Correct research. Building now would violate “no new engine” and the existin
 | WIP / % complete on multi-day installs | Same reason construction scored out | — | new engine |
 | Professional services as close #2 (unbilled labor / utilization) | Different problem shape: WIP cash lock, not processor mess | Would need a WIP recon model | later vertical |
 | Onboarding monthly scale → derived flux dual threshold | `companies` via **`0010_`** (after verified `0009`); `CompanySetupForm`; pandas in `comparison.py`. No magic-number retune. | `yeni tablo alanı` |
-| Persist bank attestation | Optional if Bucket 1 display-only is not enough | `0010_add_bank_attestation.sql` | `yeni tablo alanı` |
+| Persist bank attestation | Optional if Bucket 1 display-only is not enough | `0011_add_bank_attestation.sql` (do not reuse flux `0010`) | `yeni tablo alanı` |
 | Balance sheet + cash flow in the package | Schema cannot roll balances | `monthly_entries` model | new engine |
 | Gross margin **by service line** | `department` exists on golden row, not persisted | entries + report | `yeni tablo alanı` |
 | PTO accrual JE (QBO accrues per hour worked only) | Real close entry; needs hours/policy, not a GL-vs-file total | — | `sadece not` until payroll file carries PTO columns |
@@ -343,7 +375,7 @@ Suggested implementation order **after approval** (not this task):
 
 Do **not** in that prompt: hardcoded flux `$10k`/`$5k`; `0010` onboarding scale (separate Kova 2 spec); bank matcher.
 
-Reserve `0010_*.sql` for company monthly scale and/or bank attestation — Kova 2. Confirmed next number after `0009_add_report_type_and_quarterly.sql`.
+Reserve the next migration number(s) for Kova 2: **`0010_add_company_monthly_scale.sql`** (flux) and, if attestation is persisted, **`0011_add_bank_attestation.sql`**. Do not collide two unrelated schema changes into one `0010`. Confirmed: highest on disk is `0009_add_report_type_and_quarterly.sql`.
 
 ---
 
@@ -364,9 +396,9 @@ Reserve `0010_*.sql` for company monthly scale and/or bank attestation — Kova 
 
 Approve or amend before any implementation prompt:
 
-1. PAYROLL helper location: `backend/tools/` + `comparison.py` (not pre-AccountMapper, not consolidator-only).
-2. `structural_explained` diagnosis: primary = no fee hint + fallback hole + prompt “unsure → missing_je”; amplifier = consolidator orphans. Fix proposal accepted or narrowed (prompt-only vs hint+fallback).
-3. Flux scale via onboarding stays **Kova 2** (`0010` after `0009`); this slice does not write new flux magic numbers.
+1. PAYROLL helper location: `backend/tools/account_tags.py` + `comparison.py` (not pre-AccountMapper, not consolidator-only). See Direct answers.
+2. `structural_explained` diagnosis: primary = no fee hint + fallback hole + prompt “unsure → missing_je”; amplifier = consolidator orphans. Orchestrator overwrites consolidator hints before Claude. Fix proposal accepted or narrowed (prompt-only vs hint+fallback+prompt).
+3. Flux scale via onboarding stays **Kova 2** (`0010_add_company_monthly_scale.sql` after verified `0009`); this slice does not write new flux magic numbers. Bank attestation persist, if any, is `0011`.
 
 If item 2 is accepted only as prompt wording (no fee hint yet), still do not default unsure two-sided items to `missing_je`.
 
