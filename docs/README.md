@@ -34,6 +34,7 @@ Post-hackathon planning (spec → approval → implementation).
 
 - `field-service-close-triage.md` - Triage of field-service close research against the current consolidator/classifier (no code until approved)
 - `pre-analysis-is-material.md` - Slice 1 pre-analysis: consolidator `_is_material` AND-gate (approval gate; not PAYROLL, not class-6)
+- `pre-analysis-orphan-policy.md` - GL-only / source-only policy (planning only; not the AND-gate PR)
 
 ### 04-status/
 Current project status and TODO lists.
