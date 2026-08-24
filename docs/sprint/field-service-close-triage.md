@@ -1,7 +1,7 @@
 # Field-service close research — architecture triage
 
 *Planning only. No implementation until this document is approved.*  
-*Date: 24 August 2026.*  
+*Date: 24 August 2026. Revised same day: PAYROLL pattern placement, `structural_explained` diagnosis, flux-via-onboarding bucket, migration `0009` verified.*  
 *Source report: field-service SMB month-end close practices (undeposited funds, deferred RMR, alarm-specific accruals, materiality).*  
 *Architecture: IronLedger codebase, product name Month Proof. Same repo, not a second product.*
 
@@ -19,7 +19,7 @@ Three buckets, nothing in between.
 
 Each item: **finding → file/function → scope** (`mikro-fix` | `yeni tablo alanı` | `yeni component` | `sadece not`).
 
-Next migration number if anything in Bucket 1 is persisted: **`0010_{snake_case}.sql`**. Hints live in `reports.reconciliations` JSONB, so a new hint field is Pydantic-only unless we also persist a first-class column.
+**Migration number (verified on disk, 24 Aug 2026).** `supabase/migrations/` contains `0001`–`0009`. Highest file: **`0009_add_report_type_and_quarterly.sql`**. Next write, if any, is **`0010_{snake_case}.sql`**. The earlier `0010` guess is confirmed. Hints live in `reports.reconciliations` JSONB, so a new hint field is Pydantic-only unless we also persist a first-class column.
 
 ---
 
@@ -32,7 +32,135 @@ Verified in this repo before triage:
 - **AccountMapper already runs before consolidate.** Vendor / employee / customer names are mapped to GL account names, then `consolidator.py` joins on `account`. Do not treat “real files lack a GL Account column” as a new engine. That gap is closed.
 - `SourceFileType`: `general_ledger`, `payroll`, `supplier_invoices`, `contracts`. No bank, no processor, no inventory.
 - Bank transaction matching was explicitly cut (different data shape).
-- Interpreter fallback (`interpreter.py::_classify_from_hints`) never emits `structural_explained`. `is_round_fraction` (documented as a 50% deposit / timing signal) currently falls through to `accrual_mismatch`.
+- Interpreter fallback (`interpreter.py::_classify_from_hints`) never emits `structural_explained`. `is_round_fraction` (documented as a 50% deposit / timing signal) currently falls through to `accrual_mismatch`. Full diagnosis: [structural_explained diagnosis](#structural_explained-diagnosis) below.
+
+---
+
+## Decisions locked this round (not yet implemented)
+
+Three product decisions. Recorded here so the next approval round is about *how*, not *whether*. **No code in this turn.**
+
+1. **PAYROLL detection is pattern-match, not Haiku.** Same mechanism as `backend/tools/pii_sanitizer.py` (`_ALWAYS_DROP`: case-insensitive substring list). A deterministic substring list (`payroll`, `wages`, `salaries`, …) tags an account as payroll-sensitive **under** an existing seeded category (G&A or OPEX). Do **not** insert a row into `account_categories` (immutable). Do **not** fold this into AccountMapper. Placement analysis: [PAYROLL pattern — where](#payroll-pattern--where).
+2. **`structural_explained` fallback is in scope, but diagnose before fix.** Diagnosis is below. Fix is proposed, not applied.
+3. **Flux thresholds: no hardcoded dollar/% in the next slice.** Do not write `$10k/10%` or `$5k/5%` as product constants. Onboarding must collect company monthly scale; materiality is a revenue-scaled dual threshold (dollar floor AND percent) derived from that scale. Bucket call: [Flux via onboarding — bucket](#flux-via-onboarding--bucket).
+
+---
+
+## PAYROLL pattern — where
+
+**Rule (decided).** Deterministic, case-insensitive substring match on the **canonical account name** (the GL line after mapping), analogous to PII header blacklist. Example needles: `payroll`, `wage`, `wages`, `salary`, `salaries`, `gross pay`, `direct labor` (final list is an implementation detail). Match → sub-tag `payroll` while `category` stays `OPEX` or `G&A`. `account_categories` unchanged. AccountMapper / Haiku never sees this list.
+
+**Consumer today.** `comparison.py::calculate_variance` takes `category` from `accounts.category`. `_TIER2_CATEGORIES` includes `"PAYROLL"` and `"DEFERRED_REVENUE"`, which are **not** seeded, so the tight flux gate never fires on wages. The pattern exists to feed that gate (and any later recon severity) without a new category row.
+
+### Option A — inside `consolidator.py`
+
+Run the substring pass on `canonical` after `_build_canonical_map`, before roll-up / delta.
+
+- Plus: one place already owns canonical names. Recon items could carry a `payroll` flag in JSONB with no extra hop. Fuzzy merge has already collapsed “Wages & Salaries” / “Payroll”.
+- Minus: flux does **not** read consolidator output; it reads `monthly_entries` + `accounts.category`. Tagging only in consolidator does not fix `calculate_variance` unless the tag is persisted on `accounts` or passed through entries. Consolidator is a recon engine; payroll-tight flux is a comparison concern. Puts a flux rule in the wrong agent.
+
+### Option B — preprocessing before AccountMapper
+
+Run the list on raw `account` values (employee names, vendor names) before Haiku maps them to GL lines.
+
+- Plus: early, isolated step; looks like PII (tools, not agents).
+- Minus: **wrong grain.** Pre-map values are `"Jane Doe"`, `"AlarmTech"`. They will not contain `"wages"`. Filename/file-type (`orchestrator.py::_FILE_TYPE_PATTERNS` already has `payroll`, `gusto`, `adp`) is a file-level hint, not an account-level tag. Risk of tagging the whole payroll **file** and then treating mapped GL lines that are not wages (e.g. contractor pass-through) as payroll. Mixes with AccountMapper timing (map before groupby) and invites Haiku-adjacent bugs.
+
+### Recommendation (for the next spec, not code)
+
+**Neither A-as-sole-site nor B.**
+
+Put the list in a new pure helper next to the PII analog, e.g. `backend/tools/account_tags.py::is_payroll_account(name: str) -> bool` — **no LLM, no I/O**. Call it from **`comparison.py`** when `account_name` is already the GL name (`accounts_map[...].name`). That is the function that currently passes `category="OPEX"` / `"G&A"` / `"OTHER"` into `calculate_variance`. Optional second call site: consolidator, only if recon materiality should also treat payroll tighter — still on **canonical** names, after mapper.
+
+Do not call it from `AccountMapper.build_draft` or `parse_file_silently` pre-map.
+
+---
+
+## structural_explained diagnosis
+
+Taxonomy (prompt + `ReconciliationClassification`): the delta is fully explained by fees, platform deductions, or structural netting; not an error; no action.
+
+**When it SHOULD fire.** Two-sided recon (both GL and a source present) where pandas can support “this gap is the known netting,” e.g. FSM gross vs bank/GL net of processor fees; platform fees deducted before deposit; refunds netted. It should **not** fire on one-sided orphans (those are `missing_je`).
+
+**Chain read.** `guardrail.py` → `interpreter.py` → `narrative_prompt.txt`.
+
+### Guardrail is not the blocker
+
+`verify_guardrail` only checks `numbers_used` against pandas leaves + recon amounts (`max(1% of |ref|, $1_000)`). Classification strings are not numeric. A `structural_explained` label cannot fail the guardrail. Reinforced retry does not re-classify.
+
+### Where the class is supposed to be chosen
+
+Two writers, in order (`interpreter.py` after a successful guardrail pass):
+
+1. Claude: `narrative.reconciliation_classifications[account]` from `narrative_prompt.txt`.
+2. Else if the item has no classification: `_classify_from_hints(hints)`.
+
+Consolidator **does not classify**. It emits `ReconciliationItem` with hints; `classification` defaults to `None`.
+
+### Prompt: class 6 exists, but the default kills it
+
+`narrative_prompt.txt` defines `structural_explained` (fees, platform deductions, netting). Hard rule immediately below: **“If unsure, default to missing_je.”** `missing_je` is also defined as “`is_source_only` or `is_gl_only` **or** delta equals a single invoice.” Claude is told “Do not speculate beyond what the hints support.”
+
+Hints in `ReconciliationHints`: `crosses_period_boundary`, `is_round_fraction`, `similar_amount_in_other_account`, `is_source_only`, `is_gl_only`, `delta_matches_known_vendor`. **None maps to structural netting / fees.** There is no `looks_like_processor_fee` (or similar). So even a two-sided fee gap has no pandas signal the prompt is allowed to trust → unsure → `missing_je`.
+
+### Fallback: class 6 is unreachable in Python
+
+Priority in `_classify_from_hints`:
+
+1. `is_gl_only` or `is_source_only` → `missing_je`
+2. `crosses_period_boundary` → `timing_cutoff`
+3. `similar_amount_in_other_account` → `categorical_misclassification`
+4. `is_round_fraction` → `accrual_mismatch` (hint_computer docstring says timing/deposit)
+5. else → `stale_reference`
+
+No branch returns `structural_explained`. In the fallback, class 6 is a dead path.
+
+### Consolidator: inflates the missing_je shape
+
+`_detect_deltas` groups by `(canonical, category)`. If GL and the department file disagree on **category**, the group splits into two one-sided orphans. Each orphan gets `is_gl_only` or `is_source_only`. Those hints are exactly `missing_je` in both the prompt and the fallback.
+
+`_is_material` is effectively `>= $100` (percent gate unused), so small one-sided leftovers become recon items. Sentinel “41 accounts, 32 recon, 28 `missing_je`” is consistent with **orphan flooding**, not with 28 true structural fee gaps that were mislabeled.
+
+### Root cause (not a single line)
+
+- Consolidator: category-split grouping + `$100` floor → many one-sided items whose only hints are `is_*_only`.
+- Hints: no fee/netting signal, so a true two-sided structural gap is indistinguishable from “unsure.”
+- Prompt: class 6 is documented, then overridden by “unsure → missing_je.”
+- Fallback: class 6 has no branch; last resort is `stale_reference`, never `structural_explained`.
+- Guardrail: innocent.
+
+**Primary:** missing pandas hint + fallback hole + prompt default. **Amplifier:** consolidator orphans (most of the 28 `missing_je` are this shape; fixing only the fallback will not turn them into `structural_explained`, and should not).
+
+### Fix proposal (do not apply yet)
+
+1. Keep six classes. Do not add a seventh.
+2. Pandas: fee-band / netting hint on **two-sided** items only (`hint_computer.py` + `ReconciliationHints`). Numbers for any “expected fee” in prose stay in pandas / `numbers_used`.
+3. Fallback: if that hint is set → `structural_explained`. Do not route one-sided orphans there.
+4. Prompt: remove or narrow “unsure → missing_je”; unsure + two-sided + no other hint → `stale_reference`. One-sided stays `missing_je`. `structural_explained` only when the fee/netting hint is on.
+5. Separately (already Bucket 1 item 1): `_is_material` AND-gate, and consider grouping deltas by `canonical` only so category mismatch becomes one two-sided item (`categorical_misclassification` via `similar_amount_in_other_account`), not two `missing_je`s.
+
+Order if later approved: materiality/grouping first (exception count), then hint + fallback + prompt (class 6 can actually fire). Classifying 28 orphans as structural would be the wrong fix.
+
+---
+
+## Flux via onboarding — bucket
+
+**Decision.** No hardcoded `$10k/10%` / `$5k/5%` in the next implementation. Requirement: onboarding collects **monthly scale** (revenue band or typical monthly revenue). `calculate_variance` derives a dual threshold (dollar floor AND percent) from that scale. Tighter bands on payroll (pattern-tag) and revenue stay rule-based in pandas.
+
+**What exists today.** `companies` has `name`, `sector`, `currency` (`0001_initial_schema.sql`). `CompanySetupForm` posts `{ name, sector }` only. No scale field. `comparison.py` uses global constants.
+
+**Bucket call: Kova 2**, not Kova 1.
+
+Why not Kova 1:
+
+- Schema: needs `0010_add_company_monthly_scale.sql` (or equivalent) on `companies`. That is `yeni tablo alanı`.
+- API / UI: `POST /companies`, `Company` entity, `CompanySetupForm`, Profile. Onboarding is a product surface, not a one-function constant edit.
+- “No new engine”: a column + form is not a bank matcher, but it **is** a cross-layer change (migration, repo, API, React). Treating it as a mikro-fix would smuggle a settings product into the recon slice.
+- Existing companies: scale is missing; flux would have no input until backfill or a forced re-onboarding.
+
+**Kova 1 remains** only for: `_is_material` (recon, not flux), and the **payroll substring helper** so that *when* scale exists, tighter payroll bands have a deterministic tag. Do **not** retune `_TIER1_DOLLAR` to a new magic number in this slice.
+
+**Suggested later shape (spec only):** onboarding asks for a band (e.g. under $100k / $100–250k / $250–500k / $500k+ monthly revenue), pandas maps band → `{dollar_floor, pct, tight_pct}` in `comparison.py`. Claude never sees the band math.
 
 ---
 
@@ -56,15 +184,17 @@ return abs_delta >= _DELTA_DOLLAR_HARD or abs_delta >= _DELTA_DOLLAR_MIN
 
 ---
 
-### 2. Comparison flux floors are DRONE-scale
+### 2. Flux floors — requirement only; no new constants this slice
 
-**Finding.** Practitioners for a ~$150–250k/month shop use roughly **$5–15k dollar floors with 5–10% bands**, tighter **2–5%** on revenue, payroll, deferred revenue, and cash. Current code: Tier 1 `$50k AND 10%`, Tier 2 `$10k AND 3%` (`REVENUE` / `PAYROLL` / `DEFERRED_REVENUE`).
+**Finding.** Current `comparison.py` Tier 1 `$50k AND 10%` / Tier 2 `$10k AND 3%` is DRONE-scale and too high for a ~$150–250k/month shop. `_TIER2_CATEGORIES` includes `PAYROLL` / `DEFERRED_REVENUE`, which are not seeded, so the tight gate never fires on wages.
 
-**Affects.** `backend/agents/comparison.py::calculate_variance` constants `_TIER1_*`, `_TIER2_*`, `_TIER2_CATEGORIES`.
+**Decision.** Do **not** replace those constants with another hardcoded pair (`$10k/10%`, `$5k/5%`, etc.). Scale is collected at onboarding; pandas derives dual thresholds. See [Flux via onboarding — bucket](#flux-via-onboarding--bucket): **Kova 2** (`0010` + `CompanySetupForm`).
 
-**Scope.** `mikro-fix` for constant retune (proposed starting point for this vertical: Tier 1 `$10k AND 10%`, Tier 2 `$5k AND 5%` on revenue; payroll/cash via **account-name** match, not a new category seed).
+**This slice (Kova 1) only:** payroll substring tag helper (see [PAYROLL pattern — where](#payroll-pattern--where)) so comparison *can* treat wages tighter once scale exists. Leave `_TIER1_*` / `_TIER2_*` untouched until that Kova 2 lands.
 
-**Do not.** Insert `PAYROLL` / `DEFERRED_REVENUE` into `account_categories` just to make the constant fire. Parser seed is `REVENUE, COGS, OPEX, G&A, R&D, OTHER_INCOME, OTHER`. Those two Tier-2 names never match today. Per-company configurable thresholds are Bucket 2 (`0010` + settings UI).
+**Affects (later).** `comparison.py::calculate_variance`; `companies` via `0010_add_company_monthly_scale.sql`; `CompanySetupForm.tsx`; `POST /companies`.
+
+**Scope now.** `sadece not` + payroll helper as `mikro-fix` when implementation is approved. Full scale-derived flux = `yeni tablo alanı` (Kova 2).
 
 ---
 
@@ -76,7 +206,7 @@ return abs_delta >= _DELTA_DOLLAR_HARD or abs_delta >= _DELTA_DOLLAR_MIN
 
 - `backend/tools/hint_computer.py` — keep `is_round_fraction` for the 50% deposit pattern; add a pandas hint e.g. `looks_like_processor_fee` when GL is the lower side and `delta_pct` sits in a named fee band (constant, not a Jobber marketing rate in prose).
 - `backend/domain/contracts.py::ReconciliationHints` — new optional bool (JSONB, no migration).
-- `backend/agents/interpreter.py::_classify_from_hints` — deposit pattern should not silently become `accrual_mismatch`; processor-fee hint should reach `structural_explained` (today that class is unreachable in the fallback).
+- `backend/agents/interpreter.py::_classify_from_hints` — see diagnosis: add a `structural_explained` branch **only** when a fee/netting hint is set; do not reclassify one-sided orphans. `is_round_fraction` should not silently map to `accrual_mismatch`.
 - `backend/prompts/narrative_prompt.txt` — two templates: (a) customer deposit / prepaid agreement = liability; (b) gross-vs-net fee = structural, no “expect reversal as deferred revenue.”
 
 **Scope.** `mikro-fix`. Fee **dollar** amounts used in prose must be computed in pandas and placed in `numbers_used`. Do not bake “2.9% + 30¢” into the prompt (guardrail will fail or Claude will invent).
@@ -160,7 +290,7 @@ Correct research. Building now would violate “no new engine” and the existin
 | ASC 606 SSP split install vs monitoring | Dealers don’t do it; detect blend via `categorical_misclassification` when amounts match across accounts | Already a class example | `sadece not` (no SSP engine) |
 | WIP / % complete on multi-day installs | Same reason construction scored out | — | new engine |
 | Professional services as close #2 (unbilled labor / utilization) | Different problem shape: WIP cash lock, not processor mess | Would need a WIP recon model | later vertical |
-| Per-company materiality config | `companies` JSONB + settings UI | `0010_add_materiality_settings.sql`, `comparison.py`, `consolidator.py` | `yeni tablo alanı` |
+| Onboarding monthly scale → derived flux dual threshold | `companies` via **`0010_`** (after verified `0009`); `CompanySetupForm`; pandas in `comparison.py`. No magic-number retune. | `yeni tablo alanı` |
 | Persist bank attestation | Optional if Bucket 1 display-only is not enough | `0010_add_bank_attestation.sql` | `yeni tablo alanı` |
 | Balance sheet + cash flow in the package | Schema cannot roll balances | `monthly_entries` model | new engine |
 | Gross margin **by service line** | `department` exists on golden row, not persisted | entries + report | `yeni tablo alanı` |
@@ -199,17 +329,21 @@ When (if) implementation is approved, the first prompt must **not** include:
 - Inventory / truck-stock valuation
 - ASC 606 waterfall or SSP allocation
 - Seeding `PAYROLL` / `DEFERRED_REVENUE` categories “for consistency”
+- Hardcoded flux replacements (`$10k/10%`, `$5k/5%`, …) instead of onboarding scale
 - Rebuilding AccountMapper
 - Claude-computed fee estimates
+- Folding payroll detection into AccountMapper / Haiku
 
 Suggested implementation order **after approval** (not this task):
 
 1. `_is_material` AND-gate (exception count becomes believable)
-2. Date-hint restriction + deposit vs fee classification/prompt split
-3. Comparison constant retune (and stop pretending Tier-2 payroll category exists)
+2. Date-hint restriction + deposit vs fee classification/prompt split (`structural_explained` only with a pandas fee hint; do not relabel consolidator orphans)
+3. Payroll substring helper in `backend/tools/` called from `comparison.py` (no category seed, no Haiku)
 4. Checklist grouping / KPI strip only after 1–3, or the UI still shows 32 cards
 
-Reserve `0010_*.sql` for attestation and/or configurable materiality — only if those leave Bucket 1 as display-only insufficient.
+Do **not** in that prompt: hardcoded flux `$10k`/`$5k`; `0010` onboarding scale (separate Kova 2 spec); bank matcher.
+
+Reserve `0010_*.sql` for company monthly scale and/or bank attestation — Kova 2. Confirmed next number after `0009_add_report_type_and_quarterly.sql`.
 
 ---
 
@@ -218,7 +352,7 @@ Reserve `0010_*.sql` for attestation and/or configurable materiality — only if
 | Research rec | Bucket |
 |--------------|--------|
 | Keep three-way undeposited as flagship | Split: account-level fee hint = 1; full three-way = 2 |
-| Recalibrate materiality now | 1 (constants); config = 2 |
+| Recalibrate materiality now | Recon `_is_material` = 1; flux constants = **do not retune**; scale via onboarding = 2 (`0010`) |
 | Split deposit-as-liability vs processor clearing | 1 |
 | Extend five-tie-out with truck-stock, subcontractor, central-station, RMR count | Subcontractor label = 1; the rest = 2 |
 | Design for monthly billing, minimal deferred, no SSP; catch annual-to-revenue | 1 (detect); rollforward ingest = 2 |
@@ -228,6 +362,12 @@ Reserve `0010_*.sql` for attestation and/or configurable materiality — only if
 
 ## Approval checkpoint
 
-Approve or amend **Bucket 1 items 1–3** before any implementation prompt. Those three are the only changes that both (a) the research requires and (b) the architecture can absorb without a new engine.
+Approve or amend before any implementation prompt:
 
-If Bucket 1 item 3 (fee hint) is rejected as “too close to a bank matcher,” keep the **prompt split** only: never narrate a net-of-fee delta as deferred revenue. That alone is still a valid mikro-fix.
+1. PAYROLL helper location: `backend/tools/` + `comparison.py` (not pre-AccountMapper, not consolidator-only).
+2. `structural_explained` diagnosis: primary = no fee hint + fallback hole + prompt “unsure → missing_je”; amplifier = consolidator orphans. Fix proposal accepted or narrowed (prompt-only vs hint+fallback).
+3. Flux scale via onboarding stays **Kova 2** (`0010` after `0009`); this slice does not write new flux magic numbers.
+
+If item 2 is accepted only as prompt wording (no fee hint yet), still do not default unsure two-sided items to `missing_je`.
+
+No implementation until this checkpoint is explicit.
