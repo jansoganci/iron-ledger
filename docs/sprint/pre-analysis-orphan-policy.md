@@ -1,7 +1,7 @@
 # Pre-analysis — Orphan policy (GL-only / source-only)
 
 *Planning only. No implementation until this document is approved.*  
-*Date: 24 August 2026.*  
+*Date: 24 August 2026. Revised same day: visibility addendum — do not silently drop GL-only cards.*  
 *Parent: [field-service-close-triage.md](field-service-close-triage.md).*  
 *Independent of Slice 1 code. Do not land in the same PR as the `_is_material` AND-gate.*
 
@@ -85,90 +85,164 @@ Taxonomy: `missing_je` = appears in one source only, **or** delta equals a singl
 | Shape | Fits `missing_je`? | Better treatment inside the six |
 |-------|--------------------|----------------------------------|
 | **Source-only** (subledger has a line, GL does not) | **Yes.** This is the JE-missing case (CableMax-style). Keep `missing_je`. | Optional: if `crosses_period_boundary`, `timing_cutoff` can outrank in the fallback **after** one-sided is no longer an automatic first branch — only when the date hint is on that file. Do not do that in the same slice as “drop GL-only.” |
-| **GL-only** (P&L line, no file uploaded for that account) | **No.** Rent $3,200 in GL with no rent subledger is not a missing journal entry. The books already have the entry. Nothing is absent from the GL. The prompt template (“in [source] with no matching entry in the GL”) is **backwards** for `is_gl_only`. | **Do not emit a recon item.** Coverage, not an exception: “17 GL lines had no supporting file.” Not `stale_reference` (that is roster vs revenue). Not `timing_cutoff` (no date). Not `structural_explained` (not fees). Not `accrual_mismatch`. Not `categorical_misclassification` (no counterpart amount). |
+| **GL-only** (P&L line, no file uploaded for that account) | **No.** Rent $3,200 in GL with no rent subledger is not a missing journal entry. The books already have the entry. Nothing is absent from the GL. The prompt template (“in [source] with no matching entry in the GL”) is **backwards** for `is_gl_only`. | Not `stale_reference` / `timing_cutoff` / `accrual_mismatch` / `categorical_misclassification`. **Not** `structural_explained` either (that class is fees/netting). Visibility without a seventh class: [addendum](#addendum--keep-gl-only-visible-without-a-7th-class). |
 | **GL-only that is really a split** (same name, different category) | Looks one-sided only because of grouping | Separate slice: group deltas by `canonical` only. Then it becomes two-sided → existing `similar_amount_in_other_account` / `categorical_misclassification`. Not a new class. |
 
-**Recommendation (this slice):** stop creating reconciliation items for `is_gl_only`. Keep creating them for `is_source_only` (still `missing_je`) and for two-sided material deltas (six-class as today). Optional UI copy: “No supporting file for N GL accounts” from pandas counts — not a classification.
+**Recommendation (v1, superseded).** Silent skip of GL-only cards. Rejected: “no card” and “checked clean” look the same; the product promise is to say why files don’t agree, including “we could not compare.”
 
-Do **not** add a seventh class named `uncovered_account`. That is a coverage metric, not a discrepancy.
+**Recommendation (v2).** Keep emitting GL-only **cards**. Do **not** add a seventh taxonomy class. Do **not** park them under `structural_explained`. Treat coverage as a **presentation + prompt** problem keyed off the existing pandas hint `is_gl_only`. Full argument: [addendum](#addendum--keep-gl-only-visible-without-a-7th-class).
+
+Do **not** add `uncovered_account` to `ReconciliationClassification`.
 
 ---
 
-## 4. Files / functions / schema
+## Addendum — keep GL-only visible, without a 7th class
 
-If later approved (not this turn):
+Product objection to v1 is accepted: dropping the 16 cards makes a forgotten subledger indistinguishable from a clean tie-out.
+
+### 1. Sub-tag under `structural_explained` vs using class 6 as-is vs a third path
+
+**Using `structural_explained` as-is (no extra field).** Least code. Fallback/prompt: `is_gl_only` → class 6. Frontend already greys it: CheckCircle, label “Explained”, copy “Expected — no action needed”, card `opacity-70`, **hides `suggested_action`**. Guardrail unchanged.
+
+Product cost: Rent $3,200 becomes “no action needed.” Forgetting the rent/payroll file looks like a successful close. Class 6’s real job (processor fees / netting — still a dead class, still the field-service flagship) is spent on coverage. Later, a true fee gap and “no file uploaded” share one badge. **Not clean.**
+
+**Sub-tag under `structural_explained`** (`classification = structural_explained` plus e.g. `hints.coverage_gap` or `subtype: uncovered | fee_netting`). Six-class Literal stays. JSONB can hold the subtype. UI can grey “No supporting file” vs green “Explained.”
+
+Product cost: two meanings in one enum. `ReconciliationCard` today keys **only** on `classification === "structural_explained"` (`isExplained`). Without a frontend fork, coverage cards still hide the upload action and say “no action needed.” Prompt templates collide: class 6 text is “platform fees… No action required.” Claude already defaults unsure → `missing_je`; asking it to pick class 6 for both fees and uncovered accounts will mix them. When class-6 fee-hint work lands, you need the subtype anyway — so the subtype is the real discriminator, and hanging it off the fee class is the wrong parent.
+
+**Third path (recommended).** Keep the six classes for **exceptions only**. Coverage is not a discrepancy class. Discriminator already exists: `hints.is_gl_only`. Add an optional JSONB field on the item for UI/counts, e.g. `card_kind: "coverage" | "exception"` (default `"exception"`). Pandas sets `card_kind="coverage"` when it emits a GL-only item (a fact about files present, not Claude arithmetic). Interpreter: if `is_gl_only` / `card_kind=coverage`, do **not** map to `missing_je` or `structural_explained`; write a coverage sentence; leave `classification` **null** (or omit from `reconciliation_classifications`). Fallback: `is_gl_only` must stop returning `missing_je` (today it does, first branch). Frontend: badge/section from `card_kind` or `hints.is_gl_only`, not from class 6. Stats strip must stop dumping Rent $3,200 into “Medium.”
+
+Why this is less friction than a class-6 subtype: you do not teach Claude a second meaning for class 6; you do not wait to fork `isExplained`; fee-netting work stays unblocked; the six-class lock stays literal.
+
+Disagreeing with the user’s lean: **visibility — yes. Parenting coverage under `structural_explained` — no.** Class 6 already means “delta explained, no action.” Coverage means “we did not compare; consider uploading a file.” Those are opposite speech acts. A grey badge cannot fix a taxonomy that says both are “Explained.”
+
+### 2. Concrete file list (third path)
+
+Pandas / items (keep producing cards — consolidator already does):
 
 | File | Change |
 |------|--------|
-| `backend/agents/consolidator.py` `_detect_deltas` | When `len(grp) < 2` and the only source is GL → `continue` (no item). When the only source is non-GL → keep current `_build_item` + materiality. |
-| `tests/agents/test_consolidator.py` | GL-only Rent $200 must **stop** flagging if this policy lands (opposite of Slice 1’s AND-gate test). Source-only `$600` still flags. |
-| `backend/tools/hint_computer.py` | No change required if GL-only items are not created. `_is_gl_only` remains for safety. |
-| `backend/agents/interpreter.py` / `narrative_prompt.txt` | Optional later: stop listing `is_gl_only` under `missing_je` so a leaked item cannot be mis-templated. Not required if consolidator never emits them. |
-| `frontend/.../ReconciliationPanel.tsx` | No code if we simply emit fewer items. Optional coverage line is a later UI slice. |
+| `backend/domain/contracts.py` | `ReconciliationItem.card_kind: Literal["exception", "coverage"] = "exception"`. Optional. No change to `ReconciliationClassification`. `is_gl_only` already on `ReconciliationHints`. |
+| `backend/agents/consolidator.py` `_detect_deltas` / `_build_item` | **Do not skip GL-only.** Set `card_kind="coverage"` on GL-only items. Source-only stays `"exception"`. |
+| `backend/tools/hint_computer.py` | No new hint required if `is_gl_only` remains true (orchestrator already recomputes it). |
 
-**Schema / migration:** none. Hints already on the item JSON. Highest migration remains `0009`. Do not write `0010` for this.
+Classification / prose:
 
-**Do not touch:** comparison.py, guardrail, AccountMapper, PAYROLL helper, fee-band / class 6.
+| File | Change |
+|------|--------|
+| `backend/prompts/narrative_prompt.txt` | `missing_je` **only** for `is_source_only` (and invoice-sized two-sided gaps). Remove `is_gl_only` from that bullet. Add a **coverage** template, not as taxonomy #7: “GL shows [amount] for [account]. None of the uploaded files include this account, so it was not compared. This is not a missing journal entry.” Soft action: upload a supporting file or confirm there isn’t one. Do **not** use the class 6 fee template. Do not put coverage accounts in `reconciliation_classifications` (or map them to null). |
+| `backend/agents/interpreter.py` `_classify_from_hints` | Split today’s first branch: `is_source_only` → `missing_je`; `is_gl_only` → **do not classify** (leave null) / do not return `structural_explained`. |
+| `backend/agents/interpreter.py` merge loop | If `card_kind=="coverage"` or `hints.is_gl_only`, do not let Claude overwrite into `missing_je` / class 6 without a coverage check. |
+| `backend/tools/guardrail.py` | **No change.** Still `numbers_used` only. Coverage amounts already in recon values. |
+
+Frontend (this is where “info vs needs review” actually happens):
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/ClassificationBadge.tsx` | Do **not** add a 7th `Classification` union member. For coverage, either skip this badge or add a **separate** `CoverageBadge` (grey, not CheckCircle). Putting coverage into `CONFIG.structural_explained` reuses “Explained.” |
+| `frontend/src/components/ReconciliationCard.tsx` | `isExplained` must **not** treat coverage as class 6. New copy e.g. “No supporting file uploaded.” Keep a visible, non-error action (“Upload a file for this account, or confirm none exists”). Do not use `opacity-70` + hide action. |
+| `frontend/src/components/ReconciliationPanel.tsx` | Split groups: exception cards by severity; coverage in a third block “Not compared.” Header count: “4 to review · 16 not compared” not “20 items” as if they were the same. Empty state “No discrepancies” must **not** fire when only coverage cards exist? If coverage exists, show that block, not “all clean.” |
+| `frontend/src/components/ReportSummary.tsx` `StatsStrip` | Today High/Medium/Low are **dollar buckets on every recon item**. Rent $3,200 is Medium. Exclude `card_kind=coverage` from High/Medium/Low; optional fourth stat “Not compared.” `anomaly_count` is flux, already separate — no change. |
+| `backend/tools/excel_export.py` | Classification column: blank or “Not compared” for coverage. Do not paint Total Operating Expenses-level dollars as HIGH severity red if we ever leak subtotals. |
+
+Tests: `tests/agents/test_consolidator.py` (GL-only still an item, `card_kind=coverage`); interpreter fallback tests if present; a frontend test only if the repo has component tests (today: none required).
+
+**Not in this slice:** `comparison.py`, AccountMapper, PAYROLL helper, fee-band class-6 hint, grouping-by-canonical, `0010` migration.
+
+**If you insist on the class-6 subtype anyway**, add the same frontend forks **plus** prompt subtype rules **plus** `isExplained = classification === "structural_explained" && subtype !== "uncovered"`. More files, same UI work, worse taxonomy. Not fewer.
+
+### 3. The 16 GL-only — before / after (third path)
+
+Today (AND-gate on, current prompt/fallback): each of the 16 is a recon item, `is_gl_only`, classified `missing_je`, high/orange “Missing JE” badge, `ReconciliationPanel` severity from `|delta|` (Rent $3,200 = Medium, Payroll Taxes $3,675 = Medium, Bad Debt $177 = Low). `StatsStrip` “Findings” includes all 16. Narrative: “journal entry may be missing” (wrong — the JE is in the GL).
+
+After (third path): same 16 items still in `reports.reconciliations` JSON. `card_kind=coverage`, `classification=null`. Grey info row/section “Not compared — no supporting file.” Not in High/Medium exception counts. Narrative: could not compare; not a missing JE. Two-sided four unchanged. Source-only (none on this demo) still `missing_je`.
+
+`structural_explained` as-is: same 16 items, badge “Explained”, copy “no action needed”, muted card, **no** upload action. Visible, but lies.
+
+Class-6 + subtype: same 16 items, custom grey if UI forks; if UI does not fork, identical to as-is.
+
+Silent skip (v1): 16 gone; Findings look like only the 4 two-sided; user cannot see they never uploaded rent/insurance/etc.
+
+### 4. Migration / schema
+
+**No migration.** `reports.reconciliations` is JSONB. `card_kind` is a Pydantic field with default `"exception"`; old rows without it stay exceptions. Hints already persist on the item. Highest SQL file remains `0009`. Do not add `0010` for a coverage enum column.
+
+`ReconciliationClassification` Literal stays six values. `NarrativeJSON.reconciliation_classifications` stays `dict[str, ReconciliationClassification]`; coverage accounts are omitted from that dict (null classification).
+
+### 5. Risk / rollback
+
+| Risk | Why | Mitigation |
+|------|-----|------------|
+| Claude still stamps `missing_je` on GL-only | Prompt still lists `is_gl_only` under class 3; merge prefers Claude | Prompt edit + interpreter ignore Claude class when `card_kind=coverage` |
+| Class 6 used “for convenience” | Frontend greys it for free | Do not. Breaks fee work and hides the upload action |
+| StatsStrip still Medium-counts Rent | Dollar grouping ignores kind | Must change `ReportSummary.tsx` in the same slice or the info badge is theatre |
+| Category-split pair | GL-only half becomes coverage, source-only half `missing_je` for one real account | Grouping slice later; call out in QA |
+| Empty state | 0 exceptions + 16 coverage must not say “No discrepancies detected” | Panel empty-check uses exception subset only, still renders coverage |
+| Guardrail | Unrelated | No change |
+
+**Rollback:** revert the item `card_kind` + prompt + fallback + frontend count/badge commit(s). JSONB old reports without `card_kind` still render as today. No `DOWN` migration.
 
 ---
 
-## 5. Before / after examples (policy, not AND-gate)
+## 4. Files / functions / schema (v1 skip-card — discarded)
 
-AND-gate already landed separately. These examples are **orphan policy on top**.
+Kept only as history. Do not implement skip-GL-only. The live list is in the addendum §2.
 
-| Input | Today (post-AND-gate) | After this policy |
-|-------|----------------------|-------------------|
-| GL Rent $200, payroll file covers only Payroll | Recon item, `is_gl_only` → `missing_je` | **No item** |
-| GL Rent $3,200, same | Item, `missing_je` | **No item** |
-| Dept Bonus $200, no GL line | No item (AND-gate, pct None, `< $500`) | Still no item |
-| Dept Bonus $600, no GL line | Item, `is_source_only` → `missing_je` | **Unchanged** — still `missing_je` |
-| GL Equipment COGS $36,100 vs supplier $37,800 (same category) | Two-sided item Δ$1,700 | Unchanged (not an orphan) |
-| Same accounts, **different** category | Two one-sided items, both `missing_je` | Still wrong until grouping slice; this policy would drop the GL-only half and keep the source-only half — **call out as a sequencing risk** |
+**Schema / migration:** none (same as addendum). Highest migration remains `0009`.
 
-**Sentinel effect (direction only, no fake total):** GL-only cards should **disappear**. Two-sided tie-outs (payroll, COGS, contracts, installs) should **remain**. `missing_je` should fall by about the number of uncovered P&L lines (order of the sixteen named above if subtotals stay dropped). Do not promise “total becomes 4” — parser category splits and Total\* leakage move the integer. Source-only stays rare on this demo because department files already use GL names.
+**Do not touch:** comparison.py, AccountMapper, PAYROLL helper, fee-band class-6 engine.
 
-If a future smoke still shows ~28 `missing_je`, either subtotals leaked, categories split, or this policy was not applied — stop and compare to Reconstruction A.
+---
+
+## 5. Before / after examples
+
+See addendum §3. v1 “no item” column is **not** the plan anymore.
+
+| Input | Today | After v2 (coverage card) |
+|-------|--------|--------------------------|
+| GL Rent $3,200, no rent file | `missing_je`, Medium | Coverage card, not compared, not Medium-exception |
+| GL Rent $200, same | `missing_je`, Low | Coverage card |
+| Dept Bonus $600, no GL | `missing_je` | Unchanged `missing_je` |
+| Equipment COGS two-sided Δ$1,700 | exception | Unchanged |
+
+**Sentinel direction:** item **count stays in the same ballpark** (16 coverage + 4 exceptions if Reconstruction A). What changes is **mix and chrome**, not disappearance. `missing_je` should fall by about those 16. Do not promise a total of 4.
 
 ---
 
 ## 6. Risk / rollback
 
-| Risk | Why | Mitigation |
-|------|-----|------------|
-| Hide a true “GL extra” that the controller wanted to investigate | Some GL-only *are* errors (duplicate account, leftover) | Coverage count in pandas/logs (`gl_only_skipped=N`) so ops can see they were omitted, not classified |
-| Sequencing with category-split | Dropping GL-only while keeping source-only on a split pair leaves one `missing_je` for an account that actually exists on both sides | Grouping-by-canonical first **or** accept a leftover source-only until that slice |
-| Slice 1 test `test_and_gate_gl_only_rent_200_still_flagged` | Will fail if this policy lands | Invert that test in the same PR as the policy; do not silently break Slice 1 |
-| Prompt still says `is_gl_only` → missing_je | Harmless if no such items | Optional prompt cleanup later |
-| Expecting class-6 / fee stories to appear | Unrelated; two-sided install/contracts stay whatever class Claude picks | Keep class-6 on its own pre-analysis |
-
-**Rollback:** revert the consolidator orphan-branch commit. No migration. Next run rebuilds `reports.reconciliations`.
+See addendum §5. v1 “hide and log” rollback is obsolete.
 
 ---
 
-## 2. IMPLEMENTATION
+## IMPLEMENTATION
 
-Blocked. Do not start until this pre-analysis is explicitly approved. One PR, one concern: skip GL-only item creation in `_detect_deltas`. No class-6, no PAYROLL, no grouping rewrite unless you explicitly expand scope (not recommended in the same PR because of the split-pair sequencing risk).
+Blocked. Approve v2 (coverage cards, not class 6, not a 7th class) before any prompt.
+
+One PR when approved: `card_kind` + prompt + fallback split + badge/panel/stats. Do not mix with AND-gate, PAYROLL, or fee-hint class 6.
 
 ---
 
-## 3. VERIFICATION (after code, not now)
+## VERIFICATION (after code, not now)
 
 | Check | Prediction | Actual | Match? |
 |-------|------------|--------|--------|
-| Unit: GL-only Rent $200 | no item | | |
-| Unit: source-only $600 | still `is_source_only` item | | |
-| Unit: two-sided $700 payroll | still an item | | |
-| Sentinel GL-only named P&L lines | gone from recon list | | |
-| Sentinel two-sided four | still present (if category aligned) | | |
-| New seventh class | none | | |
-| If `missing_je` barely moves | plan wrong (still grouping/subtotals) vs implementation missed the skip | | |
+| GL-only Rent still an item | yes, `card_kind=coverage` | | |
+| That item’s classification | not `missing_je`, not `structural_explained` | | |
+| Source-only $600 | still `missing_je` | | |
+| Two-sided $700 payroll | still exception | | |
+| StatsStrip Medium | does not include Rent $3,200 | | |
+| Class 6 union | still six strings | | |
+| Sentinel `missing_je` | down by ~the GL-only set; cards still visible | | |
 
 ---
 
 ## Approval checkpoint
 
-1. GL-only = **no recon card** (coverage, not `missing_je`).
-2. Source-only = keep `missing_je`.
-3. No seventh class. No migration.
-4. Implement grouping-by-canonical as a **later** slice if split pairs still matter.
-5. Do not mix this PR with AND-gate, PAYROLL, or class-6.
+1. **Reject v1** silent skip. Visibility required.
+2. **Reject** `structural_explained` as-is for GL-only (false “no action”).
+3. **Prefer third path** (`card_kind=coverage` + `is_gl_only`, classification null, grey info section) over a class-6 subtype. If you still want the subtype, say so explicitly — it is more UI work for a worse parent class.
+4. Source-only stays `missing_je`. No seventh `ReconciliationClassification`. No SQL migration.
+5. Frontend counts must change in the same slice or the badge is cosmetic.
+6. Do not mix with AND-gate / PAYROLL / fee-hint PRs.
+
