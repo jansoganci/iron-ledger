@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "CMD=$(jq -r '.tool_input.command // empty'); if echo \"$CMD\" | grep -qE '(git push|deploy|railway up|vercel deploy)'; then pytest --tb=short -q 2>&1 | tail -5 || (echo 'BLOCKED: Tests must pass before deploying. Run pytest and fix failures first.' && exit 2); fi"
+            "command": "CMD=$(jq -r '.tool_input.command // empty'); if echo \"$CMD\" | grep -qE '(git push|deploy|railway up|vercel deploy)'; then pytest --tb=short -q > /tmp/prepush_pytest.log 2>&1 || (echo 'BLOCKED: Tests must pass before deploying. See /tmp/prepush_pytest.log' && exit 2); fi"
           }
         ]
       }
