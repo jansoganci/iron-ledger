@@ -21,13 +21,18 @@ Project plans, blueprints, and roadmaps.
 - `close-flow-contract.md` - Product contract to complete the close flow without pivoting (no code until this is locked)
 
 ### 03-sprint/
-Sprint planning and daily execution plans.
+Sprint planning and daily execution plans (hackathon days 1–6).
 
 - `README.md` - Sprint overview
 - `completed.md` - Completed tasks
 - `risks.md` - Risk assessment and mitigation
 - `day-1-foundation.md` → `day-6-demo.md` - Daily sprint plans
 - `discovery-layer-plan.md` - Discovery layer implementation
+
+### sprint/
+Post-hackathon planning (spec → approval → implementation).
+
+- `field-service-close-triage.md` - Triage of field-service close research against the current consolidator/classifier (no code until approved)
 
 ### 04-status/
 Current project status and TODO lists.
