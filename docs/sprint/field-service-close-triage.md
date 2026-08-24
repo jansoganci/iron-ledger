@@ -163,6 +163,27 @@ No branch returns `structural_explained`. `delta_matches_known_vendor` exists on
 
 **Direct answer to “prompt or consolidator?”** Primary = prompt + missing pandas hint + fallback hole (class 6 cannot fire). Amplifier = consolidator orphans (most of the 28 `missing_je` are this shape; fixing only the fallback will not turn them into `structural_explained`, and should not). A two-sided processor-fee gap that survived grouping would still be classified `missing_je` (Claude, “unsure”) or `stale_reference` (fallback) — never `structural_explained` — until a fee hint exists.
 
+### Which layer wrote Sentinel’s 28 `missing_je` — prompt or `_classify_from_hints`?
+
+They do **not** run on the same item. `interpreter.py` is exclusive, in order:
+
+1. If Claude’s `reconciliation_classifications` dict contains that account → that string wins.
+2. Else if the item has no classification → `_classify_from_hints`.
+3. Consolidator never classifies (`ReconciliationItem.classification` defaults `None`).
+
+The 24 Apr 2026 Sentinel smoke (`docs/archive/three_sector_demo_plan.md`): 32 recon = **28 `missing_je` + 4 `categorical_misclassification`**. Zero `stale_reference`, `timing_cutoff`, `accrual_mismatch`, `structural_explained`. Raw Claude JSON from that run is **not** in the repo, so we cannot stamp each of the 28 with a writer. We can still bound it:
+
+- Fallback emits `missing_je` **only** when `is_gl_only` or `is_source_only`. Its last resort is `stale_reference`, never `missing_je`.
+- Prompt emits `missing_je` for the same one-sided hints, **and** for “unsure.”
+- Therefore: a **one-sided** item labeled `missing_je` could be either writer — both agree. A **two-sided** item labeled `missing_je` can **only** be Claude (the “unsure” default). A two-sided item that skipped Claude would be `stale_reference` (or another hint branch), not `missing_je`.
+- Smoke had **zero** `stale_reference`. That is consistent with Claude filling every key (prompt says one entry per item) **or** every two-sided leftover having `similar_amount_in_other_account` (the 4 `categorical_misclassification`). It is **not** consistent with fallback silently converting two-sided fee gaps into `missing_je` — fallback cannot do that.
+
+**So the 28 count is not “which fallback fired.”** It is consolidator creating ~28 one-sided material items; whichever writer ran, the taxonomy says `missing_je`. The prompt-vs-code disagreement (`unsure → missing_je` vs last-resort `stale_reference`) is real, but it applies to **two-sided** items with no fee hint — the class-6 hole — not to these 28 orphans.
+
+**Demo implication (do not get surprised later):** a class-6 fix (fee hint + fallback branch + narrower prompt default) will **not** turn those 28 into `structural_explained` and should not. The card count drops only if `_is_material` / grouping is fixed (Bucket 1 item 1). Class-6 success looks like: a *two-sided* gross-vs-net fee gap, when one exists, stops being `missing_je`/`stale_reference`.
+
+Fix both prompt and `_classify_from_hints` when class 6 is implemented — not because both wrote the 28, but because a two-sided fee item can still hit either writer. Prompt-only leaves the Python hole; fallback-only leaves Claude’s “unsure → missing_je.”
+
 ### Fix proposal (do not apply yet)
 
 1. Keep six classes. Do not add a seventh.
