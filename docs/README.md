@@ -46,6 +46,7 @@ User guides and operational runbooks.
 Analysis reports and findings.
 
 - `hackathon_findings_report.md` - Hackathon retrospective and findings
+- `close-process-by-sector.md` - Month-end close by industry; start with field services; how to complete the current close flow without pivoting the product
 
 ### archive/
 Outdated or superseded documentation.
@@ -75,4 +76,4 @@ Sample data files for testing and demos.
 
 ---
 
-**Last Updated:** April 25, 2026
+**Last Updated:** August 24, 2026
