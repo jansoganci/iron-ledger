@@ -1,4 +1,8 @@
-import { ReconciliationCard, type ReconciliationItem } from "./ReconciliationCard";
+import {
+  ReconciliationCard,
+  isCoverageItem,
+  type ReconciliationItem,
+} from "./ReconciliationCard";
 
 interface ReconciliationPanelProps {
   reconciliations: ReconciliationItem[] | null | undefined;
@@ -26,7 +30,11 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 export function ReconciliationPanel({ reconciliations }: ReconciliationPanelProps) {
-  if (!reconciliations || reconciliations.length === 0) {
+  const items = reconciliations ?? [];
+  const exceptions = items.filter((item) => !isCoverageItem(item));
+  const coverage = items.filter((item) => isCoverageItem(item));
+
+  if (exceptions.length === 0 && coverage.length === 0) {
     return (
       <div className="rounded-lg border border-border bg-severity-normal-bg px-4 py-5 text-center">
         <p className="text-sm text-text-secondary">No discrepancies detected across files.</p>
@@ -35,9 +43,20 @@ export function ReconciliationPanel({ reconciliations }: ReconciliationPanelProp
   }
 
   const grouped: Record<string, ReconciliationItem[]> = { high: [], medium: [], low: [] };
-  for (const item of reconciliations) {
+  for (const item of exceptions) {
     grouped[severityOf(item.delta)].push(item);
   }
+
+  const countLabel = [
+    exceptions.length
+      ? `${exceptions.length} to review`
+      : null,
+    coverage.length
+      ? `${coverage.length} not compared`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <section className="space-y-6">
@@ -47,26 +66,43 @@ export function ReconciliationPanel({ reconciliations }: ReconciliationPanelProp
         </h2>
         <div className="flex-1 h-px bg-border" />
         <span className="text-xs text-text-secondary tabular-nums">
-          {reconciliations.length} item{reconciliations.length !== 1 ? "s" : ""}
+          {countLabel}
         </span>
       </div>
 
       {SEVERITY_ORDER.map((level) => {
-        const items = grouped[level];
-        if (!items.length) return null;
+        const levelItems = grouped[level];
+        if (!levelItems.length) return null;
         return (
           <div key={level} className="space-y-2">
             <p className={`text-xs font-semibold uppercase tracking-widest ${SEVERITY_COLORS[level]}`}>
-              {SEVERITY_LABELS[level]} · {items.length}
+              {SEVERITY_LABELS[level]} · {levelItems.length}
             </p>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-              {items.map((item, i) => (
+              {levelItems.map((item, i) => (
                 <ReconciliationCard key={`${item.account}-${i}`} {...item} severity={level} />
               ))}
             </div>
           </div>
         );
       })}
+
+      {coverage.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
+            Not compared · {coverage.length}
+          </p>
+          <p className="text-xs text-text-secondary">
+            These general-ledger accounts were not in any uploaded supporting file.
+            That is not a missing journal entry.
+          </p>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {coverage.map((item, i) => (
+              <ReconciliationCard key={`cov-${item.account}-${i}`} {...item} />
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

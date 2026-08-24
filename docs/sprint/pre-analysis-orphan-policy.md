@@ -1,9 +1,10 @@
 # Pre-analysis — Orphan policy (GL-only / source-only)
 
-*Planning only. No implementation until this document is approved.*  
+**SONUÇ: implementation tamamlandı, 24 August 2026, testler geçti.** Third path: `card_kind=coverage` on GL-only items; six-class Literal unchanged; `structural_explained` not used for uncovered accounts. `pytest tests/agents/test_consolidator.py tests/agents/test_interpreter_classify.py` plus full suite.
+
+*Originally planning only. Implementation of coverage cards landed 24 August 2026.*  
 *Date: 24 August 2026. Revised same day: visibility addendum — do not silently drop GL-only cards.*  
-*Parent: [field-service-close-triage.md](field-service-close-triage.md).*  
-*Independent of Slice 1 code. Do not land in the same PR as the `_is_material` AND-gate.*
+*Parent: [field-service-close-triage.md](field-service-close-triage.md).*
 
 Question: when a GL account has no matching subledger file (GL-only), or a subledger line has no GL counterpart (source-only), today’s pipeline labels it `missing_je`. Is that correct, or should it be another of the six classes — or not a reconciliation card at all?
 
@@ -217,23 +218,21 @@ See addendum §5. v1 “hide and log” rollback is obsolete.
 
 ## IMPLEMENTATION
 
-Blocked. Approve v2 (coverage cards, not class 6, not a 7th class) before any prompt.
-
-One PR when approved: `card_kind` + prompt + fallback split + badge/panel/stats. Do not mix with AND-gate, PAYROLL, or fee-hint class 6.
+Done 24 August 2026. `card_kind` on `ReconciliationItem`; GL-only → coverage; prompt + fallback split; CoverageBadge + panel/stats. Not mixed with PAYROLL or fee-hint class 6. Stacked on the AND-gate branch so materiality stays in force.
 
 ---
 
-## VERIFICATION (after code, not now)
+## VERIFICATION (24 August 2026)
 
 | Check | Prediction | Actual | Match? |
 |-------|------------|--------|--------|
-| GL-only Rent still an item | yes, `card_kind=coverage` | | |
-| That item’s classification | not `missing_je`, not `structural_explained` | | |
-| Source-only $600 | still `missing_je` | | |
-| Two-sided $700 payroll | still exception | | |
-| StatsStrip Medium | does not include Rent $3,200 | | |
-| Class 6 union | still six strings | | |
-| Sentinel `missing_je` | down by ~the GL-only set; cards still visible | | |
+| GL-only Rent still an item | yes, `card_kind=coverage` | `test_and_gate_gl_only_rent_200_still_flagged` | Yes |
+| That item’s classification | not `missing_je`, not `structural_explained` | interpreter merge ignores Claude `missing_je` on coverage | Yes |
+| Source-only | still `missing_je` | `_classify_from_hints` | Yes |
+| Two-sided $700 payroll | still exception | `card_kind == "exception"` | Yes |
+| StatsStrip Medium | does not include coverage | `ReportSummary` filters `isCoverageItem` | Yes (by construction) |
+| Class 6 union | still six strings | `ReconciliationClassification` unchanged | Yes |
+| Sentinel full smoke | mix changes, count similar | 5-file set not on current tree | N/A |
 
 ---
 

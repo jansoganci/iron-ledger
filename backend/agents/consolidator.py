@@ -297,6 +297,9 @@ def _build_item(
         return None
 
     severity = _severity(abs(delta))
+    card_kind: Literal["exception", "coverage"] = (
+        "coverage" if hints.is_gl_only else "exception"
+    )
 
     return ReconciliationItem(
         account=account,
@@ -308,6 +311,7 @@ def _build_item(
         delta_pct=round(delta_pct, 4) if delta_pct is not None else None,
         severity=severity,
         hints=hints,
+        card_kind=card_kind,
     )
 
 

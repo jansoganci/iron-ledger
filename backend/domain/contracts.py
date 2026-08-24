@@ -187,3 +187,5 @@ class ReconciliationItem(BaseModel):
     narrative: str | None = None
     suggested_action: str | None = None
     hints: ReconciliationHints = ReconciliationHints()
+    # "coverage" = GL line with no uploaded supporting file. Not a 7th class.
+    card_kind: Literal["exception", "coverage"] = "exception"

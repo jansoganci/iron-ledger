@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { formatPeriod, formatCurrency } from "../lib/formatters";
 import { ReconciliationPanel } from "./ReconciliationPanel";
-import type { ReconciliationItem } from "./ReconciliationCard";
+import { isCoverageItem, type ReconciliationItem } from "./ReconciliationCard";
 import { cn } from "../lib/utils";
 
 export type ReportStatus = "verified" | "stale" | "guardrail_failed";
@@ -211,15 +211,18 @@ function StatsStrip({ reconciliations, anomalyCount }: {
   anomalyCount: number;
 }) {
   const recons = reconciliations ?? [];
-  const high = recons.filter(r => Math.abs(r.delta) >= 5000).length;
-  const medium = recons.filter(r => Math.abs(r.delta) >= 500 && Math.abs(r.delta) < 5000).length;
-  const low = recons.filter(r => Math.abs(r.delta) < 500 && Math.abs(r.delta) > 0).length;
+  const exceptions = recons.filter((r) => !isCoverageItem(r));
+  const coverageCount = recons.length - exceptions.length;
+  const high = exceptions.filter(r => Math.abs(r.delta) >= 5000).length;
+  const medium = exceptions.filter(r => Math.abs(r.delta) >= 500 && Math.abs(r.delta) < 5000).length;
+  const low = exceptions.filter(r => Math.abs(r.delta) < 500 && Math.abs(r.delta) > 0).length;
 
   const stats = [
-    { label: "Findings", value: recons.length, color: "text-text-primary" },
+    { label: "To review", value: exceptions.length, color: "text-text-primary" },
     { label: "High", value: high, color: high > 0 ? "text-severity-high-fg" : "text-text-secondary" },
     { label: "Medium", value: medium, color: medium > 0 ? "text-severity-medium-fg" : "text-text-secondary" },
     { label: "Low", value: low, color: "text-text-secondary" },
+    { label: "Not compared", value: coverageCount, color: "text-text-secondary" },
     { label: "Flagged accounts", value: anomalyCount, color: anomalyCount > 0 ? "text-severity-medium-fg" : "text-favorable-fg" },
   ];
 

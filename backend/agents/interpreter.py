@@ -55,17 +55,20 @@ def _guardrail_user_message(exc_str: str) -> str:
     )
 
 
-def _classify_from_hints(hints: dict) -> str:
+def _classify_from_hints(hints: dict) -> str | None:
     """Rule-based fallback when Claude doesn't return a classification.
 
     Priority order:
-    1. GL-only or source-only → always missing_je (one side has no entry).
-    2. Cross-period date → timing_cutoff.
-    3. Both sources present, similar amount in another account → categorical_misclassification.
-    4. Both sources present, accrual pattern → accrual_mismatch.
-    5. Both sources present, general delta → stale_reference.
+    1. GL-only → no exception class (coverage card; not missing_je).
+    2. Source-only → missing_je.
+    3. Cross-period date → timing_cutoff.
+    4. Both sources present, similar amount in another account → categorical_misclassification.
+    5. Both sources present, accrual pattern → accrual_mismatch.
+    6. Both sources present, general delta → stale_reference.
     """
-    if hints.get("is_gl_only") or hints.get("is_source_only"):
+    if hints.get("is_gl_only"):
+        return None
+    if hints.get("is_source_only"):
         return "missing_je"
     if hints.get("crosses_period_boundary"):
         return "timing_cutoff"
@@ -74,6 +77,32 @@ def _classify_from_hints(hints: dict) -> str:
     if hints.get("is_round_fraction"):
         return "accrual_mismatch"
     return "stale_reference"
+
+
+def _is_coverage_item(item: dict) -> bool:
+    if item.get("card_kind") == "coverage":
+        return True
+    hints = item.get("hints") or {}
+    if isinstance(hints, dict):
+        return bool(hints.get("is_gl_only"))
+    return bool(getattr(hints, "is_gl_only", False))
+
+
+def _apply_reconciliation_classifications(
+    reconciliations: list[dict],
+    cls_map: dict[str, str],
+) -> None:
+    """Merge Claude classes; coverage items stay unclassified."""
+    for item in reconciliations:
+        if _is_coverage_item(item):
+            item["card_kind"] = "coverage"
+            item["classification"] = None
+            continue
+        account = item.get("account", "")
+        if account in cls_map:
+            item["classification"] = cls_map[account]
+        elif not item.get("classification"):
+            item["classification"] = _classify_from_hints(item.get("hints") or {})
 
 
 class InterpreterAgent:
@@ -183,12 +212,7 @@ class InterpreterAgent:
         # Claude's output is used first; hint-based rules fill any gaps.
         if reconciliations:
             cls_map = narrative.reconciliation_classifications or {}
-            for item in reconciliations:
-                account = item.get("account", "")
-                if account in cls_map:
-                    item["classification"] = cls_map[account]
-                elif not item.get("classification"):
-                    item["classification"] = _classify_from_hints(item.get("hints", {}))
+            _apply_reconciliation_classifications(reconciliations, cls_map)
 
         # Write reports row
         report = self._reports.write(

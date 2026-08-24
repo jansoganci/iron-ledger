@@ -30,6 +30,7 @@ _SEVERITY_FILLS = {
     "medium": PatternFill("solid", fgColor="FFE5B4"),
     "low": PatternFill("solid", fgColor="FFFFCC"),
 }
+_COVERAGE_FILL = PatternFill("solid", fgColor="F3F4F6")  # info / not an exception
 _CURRENCY_FMT = "#,##0.00"
 _PCT_FMT = "0.0%"
 
@@ -179,6 +180,7 @@ def _build_reconciliation_sheet(
 
     row_num = 3
     for item in sorted(reconciliations, key=lambda x: -abs(x.get("delta", 0))):
+        coverage = _is_coverage_item(item)
         severity = item.get("severity", "low")
         row = [
             item.get("account", ""),
@@ -186,11 +188,15 @@ def _build_reconciliation_sheet(
             item.get("gl_amount"),
             item.get("non_gl_total"),
             item.get("delta"),
-            severity.upper(),
-            (item.get("classification") or "").replace("_", " ").title(),
+            "INFO" if coverage else severity.upper(),
+            (
+                "Not compared"
+                if coverage
+                else (item.get("classification") or "").replace("_", " ").title()
+            ),
         ]
         ws.append(row)
-        fill = _SEVERITY_FILLS.get(severity)
+        fill = _COVERAGE_FILL if coverage else _SEVERITY_FILLS.get(severity)
         for col in range(1, 8):
             cell = ws.cell(row=row_num, column=col)
             if fill:
@@ -290,6 +296,15 @@ def _build_source_breakdown_sheet(
 # ---------------------------------------------------------------------------
 # Style helpers
 # ---------------------------------------------------------------------------
+
+
+def _is_coverage_item(item: dict) -> bool:
+    if item.get("card_kind") == "coverage":
+        return True
+    hints = item.get("hints") or {}
+    if isinstance(hints, dict):
+        return bool(hints.get("is_gl_only"))
+    return False
 
 
 def _style_header_row(ws, row_num: int) -> None:

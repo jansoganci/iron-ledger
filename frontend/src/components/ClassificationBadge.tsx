@@ -3,6 +3,7 @@ import {
   Calendar,
   CheckCircle,
   Clock,
+  Info,
   RefreshCw,
   Shuffle,
 } from "lucide-react";
@@ -77,6 +78,21 @@ export function ClassificationBadge({
     >
       <Icon className="h-3 w-3 shrink-0" aria-hidden />
       {label}
+    </span>
+  );
+}
+
+export function CoverageBadge({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
+        "bg-canvas text-text-secondary border border-border",
+        className
+      )}
+    >
+      <Info className="h-3 w-3 shrink-0" aria-hidden />
+      Not compared
     </span>
   );
 }
