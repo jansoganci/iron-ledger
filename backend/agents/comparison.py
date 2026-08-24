@@ -10,6 +10,7 @@ from backend.domain.entities import Anomaly
 from backend.domain.ports import AccountsRepo, AnomaliesRepo, EntriesRepo, RunsRepo
 from backend.domain.run_state_machine import RunStatus
 from backend.logger import get_logger
+from backend.tools.account_tags import is_payroll_account
 
 logger = get_logger(__name__)
 
@@ -31,14 +32,20 @@ def calculate_variance(
     historical_avg: float,
     history_count: int,
     category: str = "OTHER",
+    account_name: str | None = None,
 ) -> dict:
     """Return variance dict. All arithmetic happens here — Claude never sees this.
 
     Tiered materiality (Track 4):
-      Tier 2 (REVENUE, PAYROLL, DEFERRED_REVENUE): flag if |delta| > $10K AND |pct| > 3%
-      Tier 1 (all others):                         flag if |delta| > $50K AND |pct| > 10%
+      Tier 2 (REVENUE, PAYROLL, DEFERRED_REVENUE, or a payroll-named account
+      sitting under G&A/OPEX): flag if |delta| > $10K AND |pct| > 3%
+      Tier 1 (all others):     flag if |delta| > $50K AND |pct| > 10%
     Both gates must be exceeded — dollar floor prevents noise on tiny accounts,
     percentage floor prevents noise on giant accounts with small swings.
+
+    Payroll is not a seeded account_categories row. Haiku maps wages into
+    G&A/OPEX; ``is_payroll_account`` on the canonical GL name is the layer
+    that still puts those lines on the tight gate.
     """
     if not historical_avg:
         return {"variance_pct": None, "severity": "no_history", "flag": False}
@@ -47,7 +54,7 @@ def calculate_variance(
     abs_delta = abs(current - historical_avg)
     abs_pct = abs(variance_pct)
 
-    is_tier2 = category in _TIER2_CATEGORIES
+    is_tier2 = category in _TIER2_CATEGORIES or is_payroll_account(account_name or "")
     dollar_gate = _TIER2_DOLLAR if is_tier2 else _TIER1_DOLLAR
     pct_gate = _TIER2_PCT if is_tier2 else _TIER1_PCT
 
@@ -135,7 +142,11 @@ class ComparisonAgent:
             current_val = float(entry.actual_amount)
 
             result = calculate_variance(
-                current_val, historical_avg, len(hist_amounts), category
+                current_val,
+                historical_avg,
+                len(hist_amounts),
+                category,
+                account_name,
             )
 
             # Build AccountSummary

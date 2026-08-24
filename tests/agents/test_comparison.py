@@ -116,6 +116,42 @@ def test_tier2_below_pct_gate_not_flagged() -> None:
     assert result["flag"] is False
 
 
+def test_payroll_name_under_ga_uses_tier2_gates() -> None:
+    # Haiku maps wages to G&A. Canonical name still gets the tight gate.
+    # $15K delta, 5% — Tier 2 yes, Tier 1 ($50K) no.
+    result = calculate_variance(
+        current=315_000.0,
+        historical_avg=300_000.0,
+        history_count=3,
+        category="G&A",
+        account_name="Payroll Expense",
+    )
+    assert result["flag"] is True
+
+
+def test_payroll_name_under_opex_uses_tier2_gates() -> None:
+    result = calculate_variance(
+        current=315_000.0,
+        historical_avg=300_000.0,
+        history_count=3,
+        category="OPEX",
+        account_name="Wages Payable",
+    )
+    assert result["flag"] is True
+
+
+def test_non_payroll_name_under_ga_stays_tier1() -> None:
+    # Same $15K / 5% swing on ordinary G&A must NOT flag.
+    result = calculate_variance(
+        current=315_000.0,
+        historical_avg=300_000.0,
+        history_count=3,
+        category="G&A",
+        account_name="Office Rent",
+    )
+    assert result["flag"] is False
+
+
 # ---------------------------------------------------------------------------
 # Severity and variance_pct fields are unaffected by tiering
 # ---------------------------------------------------------------------------
@@ -193,24 +229,29 @@ def _make_history_entry(account_id: str, amount: float, period: date) -> Monthly
     )
 
 
-def _make_agent(prior_flag_counts: dict[str, int]) -> ComparisonAgent:
+def _make_agent(
+    prior_flag_counts: dict[str, int],
+    *,
+    current: float = 360_000.0,
+    historical: float = 300_000.0,
+    name: str = "Engineering Salaries",
+    category: str = "PAYROLL",
+) -> ComparisonAgent:
     """Build a ComparisonAgent with all repo dependencies mocked."""
     entries_repo = MagicMock()
     anomalies_repo = MagicMock()
     runs_repo = MagicMock()
     accounts_repo = MagicMock()
 
-    # Current entry: PAYROLL account is $360K (flagged vs $300K mean)
-    entries_repo.list_for_period.return_value = [_make_entry(ACCT_ID, 360_000.0)]
+    entries_repo.list_for_period.return_value = [_make_entry(ACCT_ID, current)]
 
-    # History: two months at $300K gives mean = $300K
     entries_repo.list_history.return_value = [
-        _make_history_entry(ACCT_ID, 300_000.0, date(2026, 1, 1)),
-        _make_history_entry(ACCT_ID, 300_000.0, date(2026, 2, 1)),
+        _make_history_entry(ACCT_ID, historical, date(2026, 1, 1)),
+        _make_history_entry(ACCT_ID, historical, date(2026, 2, 1)),
     ]
 
     accounts_repo.get_accounts_by_id.return_value = {
-        ACCT_ID: {"name": "Engineering Salaries", "category": "PAYROLL"}
+        ACCT_ID: {"name": name, "category": category}
     }
 
     anomalies_repo.list_account_flag_counts_before.return_value = prior_flag_counts
@@ -269,3 +310,32 @@ def test_list_account_flag_counts_called_once_not_per_entry() -> None:
     agent._anomalies.list_account_flag_counts_before.assert_called_once_with(
         COMPANY_ID, PERIOD, lookback_months=6
     )
+
+
+def test_agent_flags_ga_payroll_name_at_tier2_delta() -> None:
+    # $15K / 5% under G&A — only flags because the canonical name is payroll.
+    agent = _make_agent(
+        {},
+        current=315_000.0,
+        historical=300_000.0,
+        name="Payroll Expense",
+        category="G&A",
+    )
+    agent.run("run-1", COMPANY_ID, PERIOD)
+
+    written: list = agent._anomalies.write_many.call_args[0][0]
+    assert len(written) == 1
+
+
+def test_agent_does_not_flag_ga_rent_at_tier2_delta() -> None:
+    agent = _make_agent(
+        {},
+        current=315_000.0,
+        historical=300_000.0,
+        name="Office Rent",
+        category="G&A",
+    )
+    agent.run("run-1", COMPANY_ID, PERIOD)
+
+    written: list = agent._anomalies.write_many.call_args[0][0]
+    assert written == []
