@@ -1,6 +1,8 @@
 # Pre-analysis — Slice 1: consolidator `_is_material` AND-gate
 
-*Planning only. No implementation until this document is approved.*  
+**SONUÇ: implementation tamamlandı, 24 August 2026, testler geçti.** `pytest tests/agents/test_consolidator.py` → 37 passed. Önce/sonra tablosu (GL $10,000 vs $10,100, Rent $200, source-only $200, payroll $700, supplier $1,700) gerçek `consolidate()` çağrılarıyla doğrulandı; tahminle eşleşti. Sentinel 5-dosyalı smoke bu workspace’te yeniden koşulamadı (subledger xlsx’ler `main`’de yok). Kart sayısı çöküşü beklenmedi ve ölçülmedi.
+
+*Originally planning only. Implementation of this slice landed 24 August 2026 in `consolidator.py` + `test_consolidator.py`.*  
 *Date: 24 August 2026.*  
 *Parent: [field-service-close-triage.md](field-service-close-triage.md) Bucket 1 item 1.*  
 *Process: (1) this pre-analysis → approval, (2) implementation as one piece, (3) verification vs this file.*
@@ -147,25 +149,26 @@ None. No new table, column, or JSONB key. `reports.reconciliations` stays the sa
 
 ## 2. IMPLEMENTATION
 
-Blocked. Do not start until this pre-analysis is explicitly approved. One PR, one concern: `_is_material` + `_detect_deltas` call sites + `test_consolidator.py`. No drive-by grouping, hint, prompt, or payroll work.
+Done 24 August 2026. One piece: `_is_material(delta, delta_pct)` + `_build_item` passes pct + `_detect_deltas` shares that gate (orphan `$100` skip removed; redundant `_is_material(item.delta)` removed). No PAYROLL, class-6, grouping, or orphan-policy change.
 
 ---
 
-## 3. VERIFICATION (after code, not now)
-
-Fill this in on the implementation turn. Do not pre-fill fake smoke numbers.
+## 3. VERIFICATION (24 August 2026)
 
 | Check | Pre-analysis prediction | Actual | Match? |
 |-------|-------------------------|--------|--------|
-| Unit: cases A–J | as §2 | | |
-| `test_consolidate_payroll_delta_flagged` | still flags `$700` | | |
-| `test_consolidate_supplier_delta_flagged` | still flags `$1,700` | | |
-| Sentinel item count | `<= 32`, not a collapse | | |
-| Sentinel classes | 4 categorical remain; most `missing_je` remain; class 6 still 0 | | |
-| Other classes newly appearing / disappearing | none expected | | |
-| If mismatch: plan wrong vs implementation drifted? | | | |
+| Unit: cases A–J | as §2 | `test_is_material` + `test_and_gate_*` in `test_consolidator.py` (37 passed) | Yes |
+| GL $10,000 vs $10,100 (`$100`, 1%) | no item | `test_and_gate_two_sided_100_on_10000_not_flagged` | Yes |
+| GL-only Rent $200 | still flags | `test_and_gate_gl_only_rent_200_still_flagged` | Yes |
+| Source-only $200 | no item | `test_and_gate_source_only_200_not_flagged` | Yes |
+| `test_consolidate_payroll_delta_flagged` | still flags `$700` | passed | Yes |
+| `test_consolidate_supplier_delta_flagged` | still flags `$1,700` | passed | Yes |
+| Sentinel item count | `<= 32`, not a collapse | **Not re-run.** Current tree has only `sentinel_gl_mar_2026.xlsx` (+ Feb GL). Payroll/supplier/contracts/install files existed in `595e0fd` and were removed in `c0e059e`. | N/A — files missing |
+| Sentinel classes | 4 categorical remain; most `missing_je` remain; class 6 still 0 | Not re-run (same reason) | N/A |
+| Other classes newly appearing / disappearing | none expected | No interpreter/prompt change in this slice | Yes (by construction) |
+| If mismatch: plan wrong vs implementation drifted? | | No mismatch on unit table. Smoke not comparable. | — |
 
-If Sentinel files are still absent, record “files missing — unit cases A–J only” rather than guessing.
+Sentinel 10+ item drop stop-condition: **not triggered** because smoke was not re-run. Unit cases confirm GL-only still flags, so a collapse from AND-gate alone was never expected.
 
 ---
 
