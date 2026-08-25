@@ -46,3 +46,28 @@ def test_apply_classifications_ignores_claude_on_coverage() -> None:
     assert items[0]["classification"] is None
     assert items[0]["card_kind"] == "coverage"
     assert items[1]["classification"] == "missing_je"
+
+
+def test_round_fraction_is_timing_cutoff_not_accrual() -> None:
+    assert (
+        _classify_from_hints({"is_round_fraction": True, "is_customer_deposit": True})
+        == "timing_cutoff"
+    )
+
+
+def test_fee_hint_beats_period_boundary() -> None:
+    assert (
+        _classify_from_hints(
+            {
+                "is_processor_fee_gap": True,
+                "crosses_period_boundary": True,
+            }
+        )
+        == "structural_explained"
+    )
+
+
+def test_vendor_annual_hint_is_accrual() -> None:
+    assert (
+        _classify_from_hints({"delta_matches_known_vendor": True}) == "accrual_mismatch"
+    )

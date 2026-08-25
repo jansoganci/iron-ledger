@@ -28,6 +28,15 @@ Hint definitions (match ReconciliationHints in domain/contracts.py):
                             — delta × 12 ≈ an amount found in another account's
                               GL total (suggests an annual invoice expensed in
                               full rather than amortized monthly).
+
+  is_customer_deposit       — two-sided 50% peşinat / unearned revenue. True when
+                              the account-total ratio is ~0.50 or an involved
+                              source file has deposit / balance-remaining columns.
+                              Not a vendor prepaid.
+
+  is_processor_fee_gap      — two-sided gross-vs-net gap whose |delta_pct| sits
+                              in a pandas fee band. Never set on GL-only /
+                              source-only / customer-deposit items.
 """
 
 from __future__ import annotations
@@ -44,6 +53,19 @@ logger = get_logger(__name__)
 _ROUND_FRACTION_TOLERANCE = 0.05  # ±5% around 0.50
 _AMOUNT_MATCH_TOLERANCE = 0.10  # ±10% for cross-account dollar match
 _ANNUAL_MATCH_TOLERANCE = 0.10  # ±10% for delta × 12 ≈ another account
+# Processor/platform netting as a share of the GL side. Floor is above the
+# ~2.3% Vandelay late-payout shape; ceiling is below a 50% deposit ratio.
+_FEE_BAND_MIN = 0.03
+_FEE_BAND_MAX = 0.08
+
+_DEPOSIT_HEADER_NEEDLES = (
+    "deposit",
+    "balance remaining",
+    "balance_remaining",
+    "payment type",
+    "payment_type",
+)
+_DEPOSIT_VALUE_TOKENS = ("deposit", "50%")
 
 
 def compute_hints(
@@ -68,6 +90,9 @@ def compute_hints(
         involved_files = {s.source_file for s in item.sources}
         is_source_only = _is_source_only(item)
         is_gl_only = _is_gl_only(item)
+        is_customer_deposit = _is_customer_deposit(
+            item, is_gl_only, is_source_only, involved_files, source_raw_dfs
+        )
 
         return ReconciliationHints(
             crosses_period_boundary=_crosses_period_boundary(
@@ -81,6 +106,10 @@ def compute_hints(
             is_gl_only=is_gl_only,
             delta_matches_known_vendor=_delta_matches_known_vendor(
                 item, consolidated_df
+            ),
+            is_customer_deposit=is_customer_deposit,
+            is_processor_fee_gap=_is_processor_fee_gap(
+                item, is_gl_only, is_source_only, is_customer_deposit
             ),
         )
     except Exception as exc:
@@ -141,6 +170,68 @@ def _is_round_fraction(item: ReconciliationItem) -> bool:
         return False
     ratio = item.non_gl_total / item.gl_amount
     return abs(ratio - 0.5) <= _ROUND_FRACTION_TOLERANCE
+
+
+def _is_customer_deposit(
+    item: ReconciliationItem,
+    is_gl_only: bool,
+    is_source_only: bool,
+    involved_files: set[str],
+    source_raw_dfs: dict[str, pd.DataFrame],
+) -> bool:
+    """Two-sided customer peşinat — ratio ~50% or deposit columns in a source file."""
+    if is_gl_only or is_source_only:
+        return False
+    if _is_round_fraction(item):
+        return True
+    return _deposit_column_signal(involved_files, source_raw_dfs)
+
+
+def _deposit_column_signal(
+    involved_files: set[str],
+    source_raw_dfs: dict[str, pd.DataFrame],
+) -> bool:
+    """True when an involved file has a deposit/balance-remaining header.
+
+    Matches column names (and a closed token list on payment-type columns).
+    Never logs cell values.
+    """
+    for filename in involved_files:
+        df = source_raw_dfs.get(filename)
+        if df is None or df.empty:
+            continue
+        for col in df.columns:
+            col_l = str(col).lower()
+            if not any(needle in col_l for needle in _DEPOSIT_HEADER_NEEDLES):
+                continue
+            if "payment type" in col_l or "payment_type" in col_l:
+                tokens = df[col].dropna().astype(str).str.lower()
+                if tokens.apply(lambda v: any(t in v for t in _DEPOSIT_VALUE_TOKENS)).any():
+                    return True
+                continue
+            if "balance remaining" in col_l or "balance_remaining" in col_l:
+                remaining = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+                if (remaining > 0).any():
+                    return True
+                continue
+            if "deposit" in col_l:
+                return True
+    return False
+
+
+def _is_processor_fee_gap(
+    item: ReconciliationItem,
+    is_gl_only: bool,
+    is_source_only: bool,
+    is_customer_deposit: bool,
+) -> bool:
+    """Two-sided gross-vs-net whose |delta_pct| sits in the pandas fee band."""
+    if is_gl_only or is_source_only or is_customer_deposit:
+        return False
+    if item.delta_pct is None:
+        return False
+    abs_pct = abs(item.delta_pct)
+    return _FEE_BAND_MIN <= abs_pct <= _FEE_BAND_MAX
 
 
 def _similar_amount_in_other_account(
