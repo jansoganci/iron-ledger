@@ -49,8 +49,9 @@ Classification taxonomy — pick the ONE that best fits based on the hints provi
    Template: "The [account] reference list shows [amount] but the GL records [GL amount], a [delta] gap. The reference data may be out of date. Recommended action: reconcile the active list against the GL and update cancelled or re-priced items."
 
 5. accrual_mismatch
-   When to use: a large lump-sum *vendor* invoice that should be spread monthly (e.g., annual software subscription). Use when delta_matches_known_vendor is true. Do NOT use this for a customer deposit (is_customer_deposit) — that is unearned revenue, not a prepaid asset.
-   Template: "The [account] GL shows a lump-sum of [GL amount] where the monthly cost should be approximately [expected monthly]. This appears to be an accrual timing issue — the full invoice was expensed rather than amortized. Recommended action: create a prepaid asset and amortize over the contract period."
+   When to use: ONLY when looks_like_annual_prepayment (or the alias delta_matches_known_vendor) is true. Pandas already compared this item's GL total to this item's source total and found one side is about 12 months of the other. Use hints.implied_monthly as the monthly figure — do not divide, multiply, or invent a monthly amount. Do NOT use this for a customer deposit (is_customer_deposit) — that is unearned job revenue, not a 12-month prepaid. Do NOT use this when is_processor_fee_gap is true. Do NOT use this for coverage / is_gl_only.
+   Template (expense / OPEX / G&A / COGS lump): "The [account] GL shows a lump-sum of [GL amount] where the monthly amount should be [implied_monthly from hints]. This appears to be an annual prepayment booked in one month instead of being spread. Recommended action: create a prepaid asset and amortize over the contract period."
+   Template (REVENUE lump): "The [account] GL shows a lump-sum of [GL amount] where the monthly amount should be [implied_monthly from hints]. This appears to be an annual customer prepayment booked as this month's revenue. Recommended action: record unearned revenue and recognize it monthly. Do not treat this as a 50% job deposit."
 
 6. structural_explained
    When to use: ONLY when is_processor_fee_gap is true. The delta is the known difference between gross sales and net payout after platform/processor fees. Never use this for coverage / is_gl_only. Never use this for a customer deposit. Do not say the amount will be recognized as revenue later. Do not call it a liability or a prepaid.
@@ -60,7 +61,7 @@ Hard rules for reconciliation findings:
 - Use ONLY the exact numeric values provided in reconciliations[]. Do not invent numbers. Do not invent fee percentages.
 - Every dollar amount in the reconciliation narrative must appear in numbers_used.
 - Do not classify if no reconciliations are provided — omit the section entirely.
-- Do not speculate beyond what the hints support. If unsure on a two-sided exception with no other hint, default to stale_reference. Never default a coverage / is_gl_only item to missing_je. Never default is_customer_deposit to accrual_mismatch or structural_explained. Never use structural_explained unless is_processor_fee_gap is true.
+- Do not speculate beyond what the hints support. If unsure on a two-sided exception with no other hint, default to stale_reference. Never default a coverage / is_gl_only item to missing_je. Never default is_customer_deposit to accrual_mismatch or structural_explained. Never use structural_explained unless is_processor_fee_gap is true. Never divide an amount by 12 — if looks_like_annual_prepayment is true, copy hints.implied_monthly.
 - One finding per reconciliation item.
 
 ---

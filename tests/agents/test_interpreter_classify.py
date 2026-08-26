@@ -69,5 +69,24 @@ def test_fee_hint_beats_period_boundary() -> None:
 
 def test_vendor_annual_hint_is_accrual() -> None:
     assert (
+        _classify_from_hints({"looks_like_annual_prepayment": True})
+        == "accrual_mismatch"
+    )
+
+
+def test_vendor_annual_alias_still_classifies() -> None:
+    assert (
         _classify_from_hints({"delta_matches_known_vendor": True}) == "accrual_mismatch"
+    )
+
+
+def test_annual_outranks_cutoff_in_fallback() -> None:
+    assert (
+        _classify_from_hints(
+            {
+                "looks_like_annual_prepayment": True,
+                "crosses_period_boundary": True,
+            }
+        )
+        == "accrual_mismatch"
     )

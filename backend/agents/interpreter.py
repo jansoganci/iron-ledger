@@ -73,9 +73,12 @@ def _classify_from_hints(hints: dict) -> str | None:
     2. Source-only → missing_je.
     3. Processor/platform netting → structural_explained.
     4. Customer deposit / 50% peşinat → timing_cutoff (not accrual_mismatch).
-    5. Cross-period date → timing_cutoff.
-    6. Both sources present, similar amount in another account → categorical_misclassification.
-    7. Annual vendor invoice pattern → accrual_mismatch.
+    5. Same-item ~12× annual prepayment → accrual_mismatch.
+       Rationale vs 3–4: fee band (3–8%) and 50% deposit cannot be 12×;
+       column-triggered deposit still wins because that speech act is
+       unearned/liability, not “create a prepaid asset.”
+    6. Cross-period date → timing_cutoff.
+    7. Both sources present, similar amount in another account → categorical_misclassification.
     8. Both sources present, general delta → stale_reference.
     """
     if hints.get("is_gl_only"):
@@ -86,13 +89,20 @@ def _classify_from_hints(hints: dict) -> str | None:
         return "structural_explained"
     if hints.get("is_customer_deposit") or hints.get("is_round_fraction"):
         return "timing_cutoff"
+    if _is_annual_prepayment_hint(hints):
+        return "accrual_mismatch"
     if hints.get("crosses_period_boundary"):
         return "timing_cutoff"
     if hints.get("similar_amount_in_other_account"):
         return "categorical_misclassification"
-    if hints.get("delta_matches_known_vendor"):
-        return "accrual_mismatch"
     return "stale_reference"
+
+
+def _is_annual_prepayment_hint(hints: dict) -> bool:
+    return bool(
+        hints.get("looks_like_annual_prepayment")
+        or hints.get("delta_matches_known_vendor")
+    )
 
 
 def _is_coverage_item(item: dict) -> bool:
@@ -106,7 +116,7 @@ def _apply_reconciliation_classifications(
     reconciliations: list[dict],
     cls_map: dict[str, str],
 ) -> None:
-    """Merge Claude classes; pandas hints win for coverage / deposit / fee."""
+    """Merge Claude classes; pandas hints win for coverage / deposit / fee / annual."""
     for item in reconciliations:
         if _is_coverage_item(item):
             item["card_kind"] = "coverage"
@@ -114,11 +124,15 @@ def _apply_reconciliation_classifications(
             continue
         hints = _hints_as_dict(item.get("hints"))
         # Pandas-backed speech acts are not Claude's to override.
+        # Fee > deposit > annual: never two stories on one card.
         if hints.get("is_processor_fee_gap"):
             item["classification"] = "structural_explained"
             continue
         if hints.get("is_customer_deposit") or hints.get("is_round_fraction"):
             item["classification"] = "timing_cutoff"
+            continue
+        if _is_annual_prepayment_hint(hints):
+            item["classification"] = "accrual_mismatch"
             continue
         account = item.get("account", "")
         if account in cls_map:
