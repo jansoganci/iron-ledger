@@ -6,8 +6,12 @@ signals rather than guessing from dollar amounts alone.
 
 Hint definitions (match ReconciliationHints in domain/contracts.py):
 
-  crosses_period_boundary   — any transaction date in the involved source file(s)
-                              falls after period_end. Strong timing_cutoff signal.
+  crosses_period_boundary   — a *transaction-like* date in an involved source
+                              file falls after period_end (invoice / payout /
+                              payment / deposit / balance-due / canonical date).
+                              Roster cycle dates (last billed, renewal, start,
+                              end, next bill) are ignored. Strong timing_cutoff
+                              signal.
 
   is_round_fraction         — non_gl_total / gl_amount ≈ 0.5 (±5%).
                               Suggests a 50% deposit or advance — timing signal.
@@ -66,6 +70,32 @@ _DEPOSIT_HEADER_NEEDLES = (
     "payment_type",
 )
 _DEPOSIT_VALUE_TOKENS = ("deposit", "50%")
+
+# Cutoff hint: txn-like headers only. "date" matches Start Date, so blocklist
+# must run after. Do not blanket-drop every "due" — Balance Due Date stays.
+_CUTOFF_DATE_ALLOW = (
+    "date",
+    "txn date",
+    "transaction date",
+    "invoice date",
+    "payment date",
+    "payout date",
+    "settlement date",
+    "deposit date",
+    "balance due",
+    "due date",
+)
+_CUTOFF_DATE_BLOCK = (
+    "last billed",
+    "start date",
+    "end date",
+    "renewal",
+    "next bill",
+    "next_bill",
+    "contract end",
+    "payout period",
+)
+_CONTRACTS_FILE_NEEDLES = ("contract", "roster", "subscription", "recurring")
 
 
 def compute_hints(
@@ -134,19 +164,22 @@ def _crosses_period_boundary(
     source_raw_dfs: dict[str, pd.DataFrame],
     period_end: date,
 ) -> bool:
-    """True if any row in an involved source file has date > period_end.
+    """True if a transaction-like date in an involved file is after period_end.
 
-    Checks all date-like columns (not just the canonical 'date' column) so
-    that files with "Balance Due Date", "Due Date", "Payment Date" etc. are
-    also caught. Uses pandas coercion to tolerate mixed-type columns.
+    Roster/renewal/last-billed/start/end columns are ignored. Contracts-shaped
+    filenames are skipped entirely so a roster column named ``date`` cannot
+    steal timing_cutoff. Invoice due / balance due / payout dates still count.
+    Never logs cell values.
     """
     for filename in involved_files:
+        if _is_contracts_roster_file(filename):
+            continue
         df = source_raw_dfs.get(filename)
         if df is None or df.empty:
             continue
-        for col in df.select_dtypes(
-            include=["object", "datetime64[ns]", "datetime64[ns, UTC]"]
-        ).columns:
+        for col in df.columns:
+            if not _is_cutoff_date_column(col):
+                continue
             try:
                 parsed = pd.to_datetime(
                     df[col], errors="coerce", dayfirst=False, format="mixed"
@@ -159,6 +192,22 @@ def _crosses_period_boundary(
             except Exception:
                 continue
     return False
+
+
+def _normalize_header(col: object) -> str:
+    return str(col).lower().replace("_", " ")
+
+
+def _is_contracts_roster_file(filename: str) -> bool:
+    stem = filename.lower().replace("-", "_").replace(" ", "_").split("/")[-1]
+    return any(n in stem for n in _CONTRACTS_FILE_NEEDLES)
+
+
+def _is_cutoff_date_column(col: object) -> bool:
+    header = _normalize_header(col)
+    if any(n in header for n in _CUTOFF_DATE_BLOCK):
+        return False
+    return any(n in header for n in _CUTOFF_DATE_ALLOW)
 
 
 def _is_round_fraction(item: ReconciliationItem) -> bool:

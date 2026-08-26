@@ -32,7 +32,7 @@ For every other item (exceptions), write a structured finding using ONLY the cla
 Classification taxonomy — pick the ONE that best fits based on the hints provided:
 
 1. timing_cutoff
-   When to use: delta amount falls in a period near month-end, the item crosses a period boundary, OR is_customer_deposit / is_round_fraction is true (customer 50% peşinat — unearned revenue until the job is done).
+   When to use: a transaction, invoice, payout, or balance-due date falls after the period closed, OR is_customer_deposit / is_round_fraction is true (customer 50% peşinat — unearned revenue until the job is done). Do NOT use this because a contracts roster Last Billed / renewal / next-bill date is in the next month — that is stale_reference, not a timing cut-off.
    Template (ordinary cutoff): "The [account] shows a [delta] difference between [source A] ([amount A]) and the GL ([GL amount]). This appears to be a timing cut-off: the transaction was recorded in [source] before the accounting period closed. No action required — expect this to clear next month."
    Template (is_customer_deposit or is_round_fraction): "The [account] shows a [delta] difference between [source A] ([amount A]) and the GL ([GL amount]). The source is a customer deposit — a partial payment for work that is not finished. Treat this as a liability until the job is done, not as earned revenue. This is not a platform fee and not a vendor prepaid. Expect the remaining amount when the work is complete."
 
