@@ -214,9 +214,7 @@ If a dealer later inboxes a one-page “central station March bill vs roster cou
 
 ## 4. RMR account-count vs GL (alarm-specific)
 
-*Expanded to the same depth as items 1–3. Code citations from this branch unless noted.*
-
-### What the close actually is
+### What it is
 
 Alarm RMR close is not “Service Revenue dollars vs some other dollars.” It is **how many sites are billable, at what rate**, versus what hit the GL.
 
@@ -230,9 +228,11 @@ Designed Sentinel story (`docs/archive/implementation_blueprint.md` File 3): 85 
 
 That $285 is a **sum of three fees**. The *count* story is **85 Active vs 82 billed in March**. Today the product can (sometimes) surface the **dollar** gap. It cannot emit “3 accounts” without inventing it.
 
-### Proof: there is no RMR / account-count concept in code
+This is **not** a deferred-revenue rollforward (opening + billings − recognized). Annual lump 12× is already Kova 1 (`looks_like_annual_prepayment`). ServiceTitan invoice+payment double count needs row identity after `groupby` — still forbidden.
 
-Searched `backend/` for `RMR`, `recurring monthly`, `subscriber`, `active_count`, `billed_count`. **Zero hits.**
+### Does today’s code already count RMR accounts?
+
+**No.** Searched `backend/` for `RMR`, `recurring monthly`, `subscriber`, `active_count`, `billed_count`. **Zero hits.**
 
 The two `account_count` names that exist are **not** subscribers:
 
@@ -241,45 +241,48 @@ The two `account_count` names that exist are **not** subscribers:
 | `consolidator.py::consolidate` log extra `"account_count": len(consolidated)` | How many **canonical GL lines** after fuzzy merge |
 | `routes.py` report payload `"account_count": len(entries_list)` | How many **`monthly_entries` rows** this period |
 
-`ReconciliationHints` (`contracts.py`) has period-boundary, 50% fraction, similar-amount, gl-only/source-only, annual 12×, deposit, fee. **No count field. No status field. No rate field.**
+`ReconciliationHints` (`backend/domain/contracts.py`) has period-boundary, 50% fraction, similar-amount, gl-only/source-only, annual 12×, deposit, fee. **No count field. No status field. No rate field.**
 
 `GoldenField` / `GoldenSchemaRow`: `account, account_code, amount, date, parent_category, department, description`. No `status`, `customer_id`, `monthly_fee` as its own type, no `billed_flag`.
 
-`stale_reference` in `narrative_prompt.txt` *prose* says “customer count or rate differences.” The template still only has `[amount]`, `[GL amount]`, `[delta]`. Guardrail supplementation (`interpreter.py::_run_with_guardrail`) appends only `gl_amount`, `non_gl_total`, `delta`, and each `sources[].amount`. **Counts are not in `numbers_used`.** If Claude writes “3 cancelled customers,” that is a golden-rule violation unless pandas already put `3.0` on the item.
+`stale_reference` in `backend/prompts/narrative_prompt.txt` *prose* says “customer count or rate differences.” The template still only has `[amount]`, `[GL amount]`, `[delta]`. Guardrail supplementation (`interpreter.py::_run_with_guardrail`) appends only `gl_amount`, `non_gl_total`, `delta`, and each `sources[].amount`. **Counts are not in `numbers_used`.** If Claude writes “3 cancelled customers,” that is a golden-rule violation unless pandas already put `3.0` on the item.
 
-Excel export (`excel_export.py`) prints `src.row_count`. That is not a subscriber count (see grain below).
+Excel export (`backend/tools/excel_export.py`) prints `src.row_count`. That is not a subscriber count (see grain below).
+
+`SourceFileType` already includes `contracts`. Filename patterns (`orchestrator.py::_FILE_TYPE_PATTERNS`) already match `roster`, `subscription`, `recurring`, `customer`. **The type exists; the count does not.** Adding another `SourceFileType` would not recover 85 vs 82 after `groupby`.
 
 **Verdict of the hunt:** RMR-as-count does not exist. Adjacent class `stale_reference` exists and is dollar-only.
 
-### Grain: why account-total consolidator cannot do this (concrete pipeline)
+### Consolidator vs a count grain
 
-Sentinel contracts file is **customer grain** (85 rows). The live pipeline collapses it to **one P&L total** before any hint runs.
+Join grain today is **account-total dollars**, same kill as the bank matcher (item 1). Sentinel contracts are **customer grain** (85 rows). The live pipeline collapses them to **one P&L total** before any hint runs.
 
 ```
 85 customer rows
   (Customer Name, Customer ID, Service Plan, Monthly Fee, Start Date, Status, Last Billed)
         │
         ▼
-normalizer.apply_plan          — drops every column not in the 7 golden fields.
+normalizer.apply_plan          — backend/tools/normalizer.py::apply_plan
+                                drops every column not in the 7 golden fields.
                                 Status / Customer ID / Last Billed gone.
                                 Monthly Fee survives only if Discovery maps it → amount.
                                 Customer Name survives only if mapped → account.
         │
         ▼
 AccountMapper.build_draft      — "Oak Street Dental" → GL "Service Revenue"
-                                (account_mapping_prompt.txt contracts rules)
+                                (backend/prompts/account_mapping_prompt.txt)
         │
         ▼
-parser.parse_file_silently     — account_name_map applied, THEN
+parser.parse_file_silently     — backend/agents/parser.py ~531–552
+                                account_name_map applied, THEN
                                 df_validated.groupby("account")["amount"].sum()
-                                → preview_rows: ONE row, account=Service Revenue, amount=3825
-                                (parser.py ~lines 531–552)
+                                → preview_rows: ONE row,
+                                  account=Service Revenue, amount=3825
         │
         ▼
-consolidator.consolidate
+consolidator.consolidate       — backend/agents/consolidator.py
   _union / _build_canonical_map / _roll_up / _detect_deltas
-  _build_item: ReconciliationSource.row_count = 1   # hardcoded
-                                (consolidator.py ~275)
+  _build_item: ReconciliationSource.row_count = 1   # hardcoded ~line 275
         │
         ▼
 hint_computer.compute_hints    — sees gl_amount=3540, non_gl_total=3825, delta=285
@@ -288,35 +291,34 @@ hint_computer.compute_hints    — sees gl_amount=3540, non_gl_total=3825, delta
 
 Two `row_count` lies stacked:
 
-1. **Parser preview is already one row per GL name**, so even `_roll_up`’s real `len(tagged[...])` (consolidator ~199–206, used only on `source_breakdown` for `monthly_entries`) is **1** if consolidator is fed preview frames.
+1. **Parser preview is already one row per GL name**, so even `_roll_up`’s real `len(tagged[...])` (`consolidator.py` ~199–206, used only on `source_breakdown` for `monthly_entries`) is **1** if consolidator is fed preview frames.
 2. **`_build_item` ignores that anyway** and writes `row_count=1` on every `ReconciliationSource`.
 
-Un-hardcoding `row_count` is **still the wrong grain**. If 85 customer rows all map to `Service Revenue` (Active *and* the three stale), `row_count=85` means “85 Excel lines collapsed.” It does **not** mean “82 billed this month.” The GL has **no customer count at all** — only $3,540. Count recon needs **two pandas counts from the roster**, computed **before** `groupby("account")`:
+Un-hardcoding `row_count` is **still the wrong grain**. If 85 customer rows all map to `Service Revenue` (Active *and* the three stale), `row_count=85` means “85 Excel lines collapsed.” It does **not** mean “82 billed this month.” The GL has **no customer count at all** — only $3,540.
+
+Count recon needs **two pandas counts from the roster**, computed **before** `groupby("account")`:
 
 ```
-n_active         = count(Status == Active)                     # 85
-n_billed_in_period = count(Last Billed in period month)        # 82
-count_delta      = n_active - n_billed_in_period               # 3
-fee_sum_active   = sum(Monthly Fee | Active)                   # 3825  (already have as dollars)
-fee_sum_billed   = sum(Monthly Fee | billed in period)         # 3540 if GL is complete
+n_active           = count(Status == Active)                  # 85
+n_billed_in_period = count(Last Billed in period month)       # 82
+count_delta        = n_active - n_billed_in_period            # 3
+fee_sum_active     = sum(Monthly Fee | Active)                # 3825 (dollars, already have)
+fee_sum_billed     = sum(Monthly Fee | billed in period)      # 3540 if GL is complete
 ```
 
 All of that is pandas. Claude copies `count_delta` and `n_active`. Class stays **`stale_reference`** (the list is wrong), not `missing_je`, not `accrual_mismatch`, not annual 12×.
 
-Cutoff allowlist (PR #11) already stopped `Last Billed` from stealing this card to `timing_cutoff`. Count work must **read** Last Billed / Status as **count inputs**, not as cutoff dates. Do not re-widen `_crosses_period_boundary`.
+Cutoff allowlist (PR #11, `hint_computer.py::_crosses_period_boundary`) already stopped `Last Billed` from stealing this card to `timing_cutoff`. Count work must **read** Last Billed / Status as **count inputs**, not as cutoff dates. Do not re-widen the date hint.
 
-**Do not mix with deferred-revenue rollforward.** Opening + billings − recognized = close is a different grain (schedule). Annual lump 12× is already Kova 1. ServiceTitan invoice+payment double count needs row identity after groupby — still forbidden.
+A new helper (name later, e.g. `backend/tools/roster_counts.py`) must run on the **row-level** contracts frame. `df_detailed` already exists in `parse_file_silently` for hint_computer dates — but Status is stripped by the normalizer *before* that, so the sidecar has to preserve roster columns the way item 1 must preserve `batch_id`.
 
-### JSONB hint pattern? **Hayır** (as the *only* mechanism). **Evet** (for the *result*).
+`consolidator.py` must **not** become a customer matcher. Identity is roster Status × period, not fuzzy GL names (`_build_canonical_map`).
 
-Same split as item 1 (bank matcher):
+### JSONB hint pattern?
 
-| Layer | Kova 1 deposit/fee/12× pattern? |
-|-------|----------------------------------|
-| Computing the signal | **Hayır.** An account-total bool cannot recover 85 vs 82 after `groupby`. Need a contracts sidecar / pre-aggregate counter (new helper, e.g. `backend/tools/roster_counts.py`) on the **row-level** contracts frame (`df_detailed` already exists in `parse_file_silently` for hint_computer dates — Status is still stripped by the normalizer *before* that). |
-| Emitting the speech act | **Evet.** JSONB on the existing `ReconciliationItem`: e.g. `roster_count_delta: int`, `n_active: int`, `n_billed: int` (pandas ints). Interpreter **forces** `stale_reference`. Isolated fixture. Prompt copies those ints. No 7th class. No migration. |
+**Hayır.** Same split as item 1 (bank matcher): JSONB cannot *perform* the count after `groupby`. An account-total bool (`looks_like_annual_prepayment`, `is_processor_fee_gap`) cannot recover 85 vs 82.
 
-Do not hang this off `similar_amount_in_other_account` or `looks_like_annual_prepayment`. Those are dollar patterns.
+Results can still *land* on the existing `ReconciliationItem` JSONB (`n_active`, `n_billed`, `count_delta`, force `stale_reference`) **after** pandas has counted — that is storage, not the Kova 1 hint pattern. Do not hang this off `similar_amount_in_other_account` or `looks_like_annual_prepayment`. No 7th class.
 
 ### Schema / migration
 
@@ -324,11 +326,11 @@ Do not hang this off `similar_amount_in_other_account` or `looks_like_annual_pre
 |--------|------------|
 | Count fields on `ReconciliationHints` / item JSONB | **No** (`reports.reconciliations`, `0007`) |
 | Keep `monthly_entries` as dollar totals | **Do not** store 85 subscriber rows there (unique `company_id, account_id, period`) |
-| New `SourceFileType` | **No** — `contracts` already exists (`_FILE_TYPE_PATTERNS` includes `roster`, `subscription`, `recurring`, `customer`) |
-| Extra golden fields on **all** files (`status`, `customer_id`) | Avoid. Prefer a **contracts-only sidecar** so P&L/payroll stay 7-column pandera. That is a code-schema change (`GoldenField` optional, or a parallel `RosterRow` model), **not** SQL. |
+| New `SourceFileType` | **No** — `contracts` already exists |
+| Extra golden fields on **all** files (`status`, `customer_id`) | Avoid. Prefer a **contracts-only sidecar** so P&L/payroll stay 7-column pandera. Code-schema (`RosterRow` or optional fields), **not** SQL. |
 | Persist a customer dimension table | **No** in v1. Ephemeral counts per run. |
 
-Highest SQL file stays `0009` for this item. Do not steal `0010` (that is item 5).
+Highest SQL file stays `0009` for this item. Do **not** steal `0010` (that is item 5, flux scale).
 
 ### Demo data
 
@@ -337,26 +339,24 @@ Highest SQL file stays `0009` for this item. Do not steal `0010` (that is item 5
 | Sentinel | **Designed yes, file missing on this branch.** Archive specifies `sentinel_contracts_mar_2026.xlsx` (85 rows, columns above, $285 / 3 accounts). Tracked demo tree only has GL Mar + Feb. Tests use synthetic frames (`test_hint_computer.py` Last Billed cutoff; annual fixture hard-codes `row_count=85` as a label, not a computed count). |
 | Vandelay | **No.** Shopify/Amazon/purchases — no subscriber roster. |
 | DRONE | **No.** Single-file P&L. |
-| Helix `retainer_contracts` (archive) | Different vertical; 12 retainers. Not this item. |
 | Isolated fixture | **Required** even if the xlsx is restored: pin `n_active=85`, `n_billed=82`, `count_delta=3`, dollars 3825 vs 3540. Negative: annual Software $13,200 / $1,100 must **not** become a count card. Negative: $285 dollar delta with `count_delta=0` stays dollar `stale_reference` without a fake “0 accounts.” |
+
+### Overbuild risk (keep the wedge small)
+
+Success is: the Service Revenue card says **3 accounts** (pandas) and **$285** (pandas), class `stale_reference`. Do not build a customer master, attrition dashboard, or deferred-revenue waterfall here. Do not treat `_roll_up.row_count` as “accounts.”
 
 ### Affected files (when later built — do not apply now)
 
-`normalizer.py` / `validator.py` / `contracts.py` (roster sidecar or optional fields — **not** on P&L), `parser.py::parse_file_silently` (run counter **before** `groupby`, keep `df_detailed` columns), **new** `backend/tools/roster_counts.py` (pandas only), `consolidator.py::_build_item` (attach counts; stop pretending `row_count=1` is a subscriber count), `hint_computer.py` (read counts, do not scan P&L), `interpreter.py` force `stale_reference` + guardrail list includes `n_active` / `count_delta`, `narrative_prompt.txt` (copy pandas counts; never “about 3”), tests + isolated fixture. Frontend optional; not required for v1.
-
-`consolidator.py` must **not** become a customer matcher. Identity is roster Status × period, not fuzzy GL names.
+`backend/tools/normalizer.py` / `backend/tools/validator.py` / `backend/domain/contracts.py` (roster sidecar — **not** on P&L), `backend/agents/parser.py::parse_file_silently` (run counter **before** `groupby`), **new** `backend/tools/roster_counts.py` (pandas only), `backend/agents/consolidator.py::_build_item` (attach counts; stop pretending `row_count=1` is a subscriber count), `backend/tools/hint_computer.py` (read counts, do not scan P&L), `backend/agents/interpreter.py` force `stale_reference` + guardrail list includes `n_active` / `count_delta`, `backend/prompts/narrative_prompt.txt` (copy pandas counts; never “about 3”), tests + isolated fixture. Frontend optional; not required for v1.
 
 ### Size / risks / tests
 
 - **Size:** **orta**, **2 PR**. PR-A: preserve roster columns + pandas counts on the item (the grain). PR-B: hint + force-class + prompt + guardrail. Bigger than annual 12× (that was same-item dollars). Smaller than bank matcher (no new `SourceFileType`, no three files).
 - **Depends on:** cutoff allowlist (done). Independent of flux `0010`. Item 3 (wholesale) **wants** these counts later (`count × vendor rate`). Independent of bank.
 - **Risk:** Using `_roll_up` `row_count` as “accounts” silently counts cancelled + mapped lines and Claude will say “85 customers.” False. Another risk: counting `Last Billed` in April as cutoff again — regression on PR #11. Residual: one customer two rates (plan change mid-month) — v1 sums fees, does not split; prompt says “appears to be.”
-- **Tests:** isolated 85/82/3 fixture; Sentinel $285 dollars **plus** count_delta=3; PR #11 Last Billed must stay non-cutoff; annual 12× negative.
-
-**JSONB pattern (one line):** **Hayır** for the count itself (wrong grain). **Evet** for force-class + fixture once pandas has counted.
+- **Tests:** isolated 85/82/3 fixture; Sentinel $285 dollars **plus** `count_delta=3`; PR #11 Last Billed must stay non-cutoff; annual 12× negative.
 
 ---
-
 
 ## 5. Revenue-scaled materiality (onboarding)
 
