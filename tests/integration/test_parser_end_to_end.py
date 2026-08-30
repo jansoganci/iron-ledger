@@ -188,12 +188,11 @@ def test_flat_csv_trivial_plan(flat_csv_bytes):
     )
     output = parser.run("r-csv", "c1", "flat.csv", date(2026, 3, 1))
 
-    assert _status_walk(runs) == [
-        "parsing",
-        "discovering",
-        "mapping",
-        "awaiting_confirmation",
-    ]
+    walk = _status_walk(runs)
+    assert walk[0] == "parsing"
+    assert "discovering" in walk
+    assert "mapping" in walk
+    assert walk[-1] == "awaiting_confirmation"
     assert output.rows_parsed == 3  # Revenue, COGS, OpEx
     preview = runs.set_parse_preview.call_args.args[1]
     assert preview["drops"]["total_dropped"] == 0

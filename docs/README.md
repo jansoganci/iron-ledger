@@ -16,19 +16,24 @@ Technical architecture and system design documents.
 ### 02-planning/
 Project plans, blueprints, and roadmaps.
 
-- `implementation_blueprint.md` - Complete implementation guide
-- `account_mapper_sprint_plan.md` - Account mapping sprint details
-- `landing-plan.md` - Landing page implementation plan
 - `scope.md` - Project scope and requirements
+- `agentic-memory-roadmap.md` - Quarterly reporting and memory roadmap
+- `close-flow-contract.md` - Product contract to complete the close flow without pivoting (no code until this is locked)
 
 ### 03-sprint/
-Sprint planning and daily execution plans.
+Sprint planning and daily execution plans (hackathon days 1–6).
 
 - `README.md` - Sprint overview
 - `completed.md` - Completed tasks
 - `risks.md` - Risk assessment and mitigation
 - `day-1-foundation.md` → `day-6-demo.md` - Daily sprint plans
 - `discovery-layer-plan.md` - Discovery layer implementation
+
+### sprint/
+Post-hackathon planning (spec → approval → implementation).
+
+- `field-service-close-triage.md` - Triage of field-service close research against the current consolidator/classifier (no code until approved)
+- `pre-analysis-is-material.md` - Slice 1 pre-analysis: consolidator `_is_material` AND-gate (approval gate; not PAYROLL, not class-6)
 
 ### 04-status/
 Current project status and TODO lists.
@@ -46,6 +51,7 @@ User guides and operational runbooks.
 Analysis reports and findings.
 
 - `hackathon_findings_report.md` - Hackathon retrospective and findings
+- `close-process-by-sector.md` - Month-end close by industry; start with field services; how to complete the current close flow without pivoting the product
 
 ### archive/
 Outdated or superseded documentation.
@@ -75,4 +81,4 @@ Sample data files for testing and demos.
 
 ---
 
-**Last Updated:** April 25, 2026
+**Last Updated:** August 24, 2026
