@@ -70,3 +70,4 @@ DISCOVERY_REJECTED = (
 )
 
 COMPANY_CREATE_FAILED = "We couldn't create your workspace. Please try again."
+COMPANY_UPDATE_FAILED = "We couldn't save your company details. Please try again."

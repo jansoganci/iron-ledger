@@ -6,6 +6,7 @@ export interface Company {
   name: string;
   sector: string | null;
   currency: string;
+  monthly_revenue_band: string | null;
 }
 
 async function fetchCompany(): Promise<Company> {

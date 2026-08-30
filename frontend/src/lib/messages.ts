@@ -31,4 +31,5 @@ export const CLIENT_MESSAGES = {
 
   // Onboarding
   ONBOARDING_COMPANY_FAILED: "We couldn't set up your workspace. Please try again.",
+  PROFILE_BAND_FAILED: "We couldn't save your typical monthly revenue. Please try again.",
 } as const;

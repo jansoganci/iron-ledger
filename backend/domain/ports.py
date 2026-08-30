@@ -181,12 +181,27 @@ class CompaniesRepo(Protocol):
     # Returns the single company owned by this user.
     # Raises RLSForbiddenError if no row matches.
 
+    def get_by_id(self, company_id: str) -> dict: ...
+
+    # Full row including monthly_revenue_band.
+    # Raises RLSForbiddenError if no row matches.
+
+    def update(
+        self,
+        company_id: str,
+        *,
+        monthly_revenue_band: str,
+    ) -> dict: ...
+
+    # PATCH path only. Returns the updated row.
+
     def create(
         self,
         owner_id: str,
         name: str,
         sector: str | None,
         currency: str,
+        monthly_revenue_band: str | None = None,
     ) -> dict: ...
 
     # Inserts a new company row and returns the full dict.

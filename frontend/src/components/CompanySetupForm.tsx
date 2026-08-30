@@ -5,6 +5,10 @@ import { CLIENT_MESSAGES } from "../lib/messages";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import type { Company } from "../hooks/useCompany";
+import {
+  RevenueBandField,
+  type RevenueBand,
+} from "./RevenueBandField";
 
 interface Props {
   onSuccess: () => void;
@@ -18,11 +22,19 @@ export function CompanySetupForm({ onSuccess }: Props) {
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState(user?.email ?? "");
   const [sector, setSector] = useState("");
+  const [monthlyRevenueBand, setMonthlyRevenueBand] = useState<
+    RevenueBand | ""
+  >("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const disabled =
-    loading || !name.trim() || !companyName.trim() || !email.trim() || !sector;
+    loading ||
+    !name.trim() ||
+    !companyName.trim() ||
+    !email.trim() ||
+    !sector ||
+    !monthlyRevenueBand;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -32,7 +44,11 @@ export function CompanySetupForm({ onSuccess }: Props) {
     try {
       const company = await apiFetch<Company>("/companies", {
         method: "POST",
-        json: { name: companyName.trim(), sector },
+        json: {
+          name: companyName.trim(),
+          sector,
+          monthly_revenue_band: monthlyRevenueBand,
+        },
       });
 
       // Populate the cache so ProtectedRoute / other pages don't need a refetch
@@ -152,6 +168,12 @@ export function CompanySetupForm({ onSuccess }: Props) {
                 placeholder="e.g. SaaS, Real Estate, Healthcare…"
               />
             </div>
+
+            <RevenueBandField
+              value={monthlyRevenueBand}
+              onChange={setMonthlyRevenueBand}
+              disabled={loading}
+            />
 
             {error && (
               <div

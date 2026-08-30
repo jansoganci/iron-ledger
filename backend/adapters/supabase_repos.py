@@ -650,12 +650,47 @@ class SupabaseCompaniesRepo:
             raise RLSForbiddenError(f"No company found for user {user_id}")
         return resp.data[0]
 
+    def get_by_id(self, company_id: str) -> dict:
+        try:
+            resp = (
+                self._db.table("companies")
+                .select("*")
+                .eq("id", company_id)
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        if not resp.data:
+            raise RLSForbiddenError(f"No company found for id {company_id}")
+        return resp.data[0]
+
+    def update(
+        self,
+        company_id: str,
+        *,
+        monthly_revenue_band: str,
+    ) -> dict:
+        try:
+            resp = (
+                self._db.table("companies")
+                .update({"monthly_revenue_band": monthly_revenue_band})
+                .eq("id", company_id)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        if not resp.data:
+            raise RLSForbiddenError(f"No company found for id {company_id}")
+        return resp.data[0]
+
     def create(
         self,
         owner_id: str,
         name: str,
         sector: str | None,
         currency: str,
+        monthly_revenue_band: str | None = None,
     ) -> dict:
         try:
             resp = (
@@ -666,6 +701,7 @@ class SupabaseCompaniesRepo:
                         "name": name,
                         "sector": sector,
                         "currency": currency,
+                        "monthly_revenue_band": monthly_revenue_band,
                     }
                 )
                 .execute()
