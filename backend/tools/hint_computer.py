@@ -28,10 +28,13 @@ Hint definitions (match ReconciliationHints in domain/contracts.py):
   is_gl_only                — account present only in the GL source, with no
                               matching entry from any dept file.
 
-  delta_matches_known_vendor
-                            — delta × 12 ≈ an amount found in another account's
-                              GL total (suggests an annual invoice expensed in
-                              full rather than amortized monthly).
+  looks_like_annual_prepayment
+                            — two-sided, same item: |GL| / |source| (or the
+                              inverse) ≈ 12 ±10%. Annual cash booked in one
+                              month instead of amortized. Never scans other
+                              P&L accounts. implied_monthly = max(|GL|,
+                              |source|) / 12 (pandas). Alias:
+                              delta_matches_known_vendor.
 
   is_customer_deposit       — two-sided 50% peşinat / unearned revenue. True when
                               the account-total ratio is ~0.50 or an involved
@@ -56,7 +59,9 @@ logger = get_logger(__name__)
 
 _ROUND_FRACTION_TOLERANCE = 0.05  # ±5% around 0.50
 _AMOUNT_MATCH_TOLERANCE = 0.10  # ±10% for cross-account dollar match
-_ANNUAL_MATCH_TOLERANCE = 0.10  # ±10% for delta × 12 ≈ another account
+_ANNUAL_RATIO = 12.0  # annual lump vs monthly run-rate; ×4 quarterly is out of slice
+_ANNUAL_MATCH_TOLERANCE = 0.10  # ±10% around 12×
+_ANNUAL_SIDE_FLOOR = 100.0  # both sides must clear this; skips noise / coverage crumbs
 # Processor/platform netting as a share of the GL side. Floor is above the
 # ~2.3% Vandelay late-payout shape; ceiling is below a 50% deposit ratio.
 _FEE_BAND_MIN = 0.03
@@ -123,6 +128,16 @@ def compute_hints(
         is_customer_deposit = _is_customer_deposit(
             item, is_gl_only, is_source_only, involved_files, source_raw_dfs
         )
+        is_processor_fee_gap = _is_processor_fee_gap(
+            item, is_gl_only, is_source_only, is_customer_deposit
+        )
+        looks_like_annual, implied_monthly = _looks_like_annual_prepayment(
+            item,
+            is_gl_only=is_gl_only,
+            is_source_only=is_source_only,
+            is_customer_deposit=is_customer_deposit,
+            is_processor_fee_gap=is_processor_fee_gap,
+        )
 
         return ReconciliationHints(
             crosses_period_boundary=_crosses_period_boundary(
@@ -134,13 +149,11 @@ def compute_hints(
             ),
             is_source_only=is_source_only,
             is_gl_only=is_gl_only,
-            delta_matches_known_vendor=_delta_matches_known_vendor(
-                item, consolidated_df
-            ),
+            looks_like_annual_prepayment=looks_like_annual,
+            implied_monthly=implied_monthly,
+            delta_matches_known_vendor=looks_like_annual,
             is_customer_deposit=is_customer_deposit,
-            is_processor_fee_gap=_is_processor_fee_gap(
-                item, is_gl_only, is_source_only, is_customer_deposit
-            ),
+            is_processor_fee_gap=is_processor_fee_gap,
         )
     except Exception as exc:
         logger.warning(
@@ -330,33 +343,37 @@ def _is_gl_only(item: ReconciliationItem) -> bool:
     return len(gl_sources) > 0 and len(non_gl_sources) == 0
 
 
-def _delta_matches_known_vendor(
+def _looks_like_annual_prepayment(
     item: ReconciliationItem,
-    consolidated_df: pd.DataFrame,
-) -> bool:
-    """True when delta × 12 ≈ another account's GL total ±10%.
+    *,
+    is_gl_only: bool,
+    is_source_only: bool,
+    is_customer_deposit: bool,
+    is_processor_fee_gap: bool,
+) -> tuple[bool, float | None]:
+    """Same-item |GL| vs |source| ≈ 12× ±10%. Returns (hint, implied_monthly).
 
-    Signals an annual-subscription / annual-invoice pattern: the full invoice
-    was expensed in one month instead of being amortized monthly. For example,
-    a $13,200 HubSpot invoice should be $1,100/month; if the GL shows $13,200
-    for March, the delta vs. expected ($12,100) × 12 ≈ $13,200 full-year cost.
+    Does not scan other P&L accounts. Deposit and fee hints win: a 50%
+    peşinat or a 3–8% processor gap is never an annual prepaid. One-sided
+    coverage is not a prepaid. Quarterly ×4 is out of this slice.
     """
-    abs_delta = abs(item.delta)
-    if abs_delta < 1.0:
-        return False
-    annual_equivalent = abs_delta * 12
-    for _, row in consolidated_df.iterrows():
-        if row["account"] == item.account:
-            continue
-        other_amt = abs(float(row["amount"]))
-        if other_amt < 1.0:
-            continue
-        if (
-            abs(other_amt - annual_equivalent) / annual_equivalent
-            <= _ANNUAL_MATCH_TOLERANCE
-        ):
-            return True
-    return False
+    if is_gl_only or is_source_only or is_customer_deposit or is_processor_fee_gap:
+        return False, None
+    if item.gl_amount is None:
+        return False, None
+    gl_abs = abs(float(item.gl_amount))
+    source_abs = abs(float(item.non_gl_total))
+    if gl_abs < _ANNUAL_SIDE_FLOOR or source_abs < _ANNUAL_SIDE_FLOOR:
+        return False, None
+    smaller = min(gl_abs, source_abs)
+    if smaller == 0:
+        return False, None
+    ratio = max(gl_abs, source_abs) / smaller
+    lo = _ANNUAL_RATIO * (1.0 - _ANNUAL_MATCH_TOLERANCE)
+    hi = _ANNUAL_RATIO * (1.0 + _ANNUAL_MATCH_TOLERANCE)
+    if lo <= ratio <= hi:
+        return True, max(gl_abs, source_abs) / _ANNUAL_RATIO
+    return False, None
 
 
 # ---------------------------------------------------------------------------

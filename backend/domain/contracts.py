@@ -171,6 +171,11 @@ class ReconciliationHints(BaseModel):
     similar_amount_in_other_account: bool = False
     is_source_only: bool = False  # appears in dept file, not in GL
     is_gl_only: bool = False  # appears in GL, not in any dept file
+    # Same-item |GL| vs |source| ≈ 12× (±10%). Not a P&L-wide hunt.
+    looks_like_annual_prepayment: bool = False
+    # pandas: max(|GL|, |source|) / 12 when looks_like_annual_prepayment.
+    implied_monthly: float | None = None
+    # Alias of looks_like_annual_prepayment — old JSONB still parses.
     delta_matches_known_vendor: bool = False
     # Customer 50% peşinat / unearned revenue — not a vendor prepaid.
     is_customer_deposit: bool = False

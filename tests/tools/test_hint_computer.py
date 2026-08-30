@@ -15,7 +15,6 @@ import pytest
 from backend.domain.contracts import ReconciliationItem, ReconciliationSource
 from backend.tools.hint_computer import (
     _crosses_period_boundary,
-    _delta_matches_known_vendor,
     _is_gl_only,
     _is_round_fraction,
     _is_source_only,
@@ -330,28 +329,36 @@ def test_neither_source_only_nor_gl_only_when_both_present() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _delta_matches_known_vendor
+# looks_like_annual_prepayment — other-account hunt is retired
 # ---------------------------------------------------------------------------
 
 
-def test_delta_matches_known_vendor_annual_pattern() -> None:
-    """delta=$1100, × 12 = $13200. Another account 'HubSpot Annual' = $13200."""
-    item = _item(account="SaaS Subscriptions", delta=1100.0)
+def test_other_account_12x_is_not_annual_prepayment() -> None:
+    """Retired rule: delta=$1100 × 12 matching a *different* HubSpot row.
+
+    Same-item 12× is required. Payroll 43500 vs 44200 is not ~12×.
+    """
+    item = _item(
+        account="SaaS Subscriptions",
+        delta=1100.0,
+        gl_amount=6700.0,
+        non_gl_total=7800.0,
+    )
     df = _consolidated_df(
         ("SaaS Subscriptions", "OPEX", 6700.0),
         ("HubSpot Annual Invoice", "OPEX", 13200.0),
     )
-    assert _delta_matches_known_vendor(item, df) is True
-
-
-def test_delta_matches_known_vendor_false_when_no_match() -> None:
-    item = _item(delta=700.0)
-    df = _consolidated_df(
-        ("Payroll", "OPEX", 43500.0),
-        ("Contractors", "OPEX", 700.0),
-    )
-    # 700 × 12 = 8400; nothing matches 8400
-    assert _delta_matches_known_vendor(item, df) is False
+    raw = {
+        "gl_export.xlsx": pd.DataFrame(
+            {"account": ["SaaS Subscriptions"], "amount": [6700.0]}
+        ),
+        "payroll_march.xlsx": pd.DataFrame(
+            {"account": ["SaaS Subscriptions"], "amount": [7800.0]}
+        ),
+    }
+    hints = compute_hints(item, df, PERIOD, raw)
+    assert hints.looks_like_annual_prepayment is False
+    assert hints.implied_monthly is None
 
 
 # ---------------------------------------------------------------------------
