@@ -33,6 +33,43 @@ from backend.tools import file_reader, normalizer, pii_sanitizer, validator
 
 logger = get_logger(__name__)
 
+# Item 1 — the company's single Undeposited Funds / merchant-clearing GL name.
+# v1 simplification: the MVP boundary is locked to ONE clearing account, so this
+# is a constant rather than config. If the product ever supports multiple
+# clearing accounts this must become configurable (a company setting), which
+# would need a migration — deliberately out of scope here.
+_DEFAULT_UF_ACCOUNT_NAME = "Undeposited Funds"
+
+
+def _normalize_header(col: object) -> str:
+    return str(col).strip().lower().replace(" ", "_").replace("-", "_")
+
+
+# Canonical sidecar column -> accepted raw headers, per C.5.1's frame table.
+# First alias found wins, so canonical names always take precedence.
+_SIDECAR_COLUMNS: dict[str, dict[str, tuple[str, ...]]] = {
+    "processor_settlement": {
+        "payout_id": ("payout_id", "batch_id", "payout", "batch", "reference"),
+        "gross": ("gross", "gross_amount", "amount_collected"),
+        "net": ("net", "net_amount"),
+        "collected_date": ("collected_date", "collected", "date"),
+    },
+    "bank_statement": {
+        "bank_ref": ("bank_ref", "reference", "payout_id", "ref"),
+        "gross": ("gross", "gross_amount"),
+        "fee": ("fee", "fees"),
+        "net": ("net", "net_amount"),
+        "amount": ("amount", "deposit", "credit"),
+        "settlement_date": ("settlement_date", "settled", "posted_date", "date"),
+    },
+    "general_ledger": {
+        "gl_ref": ("gl_ref", "memo", "reference", "check_no", "check_number"),
+        "gl_account": ("gl_account", "account"),
+        "amount": ("amount",),
+        "gl_date": ("gl_date", "date"),
+    },
+}
+
 MAPPING_MODEL = "claude-haiku-4-5-20251001"
 
 _HIGH_CONFIDENCE_THRESHOLD = 0.80
@@ -490,6 +527,73 @@ class ParserAgent:
     # Multi-file helper (no state transitions)                          #
     # ------------------------------------------------------------------ #
 
+    # ------------------------------------------------------------------ #
+    # Item 1 — bank/processor sidecar                                    #
+    # ------------------------------------------------------------------ #
+
+    def _build_sidecar(
+        self,
+        df_raw: "pd.DataFrame",
+        file_type: str | None,
+    ) -> "pd.DataFrame | None":
+        """Copy matcher columns off the raw frame BEFORE apply_plan drops them.
+
+        Returns None for every file type the matcher does not consume, so the
+        golden path is untouched for P&L, payroll and supplier files.
+
+        Header mapping note (v1): the spec says "Discovery maps onto these"
+        canonical names but never specifies how. Rather than guess at a
+        Discovery prompt change, this resolves headers deterministically
+        against an explicit alias list — no LLM in the path, consistent with
+        the matcher being pandas-only. Files with unrecognised headers simply
+        produce no sidecar and fall back to today's behaviour.
+        """
+        if file_type not in _SIDECAR_COLUMNS:
+            return None
+
+        lookup = {_normalize_header(c): c for c in df_raw.columns}
+        out = {}
+        for canonical, aliases in _SIDECAR_COLUMNS[file_type].items():
+            for alias in aliases:
+                if alias in lookup:
+                    out[canonical] = df_raw[lookup[alias]]
+                    break
+        if not out:
+            return None
+
+        sidecar = pd.DataFrame(out)
+        sidecar["_orig_row_index"] = range(len(sidecar))
+
+        if file_type == "general_ledger":
+            # C.5.1: sidecar only rows carrying a ref OR sitting on the UF
+            # account. "Do not sidecar Rent."
+            ref = (
+                sidecar["gl_ref"]
+                if "gl_ref" in sidecar
+                else pd.Series([None] * len(sidecar))
+            )
+            account = (
+                sidecar["gl_account"]
+                if "gl_account" in sidecar
+                else pd.Series([None] * len(sidecar))
+            )
+            keep = ref.notna() | (
+                account.astype("string").str.strip() == _DEFAULT_UF_ACCOUNT_NAME
+            )
+            sidecar = sidecar[keep.fillna(False)]
+            if sidecar.empty:
+                return None
+
+        logger.info(
+            "sidecar_extracted",
+            extra={
+                "file_type": file_type,
+                "columns": sorted(out.keys()),
+                "rows": int(len(sidecar)),
+            },
+        )
+        return sidecar
+
     def parse_file_silently(
         self,
         storage_key: str,
@@ -497,7 +601,8 @@ class ParserAgent:
         period: date,
         run_id: str,
         account_name_map: dict[str, str] | None = None,
-    ) -> tuple[list[dict], str, pd.DataFrame]:
+        file_type: str | None = None,
+    ) -> tuple[list[dict], str, pd.DataFrame, "pd.DataFrame | None"]:
         """Download, discover, normalize, validate, map — without state transitions.
 
         Returns (preview_rows, source_column, df_detailed) where:
@@ -524,6 +629,10 @@ class ParserAgent:
             df_raw = pii_sanitizer.sanitize(df_raw, run_id=run_id)
         except FileHasNoValidColumns:
             raise
+
+        # Item 1: copy matcher columns off df_raw BEFORE apply_plan drops every
+        # non-golden column. Returns None for all pre-existing file types.
+        sidecar = self._build_sidecar(df_raw, file_type)
 
         df_normalized, _ = normalizer.apply_plan(df_raw, plan, period)
         df_validated = validator.validate(df_normalized)
@@ -557,7 +666,7 @@ class ParserAgent:
             lambda a: mapped_columns.get(str(a), {}).get("category", "OTHER")
         )
 
-        return preview_rows, source_column, df_detailed
+        return preview_rows, source_column, df_detailed, sidecar
 
     # ------------------------------------------------------------------ #
     # Failure helper                                                     #

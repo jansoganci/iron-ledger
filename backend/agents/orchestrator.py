@@ -117,13 +117,26 @@ def run_multi_file_parser_until_preview(
         for i, key in enumerate(storage_keys):
             label = key.split("/")[-1]  # use filename as source label
             try:
-                preview_rows, source_column, raw_df = parser.parse_file_silently(
-                    storage_key=key,
-                    company_id=company_id,
-                    period=period,
-                    run_id=run_id,
+                preview_rows, source_column, raw_df, sidecar = _unpack_parse(
+                    parser.parse_file_silently(
+                        storage_key=key,
+                        company_id=company_id,
+                        period=period,
+                        run_id=run_id,
+                        file_type="general_ledger",
+                    )
                 )
-                per_file_data.append((label, preview_rows, source_column, raw_df))
+                per_file_data.append(
+                    (
+                        label,
+                        preview_rows,
+                        source_column,
+                        raw_df,
+                        True,
+                        "general_ledger",
+                        sidecar,
+                    )
+                )
                 logger.info(
                     "multi_file_parsed",
                     extra={
@@ -162,7 +175,7 @@ def run_multi_file_parser_until_preview(
         # Also keep raw DataFrames keyed by filename for hint_computer.
         source_dfs: list[tuple[str, pd.DataFrame]] = []
         source_raw_dfs: dict[str, pd.DataFrame] = {}
-        for label, preview_rows, _, raw_df in per_file_data:
+        for label, preview_rows, _, raw_df, *_ in per_file_data:
             source_dfs.append((label, pd.DataFrame(preview_rows)))
             source_raw_dfs[label] = raw_df
 
@@ -548,6 +561,92 @@ _FILE_TYPE_PATTERNS: dict[str, list[str]] = {
 }
 
 
+def _attach_batch_matches(recon_items, per_file_data, period, run_id) -> None:
+    """Run the Item 1 three-way matcher beside the consolidator.
+
+    The consolidator must never become the matcher (spec C.6), so this runs
+    after consolidate() on the sidecars the parser preserved, and only attaches
+    its result to the Undeposited Funds reconciliation item.
+
+    Gate: BOTH a processor/FSM sidecar AND a bank sidecar must be present.
+    Without a settlement file there is no net side, so nothing can be tied out
+    three ways — Vandelay payouts with no bank file must fall back to Kova 1's
+    account-total fee hint rather than have this claim a three-way match.
+    """
+    from backend.agents.parser import _DEFAULT_UF_ACCOUNT_NAME
+    from backend.tools.batch_matcher import match
+
+    sidecars: dict[str, object] = {}
+    for entry in per_file_data:
+        if len(entry) < 7:
+            continue
+        file_type, sidecar = entry[5], entry[6]
+        if sidecar is not None and file_type not in sidecars:
+            sidecars[file_type] = sidecar
+
+    if "processor_settlement" not in sidecars or "bank_statement" not in sidecars:
+        if sidecars.get("processor_settlement") is not None:
+            logger.info(
+                "batch_matcher_skipped_no_bank_file",
+                extra={
+                    "run_id": run_id,
+                    "reason": "processor file without a bank file",
+                },
+            )
+        return
+
+    result = match(
+        sidecars.get("processor_settlement"),
+        sidecars.get("general_ledger"),
+        sidecars.get("bank_statement"),
+        period,
+        _DEFAULT_UF_ACCOUNT_NAME,
+    )
+    if not result.matches:
+        return
+
+    target = next(
+        (i for i in recon_items if i.account == _DEFAULT_UF_ACCOUNT_NAME), None
+    )
+    if target is None:
+        # No UF line on the consolidated view — nothing to nest under. Do not
+        # invent a card; log so this is visible rather than silent.
+        logger.warning(
+            "batch_matcher_no_uf_item",
+            extra={
+                "run_id": run_id,
+                "uf_account": _DEFAULT_UF_ACCOUNT_NAME,
+                "matches": len(result.matches),
+            },
+        )
+        return
+
+    target.matches = result.matches
+    logger.info(
+        "batch_matcher_attached",
+        extra={
+            "run_id": run_id,
+            "account": target.account,
+            "matches": len(result.matches),
+            "unmatched_processor": result.unmatched_processor_count,
+            "unmatched_bank": result.unmatched_bank_count,
+        },
+    )
+
+
+def _unpack_parse(result) -> tuple:
+    """Unpack parse_file_silently, tolerating the pre-Item-1 three-tuple.
+
+    Existing orchestrator tests stub the parser with a 3-tuple; the real parser
+    now returns a 4th element (the matcher sidecar, None for every file type
+    the matcher does not consume).
+    """
+    if len(result) == 4:
+        return result
+    preview_rows, source_column, raw_df = result
+    return preview_rows, source_column, raw_df, None
+
+
 def _detect_file_type(filename: str) -> str:
     """Infer SourceFileType from the filename stem — no user input required."""
     stem = filename.lower().replace("-", "_").replace(" ", "_").split(".")[0]
@@ -613,14 +712,25 @@ def run_multi_file_parser_with_mapping(
             is_gl = _is_gl_label(label)
             file_type = "general_ledger" if is_gl else _detect_file_type(label)
             try:
-                preview_rows, source_column, raw_df = parser.parse_file_silently(
-                    storage_key=key,
-                    company_id=company_id,
-                    period=period,
-                    run_id=run_id,
+                preview_rows, source_column, raw_df, sidecar = _unpack_parse(
+                    parser.parse_file_silently(
+                        storage_key=key,
+                        company_id=company_id,
+                        period=period,
+                        run_id=run_id,
+                        file_type=file_type,
+                    )
                 )
                 per_file_data.append(
-                    (label, preview_rows, source_column, raw_df, is_gl, file_type)
+                    (
+                        label,
+                        preview_rows,
+                        source_column,
+                        raw_df,
+                        is_gl,
+                        file_type,
+                        sidecar,
+                    )
                 )
                 # Capture the GL pool right after the GL file is parsed so it
                 # contains only chart-of-accounts names, not source-file values.
@@ -665,10 +775,10 @@ def run_multi_file_parser_with_mapping(
         }
         # Rebuild file_keys correctly
         file_keys = {}
-        for (label, _, _, _, _, _), key in zip(per_file_data, sorted_keys):
-            file_keys[label] = key
+        for entry, key in zip(per_file_data, sorted_keys):
+            file_keys[entry[0]] = key
 
-        for label, preview_rows, _, _, is_gl, file_type in per_file_data:
+        for label, preview_rows, _, _, is_gl, file_type, *_ in per_file_data:
             if is_gl:
                 continue
             unique_values = sorted(
@@ -794,15 +904,26 @@ def apply_mapping_and_consolidate(
             file_type = "general_ledger" if is_gl else _detect_file_type(label)
             account_name_map = None if is_gl else (user_decisions or None)
             try:
-                preview_rows, source_column, raw_df = parser.parse_file_silently(
-                    storage_key=storage_key,
-                    company_id=company_id,
-                    period=period,
-                    run_id=run_id,
-                    account_name_map=account_name_map,
+                preview_rows, source_column, raw_df, sidecar = _unpack_parse(
+                    parser.parse_file_silently(
+                        storage_key=storage_key,
+                        company_id=company_id,
+                        period=period,
+                        run_id=run_id,
+                        account_name_map=account_name_map,
+                        file_type=file_type,
+                    )
                 )
                 per_file_data.append(
-                    (label, preview_rows, source_column, raw_df, is_gl, file_type)
+                    (
+                        label,
+                        preview_rows,
+                        source_column,
+                        raw_df,
+                        is_gl,
+                        file_type,
+                        sidecar,
+                    )
                 )
                 logger.info(
                     "apply_mapping_parsed",
@@ -880,6 +1001,8 @@ def _run_consolidation(
             period=period,
             source_raw_dfs=source_raw_dfs,
         )
+
+    _attach_batch_matches(recon_items, per_file_data, period, run_id)
 
     rows = [
         {

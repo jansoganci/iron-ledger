@@ -167,6 +167,12 @@ export function FileUpload({
               : "Drop your files here or click to select"}
           </p>
           <p className="text-xs text-text-secondary">Excel · CSV · Multiple files supported</p>
+          {/* Item 1: a hint, not a control. File types are detected from the
+              filename — there is deliberately no picker here. */}
+          <p className="text-xs text-text-secondary">
+            Add your bank statement and processor payout file alongside the GL to
+            match cash three ways.
+          </p>
         </div>
 
         {/* Uploading overlay */}
