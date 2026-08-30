@@ -32,13 +32,15 @@ def _guardrail_user_message(exc_str: str) -> str:
             val = float(raw.replace(",", ""))
             abs_val = abs(val)
             formatted = f"${abs_val:,.2f}"
-            sign_note = (
-                " with a negative sign" if val < 0 else ""
-            )
+            sign_note = " with a negative sign" if val < 0 else ""
             neg_revenue_hint = (
-                "Negative values in income or revenue accounts are the most common cause — "
-                "check that revenue amounts in your GL file are entered as positive numbers. "
-            ) if val < 0 else ""
+                (
+                    "Negative values in income or revenue accounts are the most common cause — "
+                    "check that revenue amounts in your GL file are entered as positive numbers. "
+                )
+                if val < 0
+                else ""
+            )
             return (
                 f"The AI report mentioned {formatted}{sign_note}, but that exact figure "
                 f"could not be matched to your financial data. "
@@ -273,12 +275,23 @@ class InterpreterAgent:
         # Passing these as extra reference values prevents false guardrail failures in
         # multi-file runs without weakening the check for single-file variance analysis.
         recon_values: list[float] = []
-        for item in (reconciliations or []):
+        for item in reconciliations or []:
             for field in ("gl_amount", "non_gl_total", "delta"):
                 v = item.get(field)
                 if v is not None:
                     recon_values.append(float(v))
                     recon_values.append(float(abs(v)))
+            # implied_monthly lives on the nested hints object
+            # (ReconciliationHints), NOT on the item itself — reading
+            # item.get("implied_monthly") would be a silent no-op. Pandas
+            # derived: max(|GL|, |source|) / 12, set only when
+            # looks_like_annual_prepayment is true.
+            hints = item.get("hints") or {}
+            if isinstance(hints, dict):
+                implied_monthly = hints.get("implied_monthly")
+                if implied_monthly is not None:
+                    recon_values.append(float(implied_monthly))
+                    recon_values.append(float(abs(implied_monthly)))
             for src in item.get("sources", []):
                 recon_values.append(float(src.get("amount", 0)))
 
@@ -303,7 +316,11 @@ class InterpreterAgent:
                 schema=NarrativeJSON,
             )
             success, message = verify_guardrail(
-                result.model_dump(), summary_dict, reconciliation_values=recon_values
+                result.model_dump(),
+                summary_dict,
+                reconciliation_values=recon_values,
+                strict=True,
+                run_id=run_id,
             )
             logger.info(
                 "guardrail_attempt",
@@ -336,10 +353,18 @@ class InterpreterAgent:
             self._runs.update_status(
                 run_id,
                 RunStatus.GENERATING,
-                extra={"step": 4, "step_label": step_label, "progress_pct": progress_pct},
+                extra={
+                    "step": 4,
+                    "step_label": step_label,
+                    "progress_pct": progress_pct,
+                },
             )
         except Exception as exc:
             logger.warning(
                 "interpreter progress update failed",
-                extra={"run_id": run_id, "progress_pct": progress_pct, "error": str(exc)},
+                extra={
+                    "run_id": run_id,
+                    "progress_pct": progress_pct,
+                    "error": str(exc),
+                },
             )

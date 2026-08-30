@@ -59,6 +59,8 @@ Hard rules for reconciliation findings:
 GLOBAL HARD RULES (apply to all output):
 - Use ONLY the exact numeric values provided in pandas_summary and reconciliations. Do not round or abbreviate numbers in numbers_used.
 - Every number mentioned in narrative must also appear in numbers_used. The numbers_used array is how we verify your output.
+- FORMAT every dollar amount in the narrative with two decimal places, thousands separators, or a leading $ — write "2,400.00" or "$2,400.00", never "2400". This is a verification requirement, not a style preference: an amount written as a bare integer cannot be checked against the source data.
+- Write percentages with a % sign immediately after the number ("61.07%"). Copy the percentage value as provided — do not re-round it.
 - Write in plain English. Do not use jargon. Do not use acronyms without explanation.
 - Never do arithmetic. Use provided values only.
 - Negative variance on expense accounts = favorable. Say so explicitly.
