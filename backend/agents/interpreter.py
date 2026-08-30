@@ -14,6 +14,17 @@ from backend.tools.guardrail import verify_guardrail
 
 logger = get_logger(__name__)
 
+# Item 1 (E.6): account-level residue order — most action-requiring first.
+# Mirrors batch_matcher._RESIDUE_PRIORITY; kept here so the interpreter does
+# not import the matcher just to read a constant.
+_RESIDUE_PRIORITY: tuple[str, ...] = (
+    "missing_je",
+    "categorical_misclassification",
+    "stale_reference",
+    "timing_cutoff",
+    "structural_explained",
+)
+
 NARRATIVE_MODEL = "claude-opus-4-7"  # no user toggle in MVP
 
 
@@ -114,6 +125,30 @@ def _is_coverage_item(item: dict) -> bool:
     return bool(hints.get("is_gl_only"))
 
 
+def _residue_from_matches(matches: object) -> str | None:
+    """Account-level class for an item carrying three-way `matches` (E.6).
+
+    Nesting decision: per-batch classes live on each match; the item's own
+    class is the most action-requiring one among them, so a card can never read
+    "No action required" while a batch under it needs a JE or a reclass.
+    Returns None when the item has no matches, leaving today's behaviour.
+    """
+    if not matches or not isinstance(matches, list):
+        return None
+    classes = set()
+    for match in matches:
+        if isinstance(match, dict):
+            value = match.get("classification")
+        else:
+            value = getattr(match, "classification", None)
+        if value is not None:
+            classes.add(value)
+    for candidate in _RESIDUE_PRIORITY:
+        if candidate in classes:
+            return candidate
+    return None
+
+
 def _apply_reconciliation_classifications(
     reconciliations: list[dict],
     cls_map: dict[str, str],
@@ -125,6 +160,14 @@ def _apply_reconciliation_classifications(
             item["classification"] = None
             continue
         hints = _hints_as_dict(item.get("hints"))
+        # Three-way matcher result outranks every account-total hint (C.7):
+        # when real batches were matched we must not also tell the account-level
+        # fee story — that would be double speech on one card. The class is the
+        # pandas residue over the item's matches, never Claude's choice.
+        residue = _residue_from_matches(item.get("matches"))
+        if residue is not None:
+            item["classification"] = residue
+            continue
         # Pandas-backed speech acts are not Claude's to override.
         # Fee > deposit > annual: never two stories on one card.
         if hints.get("is_processor_fee_gap"):
@@ -356,6 +399,34 @@ class InterpreterAgent:
                 if implied_monthly is not None:
                     recon_values.append(float(implied_monthly))
                     recon_values.append(float(abs(implied_monthly)))
+            # Item 1: every pandas number Claude is allowed to copy from a
+            # nested BatchMatch must be a verified reference, or a correct
+            # narrative fails the guardrail. fee_pct is deliberately ABSENT —
+            # it is an internal gate (E.1), it is a percentage rather than
+            # money, and putting it in this money pool is exactly the
+            # mixed-unit bug the guardrail fix removed.
+            for match in item.get("matches") or []:
+                if not isinstance(match, dict):
+                    match = getattr(match, "model_dump", dict)()
+                for money_field in ("gross", "fee", "net", "gl_amount"):
+                    v = match.get(money_field)
+                    if v is not None:
+                        recon_values.append(float(v))
+                        recon_values.append(float(abs(v)))
+                # A count, not money. Claude may copy it ("2 candidates"), so it
+                # must be a reference; at cent tolerance it is a point value and
+                # cannot widen anything.
+                candidate_count = match.get("candidate_count")
+                if candidate_count is not None:
+                    recon_values.append(float(candidate_count))
+            for count_field in (
+                "unmatched_count",
+                "unmatched_processor_count",
+                "unmatched_bank_count",
+            ):
+                v = item.get(count_field)
+                if v is not None:
+                    recon_values.append(float(v))
             for src in item.get("sources", []):
                 recon_values.append(float(src.get("amount", 0)))
 

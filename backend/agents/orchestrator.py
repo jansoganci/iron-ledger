@@ -353,7 +353,9 @@ def run_comparison_and_report(
         try:
             run_row = get_runs_repo().get_by_id(run_id)
             parse_preview = run_row.get("parse_preview") or {}
-            reconciliations: list[dict] | None = parse_preview.get("reconciliations") or None
+            reconciliations: list[dict] | None = (
+                parse_preview.get("reconciliations") or None
+            )
         except Exception:
             reconciliations = None
 
@@ -364,7 +366,9 @@ def run_comparison_and_report(
         )
 
         try:
-            get_runs_repo().set_pandas_summary(run_id, pandas_summary.model_dump(mode="json"))
+            get_runs_repo().set_pandas_summary(
+                run_id, pandas_summary.model_dump(mode="json")
+            )
         except Exception as summary_exc:
             logger.warning(
                 "set_pandas_summary failed",
@@ -468,7 +472,9 @@ def run_parser_after_discovery_approval(
                 "resume_from_plan missing discovery_plan",
                 extra={"run_id": run_id, "trace_id": get_trace_id()},
             )
-            failed_status = RunStateMachine.transition(run["status"], RunStatus.PARSING_FAILED)
+            failed_status = RunStateMachine.transition(
+                run["status"], RunStatus.PARSING_FAILED
+            )
             runs_repo.update_status(
                 run_id,
                 failed_status,
@@ -522,6 +528,23 @@ _FILE_TYPE_PATTERNS: dict[str, list[str]] = {
     "payroll": ["payroll", "salary", "salaries", "wages", "gusto", "adp", "rippling"],
     "contracts": ["contract", "subscription", "recurring", "roster", "customer"],
     "supplier_invoices": ["invoice", "supplier", "vendor", "purchase", "bill", "ap"],
+    # Item 1 (PR-B). Deliberately LAST: on any overlap the pre-existing types
+    # win, so a genuine processor file that also looks like a vendor file falls
+    # back to today's behaviour rather than being fed to the matcher.
+    # Conservative needles per C.2 — note bare "statement" is intentionally NOT
+    # used, because it would capture "income_statement" / "profit_and_loss
+    # _statement" P&L exports. "deposit_account" rather than "deposit" for the
+    # same reason the spec gives: do not steal customer-deposit files.
+    "bank_statement": ["bank", "bank_statement", "checking", "deposit_account"],
+    "processor_settlement": [
+        "stripe",
+        "shopify_payout",
+        "paypal",
+        "square",
+        "processor",
+        "settlement",
+        "payout",
+    ],
 }
 
 
@@ -573,7 +596,9 @@ def run_multi_file_parser_with_mapping(
         )
 
         # GL files first so accounts_repo is populated before dept files are mapped.
-        sorted_keys = sorted(storage_keys, key=lambda k: 0 if _is_gl_label(k.split("/")[-1]) else 1)
+        sorted_keys = sorted(
+            storage_keys, key=lambda k: 0 if _is_gl_label(k.split("/")[-1]) else 1
+        )
 
         # Captured immediately after the GL file is parsed — before non-GL files
         # write vendor names / employee names / POS categories into the accounts
@@ -594,7 +619,9 @@ def run_multi_file_parser_with_mapping(
                     period=period,
                     run_id=run_id,
                 )
-                per_file_data.append((label, preview_rows, source_column, raw_df, is_gl, file_type))
+                per_file_data.append(
+                    (label, preview_rows, source_column, raw_df, is_gl, file_type)
+                )
                 # Capture the GL pool right after the GL file is parsed so it
                 # contains only chart-of-accounts names, not source-file values.
                 if is_gl and not gl_pool:
@@ -632,7 +659,9 @@ def run_multi_file_parser_with_mapping(
         all_draft_items = []
         file_keys = {
             label: key
-            for label, key, *_ in [(f[0], sorted_keys[i]) for i, f in enumerate(per_file_data)]
+            for label, key, *_ in [
+                (f[0], sorted_keys[i]) for i, f in enumerate(per_file_data)
+            ]
         }
         # Rebuild file_keys correctly
         file_keys = {}
@@ -642,7 +671,9 @@ def run_multi_file_parser_with_mapping(
         for label, preview_rows, _, _, is_gl, file_type in per_file_data:
             if is_gl:
                 continue
-            unique_values = sorted({row["account"] for row in preview_rows if row.get("account")})
+            unique_values = sorted(
+                {row["account"] for row in preview_rows if row.get("account")}
+            )
             _, draft = mapper.build_draft(
                 unique_values=unique_values,
                 file_type=file_type,
@@ -750,7 +781,9 @@ def apply_mapping_and_consolidate(
         file_keys: dict[str, str] = parse_preview.get("file_keys", {})
 
         if not file_keys:
-            logger.error("apply_mapping no file_keys in parse_preview", extra={"run_id": run_id})
+            logger.error(
+                "apply_mapping no file_keys in parse_preview", extra={"run_id": run_id}
+            )
             _fail_if_not_terminal(run_id, messages.INTERNAL_ERROR)
             return
 
@@ -768,7 +801,9 @@ def apply_mapping_and_consolidate(
                     run_id=run_id,
                     account_name_map=account_name_map,
                 )
-                per_file_data.append((label, preview_rows, source_column, raw_df, is_gl, file_type))
+                per_file_data.append(
+                    (label, preview_rows, source_column, raw_df, is_gl, file_type)
+                )
                 logger.info(
                     "apply_mapping_parsed",
                     extra={
@@ -879,7 +914,9 @@ def _run_consolidation(
     runs_repo.set_parse_preview(run_id, parse_preview)
     runs_repo.set_file_count(run_id, len(storage_keys))
 
-    await_status = RunStateMachine.transition(from_status, RunStatus.AWAITING_CONFIRMATION)
+    await_status = RunStateMachine.transition(
+        from_status, RunStatus.AWAITING_CONFIRMATION
+    )
     runs_repo.update_status(
         run_id,
         await_status,

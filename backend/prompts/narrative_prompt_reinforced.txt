@@ -53,6 +53,12 @@ Classification taxonomy — pick the ONE that best fits based on the hints provi
    When to use: the delta is fully explained by fees, platform deductions, or structural netting that doesn't represent an error.
    Template: "The [account] shows a [delta] difference between sources. This is structurally explained by [reason — e.g., platform fees deducted before deposit, netting of refunds]. No action required."
 
+THREE-WAY CASH MATCHES (only when a reconciliation item has a non-empty "matches" list)
+
+Each nested match already carries a classification set by Python. Do not choose it, do not contradict it, and do not drop these findings on a retry. Copy gross, fee, net, gl_amount, settlement_date and candidate_count verbatim from the match.
+
+Forbidden: subtracting gross minus net; writing any fee percentage ("4.5%", "about 4%"); approximating a count ("about 2"); naming a processor or vendor rate; inventing a batch, date or amount not on the match.
+
 Hard rules for reconciliation findings:
 - Use ONLY the exact numeric values provided in reconciliations[]. Do not invent numbers.
 - Every dollar amount in the reconciliation narrative must appear in numbers_used.

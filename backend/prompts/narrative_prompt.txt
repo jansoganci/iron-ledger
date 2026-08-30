@@ -57,6 +57,25 @@ Classification taxonomy — pick the ONE that best fits based on the hints provi
    When to use: ONLY when is_processor_fee_gap is true. The delta is the known difference between gross sales and net payout after platform/processor fees. Never use this for coverage / is_gl_only. Never use this for a customer deposit. Do not say the amount will be recognized as revenue later. Do not call it a liability or a prepaid.
    Template: "The [account] shows a [delta] difference between sources. This is structurally explained by processor or platform fees deducted before the net payout landed. This is not a missing journal entry, not a customer deposit, and not unearned revenue. No action required."
 
+THREE-WAY CASH MATCHES (only when a reconciliation item has a non-empty "matches" list)
+
+Some items carry nested cash batches matched across the job/card-batch file, the GL Undeposited Funds line, and the bank or processor settlement file. Each match already has its classification set by Python — you do NOT choose it and you must NOT contradict it. Write one sentence per match, using the template for that match's classification. Copy every number verbatim from the match.
+
+Numbers you may copy from a match: gross, fee, net, gl_amount, settlement_date, candidate_count.
+
+- structural_explained: "[account] shows a [fee] difference between sources. Gross is [gross] and the net payout is [net]. This is structurally explained by processor or platform fees deducted before the net payout landed. This is not a missing journal entry, not a customer deposit, and not unearned revenue. No action required."
+- timing_cutoff: "[account] shows a [fee] difference between sources. Gross is [gross] and the net payout is [net]. The payout date is [settlement_date], after the period closed on [period_end]. This appears to be a timing cut-off. No action required — expect this to clear next month."
+- missing_je: "[account] shows [gross] in the card-batch file with no matching entry in the GL. A journal entry may be missing. Recommended action: verify whether this transaction has been posted and enter the missing JE if not." (When the unmatched side is the bank file, say "The bank file shows [net]" instead.)
+- categorical_misclassification: "[account] shows a [fee] fee and a [net] payout. The GL booked [gl_amount] under [gl_account]. The GL appears to have booked this amount under a different category. Recommended action: review the GL coding and reclassify to align with [account]."
+- stale_reference (ambiguous match): "[account] has [candidate_count] possible matching entries of [net] on [settlement_date]. The correct one cannot be identified from the files provided. Recommended action: review these entries and confirm which one belongs to this batch." Never guess which candidate is correct.
+
+Forbidden in three-way sentences:
+- Do not subtract. Never write or imply "gross minus net"; copy [fee] as given.
+- Do not write a fee percentage. No "4.5%", no "about 4%", no percentage of any kind for a fee.
+- Do not approximate a count. Write [candidate_count] exactly; never "about 2", never "a couple".
+- Do not name a processor's rate or any vendor rate (no "Stripe charges 2.9%", no "Jobber", no "typical processor fee is...").
+- Do not invent a batch, a date, or an amount that is not on the match.
+
 Hard rules for reconciliation findings:
 - Use ONLY the exact numeric values provided in reconciliations[]. Do not invent numbers. Do not invent fee percentages.
 - Every dollar amount in the reconciliation narrative must appear in numbers_used.

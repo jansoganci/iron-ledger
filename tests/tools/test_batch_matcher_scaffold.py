@@ -329,55 +329,93 @@ def test_reconciliation_item_accepts_nested_matches() -> None:
 
 
 # ---------------------------------------------------------------------------
-# INERTNESS — the whole point of PR-A
+# FILE-TYPE DETECTION — went live in PR-B
 # ---------------------------------------------------------------------------
+#
+# PR-A shipped these literals unwired on purpose; PR-B wires them now that a
+# matcher exists behind them. What must NOT change: files that are not
+# genuinely bank/processor shaped still resolve exactly as before.
 
 
-def test_new_file_type_literals_exist_but_detection_is_unwired() -> None:
-    """PR-A declares the literals; PR-B wires detection. Not before."""
+def test_new_file_types_are_wired() -> None:
     from backend.agents.orchestrator import _FILE_TYPE_PATTERNS
 
-    assert "bank_statement" not in _FILE_TYPE_PATTERNS
-    assert "processor_settlement" not in _FILE_TYPE_PATTERNS
+    assert "bank_statement" in _FILE_TYPE_PATTERNS
+    assert "processor_settlement" in _FILE_TYPE_PATTERNS
+
+
+def test_new_types_are_matched_last_so_existing_types_win_on_overlap() -> None:
+    from backend.agents.orchestrator import _FILE_TYPE_PATTERNS
+
+    keys = list(_FILE_TYPE_PATTERNS)
+    for pre_existing in ("general_ledger", "payroll", "contracts", "supplier_invoices"):
+        assert keys.index(pre_existing) < keys.index("bank_statement")
+        assert keys.index(pre_existing) < keys.index("processor_settlement")
+
+
+@pytest.mark.parametrize(
+    "filename,expected",
+    [
+        ("vandelay_shopify_payouts_mar_2026.xlsx", "processor_settlement"),
+        ("stripe_payouts.xlsx", "processor_settlement"),
+        ("vandelay_amazon_settlement_mar_2026.xlsx", "processor_settlement"),
+        ("paypal_march.csv", "processor_settlement"),
+        ("bank_statement.csv", "bank_statement"),
+        ("kova_cash_bank_mar_2026.csv", "bank_statement"),
+        ("checking_march.csv", "bank_statement"),
+    ],
+)
+def test_genuinely_bank_or_processor_files_now_route(filename, expected) -> None:
+    from backend.agents.orchestrator import _detect_file_type
+
+    assert _detect_file_type(filename) == expected
+
+
+@pytest.mark.parametrize(
+    "filename,expected",
+    [
+        # Pre-existing behaviour must be untouched.
+        ("sentinel_gl_mar_2026.xlsx", "general_ledger"),
+        ("quickbooks_export.xlsx", "general_ledger"),
+        ("helix_payroll_mar_2026.xlsx", "payroll"),
+        ("gusto_salaries.csv", "payroll"),
+        ("sentinel_contracts_mar_2026.xlsx", "contracts"),
+        ("vendor_invoices_march.xlsx", "supplier_invoices"),
+        ("ap_bills.csv", "supplier_invoices"),
+        ("vandelay_inventory_purchases_mar_2026.xlsx", "supplier_invoices"),
+        # Generic unknowns still fall back, exactly as before.
+        ("mystery_file.xlsx", "supplier_invoices"),
+        ("march_data.csv", "supplier_invoices"),
+    ],
+)
+def test_non_bank_files_are_unaffected(filename, expected) -> None:
+    from backend.agents.orchestrator import _detect_file_type
+
+    assert _detect_file_type(filename) == expected
 
 
 @pytest.mark.parametrize(
     "filename",
     [
-        "vandelay_shopify_payouts_mar_2026.xlsx",
-        "stripe_payouts.xlsx",
-        "bank_statement.csv",
-        "kova_cash_bank_mar_2026.csv",
-        "settlement_march.csv",
+        "income_statement.xlsx",
+        "profit_and_loss_statement.xlsx",
+        "financial_statement_q1.csv",
     ],
 )
-def test_bank_and_processor_files_still_default_to_supplier_invoices(filename) -> None:
-    """The reason PR-A must stay inert.
+def test_pl_statements_are_not_captured_as_bank_files(filename) -> None:
+    """Why bare "statement" is deliberately not a bank needle.
 
-    If detection went live without a matcher, Vandelay's payouts would stop
-    being supplier_invoices and the consolidator would tell a fee story with no
-    matching behind it.
+    C.2 lists it, but it would swallow every P&L export named "...statement".
+    The conservative list uses "bank" / "bank_statement" instead. See the
+    deviation note in the PR-B commit message.
     """
     from backend.agents.orchestrator import _detect_file_type
 
-    assert _detect_file_type(filename) not in (
-        "bank_statement",
-        "processor_settlement",
-    )
+    assert _detect_file_type(filename) != "bank_statement"
 
 
-def test_vandelay_payouts_specifically_unchanged() -> None:
+def test_customer_deposit_files_are_not_stolen_by_the_bank_needles() -> None:
+    """C.2: "do not steal `deposit` from customer-deposit files"."""
     from backend.agents.orchestrator import _detect_file_type
 
-    assert (
-        _detect_file_type("vandelay_shopify_payouts_mar_2026.xlsx")
-        == "supplier_invoices"
-    )
-
-
-def test_batch_matcher_module_has_no_matching_logic_yet() -> None:
-    """PR-A scaffolding only: identity + gate, no passes, no _classify."""
-    import backend.tools.batch_matcher as bm
-
-    assert not hasattr(bm, "match")
-    assert not hasattr(bm, "_classify")
+    assert _detect_file_type("customer_deposits_mar_2026.xlsx") != "bank_statement"
