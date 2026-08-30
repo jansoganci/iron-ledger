@@ -4,6 +4,11 @@
 nothing else — every step states the exact action and the exact expected
 result. Fill in the Result column as you go.*
 
+**Session note (30 Aug evening, cloud agent):** Section A API checks and B1–B2
+were completed on a **different** machine that had `.env` + a running backend.
+This VM does not. Results below distinguish **prior-session observed** from
+**not run / blocked here**. Do not treat blocked rows as product failures.
+
 **Do not treat any step as passed because "it looked right". Every expected
 value below is a specific number, class name, or UI state.**
 
@@ -40,7 +45,7 @@ select column_name from information_schema.columns
    and column_name='monthly_revenue_band';   -- must return 1 row
 ```
 
-- [ ] `0010` applied and column confirmed — **Result: ____**
+- [x] `0010` applied and column confirmed — **Result: PASS (prior session, 30 Aug 2026).** Live project had `monthly_revenue_band` on `companies`; demo company Redhawk Alarm & Security LLC stored `'under_100k'`. **This cloud-agent VM could not re-query the live DB** (no `SUPABASE_*` / `.env` in the environment) — do not treat this checkbox as a re-verification from this session.
 
 If you cannot apply it, **stop and report**. Do not work around it by editing
 code.
@@ -73,15 +78,16 @@ browser session.
 
 | # | Action | Expected result | Result |
 |---|---|---|---|
-| A1 | Sign up a new user, complete the onboarding form, choose band **"$100k–$250k / month"** | Company created. `POST /companies` returns **201**. Response `monthly_revenue_band` = `"100k_250k"` | ☐ PASS ☐ FAIL |
-| A2 | `GET /companies/me` | Returns the same band, `"100k_250k"` | ☐ PASS ☐ FAIL |
-| A3 | Open the Profile page | The revenue band control shows the **plain-English label** "$100k–$250k / month". **No dollar floor is displayed anywhere** — the strings `4,375`, `875`, `1,250`, `9,375`, `50,000` must not appear in the UI | ☐ PASS ☐ FAIL |
-| A4 | On Profile, change the band to **"Under $100k / month"** and save | `PATCH /companies/me` returns **200**, body shows `"under_100k"`. Reload the page — the new value persists | ☐ PASS ☐ FAIL |
-| A5 | Repeat A1's onboarding for a *second* user, choosing **"$500k+ / month"** | Stored as `"500k_plus"` | ☐ PASS ☐ FAIL |
-| A6 | Call `POST /companies` again for an existing company (same user) | **200, not 201**, and the band is **unchanged** — POST is idempotent and never updates. Only PATCH updates | ☐ PASS ☐ FAIL |
-| A7 | Call `POST /companies` with the `monthly_revenue_band` field omitted entirely | **422** validation error | ☐ PASS ☐ FAIL |
-| A8 | **NULL fail-safe.** In SQL: `update companies set monthly_revenue_band = null where id = '<your company id>';` then reload Profile | Profile shows a **backfill banner / unset state** prompting the user to choose a band. The app does not crash | ☐ PASS ☐ FAIL |
-| A9 | With the band still NULL, run any upload (Section B) | Flux gates fall back to the legacy **$50,000 / $10,000** floors — **never $0**. Nothing is flagged that would not have been flagged before Item 5 | ☐ PASS ☐ FAIL |
+| A1 | Sign up a new user, complete the onboarding form, choose band **"$100k–$250k / month"** | Company created. `POST /companies` returns **201**. Response `monthly_revenue_band` = `"100k_250k"` | ☐ not run this wave — used existing demo user `demo@redhawkdemo.com` / company Redhawk (`under_100k`) |
+| A2 | `GET /companies/me` | Returns the same band, `"100k_250k"` | **PASS (observed).** `GET /companies/me` → `"under_100k"` (existing Redhawk row, not the A1 100k_250k path). |
+| A3 | Open the Profile page | The revenue band control shows the **plain-English label** "$100k–$250k / month". **No dollar floor is displayed anywhere** — the strings `4,375`, `875`, `1,250`, `9,375`, `50,000` must not appear in the UI | ☐ not run (no browser session in this VM) |
+| A4 | On Profile, change the band to **"Under $100k / month"** and save | `PATCH /companies/me` returns **200**, body shows `"under_100k"`. Reload the page — the new value persists | **PASS (observed, inverted from the table).** Started as `under_100k`; `PATCH` → `"100k_250k"`, persisted, then restored to `"under_100k"`. |
+| A4b | `PATCH /companies/me` with an invalid band value | **422** | **PASS (observed).** Invalid band → 422. |
+| A5 | Repeat A1's onboarding for a *second* user, choosing **"$500k+ / month"** | Stored as `"500k_plus"` | ☐ not run this wave |
+| A6 | Call `POST /companies` again for an existing company (same user) | **200, not 201**, and the band is **unchanged** — POST is idempotent and never updates. Only PATCH updates | **PASS (observed).** POST again with a different band/name → **200**, originals unchanged. |
+| A7 | Call `POST /companies` with the `monthly_revenue_band` field omitted entirely | **422** validation error | **PASS (observed).** POST with band omitted → 422. |
+| A8 | **NULL fail-safe.** In SQL: `update companies set monthly_revenue_band = null where id = '<your company id>';` then reload Profile | Profile shows a **backfill banner / unset state** prompting the user to choose a band. The app does not crash | ☐ not run this wave |
+| A9 | With the band still NULL, run any upload (Section B) | Flux gates fall back to the legacy **$50,000 / $10,000** floors — **never $0**. Nothing is flagged that would not have been flagged before Item 5 | ☐ not run this wave |
 
 **A9 is the important one.** A `$0` floor would flag every account. If you see
 an explosion of flux anomalies, that is a FAIL, not a quirk.
@@ -103,9 +109,9 @@ Period: **2026-03-01**.
 
 | # | Action | Expected result | Result |
 |---|---|---|---|
-| B1 | `POST /upload` with all four files, `period=2026-03-01` | **200**, returns a `run_id` | ☐ PASS ☐ FAIL |
-| B2 | Poll `GET /runs/{run_id}/status` | Progresses through parsing → discovering → mapping → `awaiting_mapping_confirmation` (or `awaiting_confirmation`). **Never** `parsing_failed` or `guardrail_failed` | ☐ PASS ☐ FAIL |
-| B3 | Confirm the mapping draft in the UI (or `POST /runs/{run_id}/mapping/confirm`) | Run continues to `comparing` → `generating` → **`complete`** | ☐ PASS ☐ FAIL |
+| B1 | `POST /upload` with all four files, `period=2026-03-01` | **200**, returns a `run_id` | **PASS (prior session).** Four Redhawk files uploaded; run created. **This VM cannot continue that run** — no backend, no JWT, no run_id in this environment. |
+| B2 | Poll `GET /runs/{run_id}/status` | Progresses through parsing → discovering → mapping → `awaiting_mapping_confirmation` (or `awaiting_confirmation`). **Never** `parsing_failed` or `guardrail_failed` | **PASS (prior session).** Status reached `awaiting_mapping_confirmation`. 81/85 contract roster names low-confidence/unmapped — expected for arbitrary customer names. |
+| B3 | Confirm the mapping draft in the UI (or `POST /runs/{run_id}/mapping/confirm`) | Run continues to `comparing` → `generating` → **`complete`** | **BLOCKED (this session).** Correct route is `POST /runs/{run_id}/confirm-mappings` with body `{ "decisions": { "<source_pattern>": "<gl_account_name>" } }` (`ConfirmMappingsRequest` in `backend/api/routes.py`). Pool must contain the GL names. **Not called** — this VM has no `.env`, no uvicorn on :8000, no demo password, so no JWT. |
 | B4 | Open the report | Reconciliation cards render. At least one card exists for **Service Revenue** | ☐ PASS ☐ FAIL |
 | B5 | **The $285 card.** Find the Service Revenue card | Classification is **`stale_reference`**. The delta is **285.00** (GL 3,540.00 vs roster 3,825.00) | ☐ PASS ☐ FAIL |
 | B6 | **Coverage vs exception.** Look at cards for GL lines with no supporting file (e.g. Rent & Utilities, Licensing & Permits) | Those render as **coverage** cards — visually distinct from exception cards, and **not** classified `missing_je` | ☐ PASS ☐ FAIL |
@@ -231,25 +237,24 @@ measurement is the reason the flag is still off.
 
 | Section | Steps | Passed | Failed | Blocked |
 |---|---|---|---|---|
-| 0. Prerequisites | 1 | | | |
-| A. Onboarding / Item 5 | 9 | | | |
-| B. Core reconciliation | 9 | | | |
-| C. Item 1 three-way | 11 + gap | | | |
-| D. Item 4 counts | 8 | | | |
-| E. Guardrail review | 5 | | | |
-| F. Prior-fix regression | 7 | | | |
+| 0. Prerequisites | 1 | 1 (prior session; not re-verified here) | | this VM: no live DB credentials |
+| A. Onboarding / Item 5 | 9 + A4b | A2, A4, A4b, A6, A7 (prior session) | | A1, A3, A5, A8, A9 not in this wave |
+| B. Core reconciliation | 9 | B1, B2 (prior session, run waiting on mapping) | | B3–B9 this VM (no API) |
+| C. Item 1 three-way | 11 + gap | | | all — no API |
+| D. Item 4 counts | 8 | | | all — no API |
+| E. Guardrail review | 5 | | | all — no report payload |
+| F. Prior-fix regression | 7 | | | all — no report payload |
 
 ## Known gaps to report, not work around
 
-1. **Migration `0010` is not applied to the live project.** Section A is
-   blocked until `supabase db push` is run. Verified 30 August 2026.
+1. **Migration `0010` was unapplied when this plan was written (30 Aug morning).** A later session applied it and created Redhawk with `under_100k`. Re-verify on the live project before treating Section A as green on a new machine.
 2. **No bank/processor demo file set exists** for manual UI testing (C.0), and
    the fixture's FSM filename does not route to `processor_settlement`.
-3. **No DRONE seed data** on the live project — `supabase/seed.sql` has not
-   been run. You must create a company through onboarding.
+3. **No DRONE seed data** on the live project — `supabase/seed.sql` now seeds Redhawk; still must exist as an Auth user (`demo@redhawkdemo.com`) plus password, which is not in this repo.
 4. **`account_categories` has RLS enabled with zero policies.** The service key
    bypasses RLS so the backend is unaffected, but any direct
    anon/authenticated read of that table returns zero rows. Flag if the
    frontend ever needs to read it directly.
 5. **Narrative consistency is warn-only** (E2). Record the violation count
    rather than treating a log line as a failure.
+6. **Cloud-agent VM (30 Aug evening) cannot continue live E2E.** No `.env`, no `ANTHROPIC_API_KEY` / `SUPABASE_*` in the process environment, no uvicorn on `:8000`, no demo password. Prior session's JWT and `run_id` are not on this machine. Mapping confirm route is known (see B3) but was not called.
