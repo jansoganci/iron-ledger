@@ -245,36 +245,17 @@ def _detect_deltas(
             if total_sources < 2:
                 continue  # nothing to reconcile with one source total
             # Flag as orphan only if there are multiple source files
-            gl_amount = (
-                float(grp[grp["source_file"] == gl_label]["amount"].sum())
-                if gl_label
-                else None
-            )
-            non_gl_total = (
-                float(grp[grp["source_file"] != gl_label]["amount"].sum())
-                if gl_label
-                else float(grp["amount"].sum())
-            )
             hints = ReconciliationHints(
                 is_gl_only=is_gl,
                 is_source_only=not is_gl,
             )
-            if (
-                abs(
-                    non_gl_total
-                    if gl_amount is None
-                    else (non_gl_total - (gl_amount or 0))
-                )
-                < _DELTA_DOLLAR_MIN
-            ):
-                continue
-            items.append(_build_item(canonical, category, grp, gl_label, hints))
+            item = _build_item(canonical, category, grp, gl_label, hints)
+            if item is not None:
+                items.append(item)
             continue
 
         item = _build_item(canonical, category, grp, gl_label, ReconciliationHints())
-        if item is None:
-            continue
-        if _is_material(item.delta):
+        if item is not None:
             items.append(item)
 
     return items
@@ -312,7 +293,7 @@ def _build_item(
         delta = non_gl_total
         delta_pct = None
 
-    if not _is_material(delta):
+    if not _is_material(delta, delta_pct):
         return None
 
     severity = _severity(abs(delta))
@@ -340,9 +321,20 @@ def _is_gl_label(label: str) -> bool:
     return any(gl in normalized for gl in _GL_LABELS)
 
 
-def _is_material(delta: float) -> bool:
+def _is_material(delta: float, delta_pct: float | None = None) -> bool:
+    """Flag if |delta| >= $500, or |delta| >= $100 AND |delta_pct| > 5%.
+
+    ``delta_pct`` is a ratio (0.05 = 5%), matching ``_build_item``. When it is
+    None (no GL amount), only the hard dollar gate can flag.
+    """
     abs_delta = abs(delta)
-    return abs_delta >= _DELTA_DOLLAR_HARD or abs_delta >= _DELTA_DOLLAR_MIN
+    if abs_delta >= _DELTA_DOLLAR_HARD:
+        return True
+    if abs_delta < _DELTA_DOLLAR_MIN:
+        return False
+    if delta_pct is None:
+        return False
+    return abs(delta_pct) > _DELTA_PCT_MIN
 
 
 def _severity(abs_delta: float) -> Literal["low", "medium", "high"]:
