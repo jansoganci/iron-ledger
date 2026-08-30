@@ -625,7 +625,9 @@ Account-total fee-band stays the **fallback** when the user did not upload a set
 
 **Modify `SourceFileType`:** add `"bank_statement"` and `"processor_settlement"`. Still four-or-six literals total for files; do not add a seventh **classification**.
 
-**Do not** add `batch_id` / `gross` / `fee` / `net` to `GoldenField` for every file (pandera `strict=True` on P&L would then require those columns). Prefer a **sidecar** typed model, e.g. `ProcessorSettlementRow` / `BankStatementRow`, used only when `file_type` is the new literals.
+**Do not** add `batch_id` / `gross` / `fee` / `net` to `GoldenField` for every file (pandera `strict=True` on P&L would then require those columns). Prefer a **sidecar** typed model, used only when `file_type` is the new literals.
+
+**There are three sidecar models, one per frame in C.5.1's table** — `ProcessorSettlementRow` (FSM / card-batch: `payout_id`, `gross`, optional `net`, `collected_date`), `GLUFDetailRow` (Undeposited-Funds detail lifted from the GL file: `gl_ref`, `gl_account`, `amount`, `gl_date`), and `BankStatementRow` (bank / processor settlement: `bank_ref`, `settlement_date`, `gross`, `fee`, `net`, `amount`). The GL sidecar was previously left unnamed here while C.5.1 already required three frames; it is named now so the document and the shipped code agree. `GLUFDetailRow` is **not** a new `SourceFileType` — the GL file stays `general_ledger`, and only rows carrying a ref **or** sitting on the UF account are sidecarred ("Do not sidecar Rent").
 
 **Modify `ReconciliationItem` (JSONB, no migration):** optional nested `matches: list[BatchMatch] | None = None` so several batches on one UF line can be classified without a seventh class. Do not invent a seventh enum.
 
