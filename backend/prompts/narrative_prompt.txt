@@ -19,7 +19,15 @@ Report format:
 
 PART 2 — RECONCILIATION FINDINGS (only when reconciliations list is non-empty)
 
-For each reconciliation item, write a structured finding using ONLY the classification taxonomy below.
+Some items are coverage, not discrepancies:
+- card_kind is "coverage", or the is_gl_only hint is true.
+- These accounts appear in the GL but in none of the uploaded supporting files.
+- Write a coverage sentence using the template below. Do NOT pick a taxonomy class for them. Do NOT add them to reconciliation_classifications. Do NOT call this a missing journal entry. Do NOT use the structural_explained / fees template.
+
+Coverage template:
+"The general ledger shows [GL amount] for [account]. None of the files you uploaded include this account, so it was not compared. This is not a missing journal entry. Upload a supporting file for this account, or confirm that this account has no subledger."
+
+For every other item (exceptions), write a structured finding using ONLY the classification taxonomy below.
 
 Classification taxonomy — pick the ONE that best fits based on the hints provided:
 
@@ -32,7 +40,7 @@ Classification taxonomy — pick the ONE that best fits based on the hints provi
    Template: "The [account] shows a [delta] gap between [source A] ([amount A]) and the GL ([GL amount]). The GL appears to have booked this amount under a different category. Recommended action: review the GL coding and reclassify to align with [source A]."
 
 3. missing_je
-   When to use: item appears in one source only (is_source_only or is_gl_only hint is true), or delta is equal to a single invoice/line item amount.
+   When to use: item appears in a supporting file only (is_source_only hint is true), or delta is equal to a single invoice/line item amount. Do NOT use this when is_gl_only is true.
    Template: "The [account] shows [amount] in [source] with no matching entry in the GL. A journal entry may be missing. Recommended action: verify whether this transaction has been posted and enter the missing JE if not."
 
 4. stale_reference
@@ -44,14 +52,14 @@ Classification taxonomy — pick the ONE that best fits based on the hints provi
    Template: "The [account] GL shows a lump-sum of [GL amount] where the monthly cost should be approximately [expected monthly]. This appears to be an accrual timing issue — the full invoice was expensed rather than amortized. Recommended action: create a prepaid asset and amortize over the contract period."
 
 6. structural_explained
-   When to use: the delta is fully explained by fees, platform deductions, or structural netting that doesn't represent an error.
+   When to use: the delta is fully explained by fees, platform deductions, or structural netting that doesn't represent an error. Never use this for an account that was simply not in the uploaded files.
    Template: "The [account] shows a [delta] difference between sources. This is structurally explained by [reason — e.g., platform fees deducted before deposit, netting of refunds]. No action required."
 
 Hard rules for reconciliation findings:
 - Use ONLY the exact numeric values provided in reconciliations[]. Do not invent numbers.
 - Every dollar amount in the reconciliation narrative must appear in numbers_used.
 - Do not classify if no reconciliations are provided — omit the section entirely.
-- Do not speculate beyond what the hints support. If unsure, default to missing_je.
+- Do not speculate beyond what the hints support. If unsure on an exception item, default to missing_je. Never default a coverage / is_gl_only item to missing_je.
 - One finding per reconciliation item.
 
 ---
@@ -70,9 +78,9 @@ Return ONLY valid JSON — no prose outside the JSON:
   "narrative": "<Part 1 variance commentary + Part 2 reconciliation findings if applicable>",
   "numbers_used": [<every number you mentioned, as float, verbatim from pandas_summary and reconciliations>],
   "reconciliation_classifications": {
-    "<account name exactly as it appears in reconciliations[].account>": "<classification string from the taxonomy above>",
-    "...one entry per reconciliation item..."
+    "<exception account name exactly as it appears in reconciliations[].account>": "<classification string from the taxonomy above>",
+    "...one entry per exception item only — omit coverage / is_gl_only accounts..."
   }
 }
 
-If reconciliations is empty, set reconciliation_classifications to {}.
+If reconciliations is empty, set reconciliation_classifications to {}. Omit coverage accounts from reconciliation_classifications.

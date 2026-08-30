@@ -2,7 +2,14 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "../lib/utils";
 import { formatCurrency } from "../lib/formatters";
-import type { Classification } from "./ClassificationBadge";
+import { CoverageBadge, type Classification } from "./ClassificationBadge";
+
+export type CardKind = "exception" | "coverage";
+
+export interface ReconciliationHints {
+  is_gl_only?: boolean;
+  is_source_only?: boolean;
+}
 
 export interface ReconciliationSource {
   source_file: string;
@@ -19,26 +26,40 @@ export interface ReconciliationItem {
   narrative: string | null;
   suggested_action: string | null;
   sources?: ReconciliationSource[];
+  card_kind?: CardKind | null;
+  hints?: ReconciliationHints | null;
 }
 
 interface ReconciliationCardProps extends ReconciliationItem {
   severity?: "high" | "medium" | "low";
 }
 
+export function isCoverageItem(item: {
+  card_kind?: CardKind | null;
+  hints?: ReconciliationHints | null;
+}): boolean {
+  if (item.card_kind === "coverage") return true;
+  return item.hints?.is_gl_only === true;
+}
+
 // Plain-English status labels — no jargon
 const STATUS_LABEL: Record<string, string> = {
-  missing_je:                  "Not confirmed by your uploaded records",
+  missing_je: "Not confirmed by your uploaded records",
   categorical_misclassification: "May be in the wrong category",
-  timing_cutoff:               "Likely a timing difference",
-  accrual_mismatch:            "Invoice may need to be spread monthly",
-  stale_reference:             "Reference data may be outdated",
-  structural_explained:        "Expected — no action needed",
+  timing_cutoff: "Likely a timing difference",
+  accrual_mismatch: "Invoice may need to be spread monthly",
+  stale_reference: "Reference data may be outdated",
+  structural_explained: "Expected — no action needed",
 };
 
+const COVERAGE_STATUS = "No supporting file uploaded";
+const COVERAGE_ACTION =
+  "Upload a supporting file for this account, or confirm there isn't one.";
+
 const AMOUNT_COLOR: Record<string, string> = {
-  high:   "text-severity-high-fg",
+  high: "text-severity-high-fg",
   medium: "text-severity-medium-fg",
-  low:    "text-text-secondary",
+  low: "text-text-secondary",
 };
 
 export function ReconciliationCard({
@@ -48,15 +69,29 @@ export function ReconciliationCard({
   narrative,
   suggested_action,
   severity = "low",
+  card_kind,
+  hints,
 }: ReconciliationCardProps) {
   const [copied, setCopied] = useState(false);
+  const coverage = isCoverageItem({ card_kind, hints });
 
-  const isExplained = classification === "structural_explained";
-  const statusLabel = classification ? STATUS_LABEL[classification] : null;
-  const amountColor = isExplained ? "text-favorable-fg" : (AMOUNT_COLOR[severity] ?? "text-text-secondary");
+  const isExplained = !coverage && classification === "structural_explained";
+  const statusLabel = coverage
+    ? COVERAGE_STATUS
+    : classification
+      ? STATUS_LABEL[classification]
+      : null;
+  const amountColor = coverage
+    ? "text-text-secondary"
+    : isExplained
+      ? "text-favorable-fg"
+      : (AMOUNT_COLOR[severity] ?? "text-text-secondary");
+  const actionText = coverage
+    ? COVERAGE_ACTION
+    : suggested_action;
 
   function handleCopy() {
-    navigator.clipboard.writeText(suggested_action ?? "").then(() => {
+    navigator.clipboard.writeText(actionText ?? "").then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     });
@@ -66,14 +101,20 @@ export function ReconciliationCard({
     <div
       className={cn(
         "rounded-lg border border-border p-4 space-y-3",
-        isExplained ? "bg-severity-normal-bg opacity-70" : "bg-surface"
+        coverage
+          ? "bg-canvas"
+          : isExplained
+            ? "bg-severity-normal-bg opacity-70"
+            : "bg-surface"
       )}
     >
-      {/* Header: account name + amount */}
       <div className="flex items-start justify-between gap-4">
-        <h3 className="text-sm font-medium text-text-primary leading-snug">
-          {account}
-        </h3>
+        <div className="space-y-1.5 min-w-0">
+          <h3 className="text-sm font-medium text-text-primary leading-snug">
+            {account}
+          </h3>
+          {coverage && <CoverageBadge />}
+        </div>
         <div className="text-right shrink-0">
           <p className={cn("text-base font-semibold tabular-nums", amountColor)}>
             {formatCurrency(Math.abs(delta))}
@@ -86,17 +127,15 @@ export function ReconciliationCard({
         </div>
       </div>
 
-      {/* Narrative — only when non-empty */}
       {narrative && (
         <p className="text-sm text-text-secondary leading-relaxed">{narrative}</p>
       )}
 
-      {/* Action — only when non-empty */}
-      {suggested_action && !isExplained && (
+      {actionText && !isExplained && (
         <div className="group flex items-start justify-between gap-2 pt-1">
           <p className="text-xs text-text-secondary flex-1">
             <span className="text-accent font-medium mr-1">→</span>
-            {suggested_action}
+            {actionText}
           </p>
           <button
             type="button"

@@ -149,6 +149,7 @@ def test_consolidate_payroll_delta_flagged() -> None:
     ), "Expected a reconciliation item for the payroll delta"
     item = payroll_items[0]
     assert abs(item.delta) == pytest.approx(700.0, abs=1.0)
+    assert item.card_kind == "exception"
     assert item.severity in ("low", "medium", "high")
 
 
@@ -242,6 +243,7 @@ def test_and_gate_gl_only_rent_200_still_flagged() -> None:
     rent = [i for i in items if i.account == "Rent"]
     assert len(rent) == 1
     assert rent[0].hints.is_gl_only
+    assert rent[0].card_kind == "coverage"
     assert abs(rent[0].delta) == pytest.approx(200.0)
 
 
