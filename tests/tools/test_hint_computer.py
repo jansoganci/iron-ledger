@@ -135,6 +135,84 @@ def test_crosses_period_boundary_false_when_file_not_in_raw_dfs() -> None:
     assert result is False
 
 
+def test_last_billed_april_on_contracts_file_is_not_cutoff() -> None:
+    """Sentinel roster: Last Billed 1 Apr must not steal stale_reference."""
+    df = pd.DataFrame(
+        {
+            "Account": ["Service Revenue"] * 2,
+            "Last Billed": [date(2026, 3, 1), date(2026, 4, 1)],
+            "Start Date": [date(2024, 6, 1), date(2025, 1, 1)],
+        }
+    )
+    result = _crosses_period_boundary(
+        {"sentinel_contracts_mar_2026.xlsx"},
+        {"sentinel_contracts_mar_2026.xlsx": df},
+        PERIOD_END,
+    )
+    assert result is False
+
+
+def test_last_billed_april_blocked_even_without_contracts_filename() -> None:
+    df = pd.DataFrame({"Last Billed": [date(2026, 4, 1)]})
+    result = _crosses_period_boundary(
+        {"rmr_export.xlsx"},
+        {"rmr_export.xlsx": df},
+        PERIOD_END,
+    )
+    assert result is False
+
+
+def test_feb_28_renewal_does_not_fire() -> None:
+    df = pd.DataFrame({"Renewal Date": [date(2026, 2, 28)]})
+    result = _crosses_period_boundary(
+        {"customers.xlsx"},
+        {"customers.xlsx": df},
+        PERIOD_END,
+    )
+    assert result is False
+
+
+def test_invoice_date_after_month_end_is_cutoff() -> None:
+    df = pd.DataFrame({"Invoice Date": [date(2026, 3, 12), date(2026, 4, 3)]})
+    result = _crosses_period_boundary(
+        {"sentinel_supplier_invoices_mar_2026.xlsx"},
+        {"sentinel_supplier_invoices_mar_2026.xlsx": df},
+        PERIOD_END,
+    )
+    assert result is True
+
+
+def test_payout_date_after_month_end_is_cutoff() -> None:
+    df = pd.DataFrame({"Payout Date": [date(2026, 4, 2)]})
+    result = _crosses_period_boundary(
+        {"vandelay_shopify_payouts_mar_2026.xlsx"},
+        {"vandelay_shopify_payouts_mar_2026.xlsx": df},
+        PERIOD_END,
+    )
+    assert result is True
+
+
+def test_payout_period_text_is_not_cutoff() -> None:
+    """Harvest-style 'Mar 1-14' must not coerce into a future cutoff date."""
+    df = pd.DataFrame({"Payout Period": ["Mar 1-14", "Mar 15-31"]})
+    result = _crosses_period_boundary(
+        {"harvest_delivery_settlements_mar_2026.xlsx"},
+        {"harvest_delivery_settlements_mar_2026.xlsx": df},
+        PERIOD_END,
+    )
+    assert result is False
+
+
+def test_contracts_file_column_named_date_is_skipped() -> None:
+    df = pd.DataFrame({"date": [date(2026, 4, 1)]})
+    result = _crosses_period_boundary(
+        {"customer_roster.xlsx"},
+        {"customer_roster.xlsx": df},
+        PERIOD_END,
+    )
+    assert result is False
+
+
 # ---------------------------------------------------------------------------
 # _is_round_fraction
 # ---------------------------------------------------------------------------
