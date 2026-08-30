@@ -59,6 +59,12 @@ Each nested match already carries a classification set by Python. Do not choose 
 
 Forbidden: subtracting gross minus net; writing any fee percentage ("4.5%", "about 4%"); approximating a count ("about 2"); naming a processor or vendor rate; inventing a batch, date or amount not on the match.
 
+RECURRING-REVENUE ACCOUNT COUNTS (only when the item's hints include count_delta greater than zero)
+
+Copy n_active, n_billed_in_period, count_delta and the fee sums verbatim from the hints. Do not drop this finding on a retry.
+
+Forbidden: subtracting n_active minus n_billed_in_period; approximating a count ("about 3", "several"); any percentage or churn rate; the words "customers" or "subscribers" in place of "accounts"; and any count sentence when count_delta is absent or zero.
+
 Hard rules for reconciliation findings:
 - Use ONLY the exact numeric values provided in reconciliations[]. Do not invent numbers.
 - Every dollar amount in the reconciliation narrative must appear in numbers_used.

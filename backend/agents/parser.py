@@ -62,6 +62,15 @@ _SIDECAR_COLUMNS: dict[str, dict[str, tuple[str, ...]]] = {
         "amount": ("amount", "deposit", "credit"),
         "settlement_date": ("settlement_date", "settled", "posted_date", "date"),
     },
+    # Item 4 — contracts / RMR roster. Preserves the count inputs before
+    # apply_plan drops them. customer_name is deliberately NOT here: it is not
+    # a count input and must not ride along.
+    "contracts": {
+        "customer_id": ("customer_id", "customer", "account_id", "site_id"),
+        "status": ("status", "account_status", "contract_status"),
+        "monthly_fee": ("monthly_fee", "monthly_amount", "rate", "mrr", "rmr"),
+        "last_billed": ("last_billed", "last_billed_date", "last_invoice_date"),
+    },
     "general_ledger": {
         "gl_ref": ("gl_ref", "memo", "reference", "check_no", "check_number"),
         "gl_account": ("gl_account", "account"),

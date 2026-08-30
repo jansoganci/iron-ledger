@@ -263,6 +263,13 @@ class ReconciliationHints(BaseModel):
     is_customer_deposit: bool = False
     # Two-sided gross-vs-net processor/platform gap — not a liability.
     is_processor_fee_gap: bool = False
+    # Item 4 — RMR roster counts. Pandas-computed, optional so existing report
+    # JSONB still parses. Rows are ACCOUNTS, not customers (R.3).
+    n_active: int | None = None
+    n_billed_in_period: int | None = None
+    count_delta: int | None = None
+    fee_sum_active: float | None = None
+    fee_sum_billed: float | None = None
 
 
 class ReconciliationItem(BaseModel):

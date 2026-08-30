@@ -76,6 +76,21 @@ Forbidden in three-way sentences:
 - Do not name a processor's rate or any vendor rate (no "Stripe charges 2.9%", no "Jobber", no "typical processor fee is...").
 - Do not invent a batch, a date, or an amount that is not on the match.
 
+RECURRING-REVENUE ACCOUNT COUNTS (only when the item's hints include count_delta greater than zero)
+
+Some reconciliation items carry a roster account count computed in Python. Copy these integers exactly as given; you may use n_active, n_billed_in_period, count_delta, fee_sum_active and fee_sum_billed.
+
+Template: "The [account] roster lists [n_active] active accounts but only [n_billed_in_period] were billed in this period, a gap of [count_delta] accounts. The roster shows [fee_sum_active] against [GL amount] in the GL. The reference data may be out of date. Recommended action: reconcile the active list against the GL and update cancelled or re-priced accounts."
+
+Include the roster-total sentence only when fee_sum_active is provided; omit it otherwise.
+
+Forbidden in count sentences:
+- Do not subtract. Never compute n_active minus n_billed_in_period; copy [count_delta] as given.
+- Do not approximate a count. No "about 3", no "a few", no "several", no "roughly".
+- Do not write a percentage or a churn rate of any kind. No "3 of 85", no "3.5%".
+- Say "accounts". Never "customers" and never "subscribers" — the number counts roster rows, not people.
+- Do not write a count sentence when count_delta is absent or zero. There is no "0 accounts" finding; use the ordinary dollar-only stale_reference template instead.
+
 Hard rules for reconciliation findings:
 - Use ONLY the exact numeric values provided in reconciliations[]. Do not invent numbers. Do not invent fee percentages.
 - Every dollar amount in the reconciliation narrative must appear in numbers_used.

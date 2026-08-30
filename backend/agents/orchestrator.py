@@ -561,6 +561,92 @@ _FILE_TYPE_PATTERNS: dict[str, list[str]] = {
 }
 
 
+def _attach_roster_counts(recon_items, per_file_data, period, run_id) -> None:
+    """Item 4 — attach RMR roster counts to the mapped GL revenue item.
+
+    Runs beside the consolidator, never inside it, exactly like
+    _attach_batch_matches. Every gate below fails closed: attach nothing and
+    log, leaving today's dollar-only behaviour untouched.
+
+    R.4 — one roster file per run.
+    R.5 — the roster must resolve to exactly one mapped GL account.
+    R.7 — never resurrect an item consolidate already dropped as immaterial.
+    """
+    from backend.tools import roster_counts
+
+    rosters = [
+        entry
+        for entry in per_file_data
+        if len(entry) >= 7 and entry[5] == "contracts" and entry[6] is not None
+    ]
+
+    # R.4: merging two rosters needs a cross-file identity rule that does not
+    # exist; guessing one would double-count or silently drop accounts.
+    if len(rosters) != 1:
+        if len(rosters) > 1:
+            logger.info(
+                "roster_counts_skipped",
+                extra={
+                    "run_id": run_id,
+                    "reason": "more than one contracts file",
+                    "files": len(rosters),
+                },
+            )
+        return
+
+    label, preview_rows, _, _, _, _, sidecar = rosters[0][:7]
+
+    # R.5: attaching "85 accounts" to a line that only represents some of them
+    # would be false, so require exactly one mapped account.
+    accounts = sorted({str(r.get("account")) for r in (preview_rows or [])})
+    if len(accounts) != 1:
+        logger.info(
+            "roster_counts_skipped",
+            extra={
+                "run_id": run_id,
+                "reason": "roster did not map to exactly one " "GL account",
+                "mapped_accounts": len(accounts),
+            },
+        )
+        return
+    target_account = accounts[0]
+
+    counts = roster_counts.compute(sidecar, period)
+    if counts is None:
+        return
+
+    # R.7: a count-only card is not a reason to override materiality.
+    target = next((i for i in recon_items if i.account == target_account), None)
+    if target is None:
+        logger.info(
+            "roster_counts_no_item",
+            extra={
+                "run_id": run_id,
+                "account": target_account,
+                "reason": "account not present in recon items (immaterial or "
+                "fully tied out); counts discarded",
+            },
+        )
+        return
+
+    target.hints.n_active = counts.n_active
+    target.hints.n_billed_in_period = counts.n_billed_in_period
+    target.hints.count_delta = counts.count_delta
+    target.hints.fee_sum_active = counts.fee_sum_active
+    target.hints.fee_sum_billed = counts.fee_sum_billed
+
+    logger.info(
+        "roster_counts_attached",
+        extra={
+            "run_id": run_id,
+            "account": target_account,
+            "n_active": counts.n_active,
+            "n_billed_in_period": counts.n_billed_in_period,
+            "count_delta": counts.count_delta,
+        },
+    )
+
+
 def _attach_batch_matches(recon_items, per_file_data, period, run_id) -> None:
     """Run the Item 1 three-way matcher beside the consolidator.
 
@@ -1003,6 +1089,7 @@ def _run_consolidation(
         )
 
     _attach_batch_matches(recon_items, per_file_data, period, run_id)
+    _attach_roster_counts(recon_items, per_file_data, period, run_id)
 
     rows = [
         {

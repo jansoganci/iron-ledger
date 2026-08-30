@@ -1281,218 +1281,380 @@ Do not merge PR-A to `main` as a “user-facing bank” story. Stack A←B←C.
 
 # Item 4 — RMR account-count vs GL
 
-Build **after item 1 ships** and after an explicit go-ahead. Not a deferred-revenue waterfall. Not annual 12× (already Kova 1). Class stays **`stale_reference`**.
+*Revised 30 August 2026, after Item 1 shipped. This replaces the first-pass
+Item 4 section rather than sitting alongside it — there is one Item 4 section,
+not two. The A–H skeleton and every locked decision from the first pass are
+preserved; what is new is the R-series resolutions in C.3, written to the
+standard Item 1 only reached after E.1–E.7 were forced out by implementation.*
 
-There is **no** RMR/subscriber concept in the backend today (`backend/` grep: zero `RMR`, `subscriber`, `active_count`). `contracts` as `SourceFileType` already exists. Filename patterns already include `roster`, `subscription`, `recurring`, `customer`. The type exists; the count does not.
+Not a deferred-revenue waterfall. Not annual 12× (already Kova 1). Class stays
+**`stale_reference`**. No seventh class.
+
+**The grain problem, stated once.** Alarm RMR close asks *how many* accounts are
+billable and at what rate, not just what the dollars total. Today 85 roster rows
+collapse to one consolidated line (`Service Revenue $3,825`) at
+`parser.py::parse_file_silently`'s `groupby("account")`, and the normalizer has
+already dropped Status / Last Billed / Customer ID before that. By the time
+`hint_computer` runs it can see `gl_amount=3540`, `non_gl_total=3825`,
+`delta=285` — and no 85, no 82, no 3. This is Item 1's grain mismatch again:
+identity destroyed before aggregation. The fix is the same shape — preserve the
+columns in a sidecar before the drop, count in pandas, attach the result.
+
+**v1 boundary (locked), stated in the Item 1 style:** one roster file, one
+mapped GL revenue account, one period, row-grain counts only. No customer
+dimension, no attrition trend, no churn rate, no `count × rate` wholesale
+accrual (that is item 3, and it depends on this).
 
 ## A. Pre-conditions
 
-- Item 1 shipped (roadmap). Not a Python import of `batch_matcher`.
-- Cutoff allowlist (PR #11) **must stay**: `hint_computer.py::_crosses_period_boundary` skips contracts filenames (`_is_contracts_roster_file`) and ignores Last Billed / renewal headers. Item 4 **reads** Last Billed as a **count input**. Do **not** re-widen the cutoff allowlist.
-- Independent of item 5 / `0010`. Do not steal that filename.
-- Sentinel contracts xlsx is **designed** (85 rows, $285, 3 stale) but **missing** on this branch. Isolated fixture is required even if the xlsx is restored.
-- Vandelay / DRONE: no subscriber roster. They are negatives, not demos of this item.
-- `parse_file_silently` does **not** currently receive `file_type` (orchestrator detects it separately). Item 4 must pass `file_type` in so the sidecar is contracts-only.
+- **Item 1 is shipped.** `backend/tools/batch_matcher.py::match` exists with a
+  live call site (`orchestrator::_attach_batch_matches`), and PR-C landed the
+  sidecar machinery. Its roadmap pre-condition is satisfied.
+- **The sidecar interception already exists — this is the single biggest change
+  since the first pass.** `parser.py` now has `file_type` on
+  `parse_file_silently`, a `_build_sidecar` method, and a `_SIDECAR_COLUMNS`
+  registry keyed by file type (`processor_settlement`, `bank_statement`,
+  `general_ledger`). Item 4 adds a **fourth key** — `contracts` — and reuses the
+  existing "copy off `df_raw` before `apply_plan` drops non-golden columns"
+  path. The first-pass spec budgeted a new interception point; that work is
+  done. Size drops accordingly (see G).
+- **`contracts` already detects.** `orchestrator._FILE_TYPE_PATTERNS["contracts"]`
+  is `["contract", "subscription", "recurring", "roster", "customer"]`. **No new
+  `SourceFileType`**, no detection change of any kind.
+- **PR #11's cutoff allowlist must stay intact.** `hint_computer` blocks roster
+  cycle columns from `crosses_period_boundary` via `_CUTOFF_DATE_BLOCK`, which
+  contains `"last billed"`, `"renewal"`, `"start date"`, `"end date"`,
+  `"next bill"`, `"contract end"`, `"payout period"`, plus the
+  `_is_contracts_roster_file(filename)` guard. Item 4 **reads Last Billed as a
+  count input** and must not re-widen that hint. A regression test is required
+  (F), not merely an intention.
+- **Sentinel's contracts file is still absent from the tracked demo tree.**
+  Verified: `docs/demo_data/sentinel/` holds `sentinel_gl_mar_2026.xlsx` and
+  `february/` only. The 85-row roster is designed but not checked in, so an
+  isolated fixture is **required**, not optional.
+- Not blocked on item 3 (which wants these counts later) or on anything else
+  unbuilt.
 
 ## B. Database / migration
 
-**No SQL.** Highest migration stays whatever item 5 wrote (`0010`). Do not write `0011` for counts.
+**No SQL. Highest migration stays `0010`.**
 
 | Change | Migration? |
-|--------|------------|
-| `n_active`, `n_billed_in_period`, `count_delta`, `fee_sum_active` on hints / item JSONB | **No** (`reports.reconciliations`) |
-| 85 subscriber rows in `monthly_entries` | **Do not.** Unique `(company_id, account_id, period)` cannot hold them |
+|---|---|
+| `n_active`, `n_billed_in_period`, `count_delta`, `fee_sum_active`, `fee_sum_billed` on `ReconciliationHints` | **No** — `reports.reconciliations` JSONB, already there since `0007` |
+| 85 subscriber rows in `monthly_entries` | **Never.** See below |
 | New `SourceFileType` | **No** — `contracts` exists |
-| Extra golden fields on **all** files (`status`, `customer_id`) | **No.** Contracts-only sidecar. P&L/payroll stay 7-column pandera |
-| Customer dimension table | **No** in v1. Ephemeral counts per run |
+| `status` / `customer_id` as golden fields on every file | **No.** Contracts-only sidecar; P&L and payroll stay seven-column pandera `strict=True` |
+| Customer dimension table | **No** in v1. Counts are ephemeral per run |
 
-**RLS:** none new.
-
-**What is NOT migrated:** everything in the table above.
+**Why `monthly_entries` cannot hold the roster.** `0001_initial_schema.sql:72`
+declares `CONSTRAINT unique_entry UNIQUE (company_id, account_id, period)`. All
+85 roster rows map through `AccountMapper` to **one** GL account (`Service
+Revenue`) in **one** period for **one** company — so all 85 would collide on a
+single key. The table's grain is one amount per account per month by design;
+storing subscribers there would require either a synthetic per-customer
+`account_id` (inventing 85 chart-of-accounts entries that do not exist) or
+dropping the constraint that protects against duplicate-upload double counting.
+Both are worse than keeping counts in JSONB. **RLS:** none new.
 
 ## C. Backend — file by file
 
-### C.1 Exact drop path today (this is the grain kill)
+### C.1 Interception point (exact)
+
+`ParserAgent.parse_file_silently`, in the slot Item 1 already created:
 
 ```
-parser.parse_file_silently                          backend/agents/parser.py ~493
-  sample = read + pii_sanitizer.sanitize_sample
-  plan = discovery.discover(...)
-  df_raw = read_full + pii_sanitizer.sanitize       Status / Last Billed still present
+df_raw = self._read_full(storage_key)
+df_raw = pii_sanitizer.sanitize(df_raw, run_id=run_id)
         │
         ▼
-  df_normalized, _ = normalizer.apply_plan(df_raw, plan, period)
-        backend/tools/normalizer.py::apply_plan
-        ~108–134  ← DROP POINT
-          column_mapping: target is None → drop
-          extra columns not in _GOLDEN_FIELDS → drop
-          Status, Customer ID, Last Billed gone
-          Monthly Fee survives only if Discovery mapped it → amount
-          Customer Name survives only if mapped → account
-        │
+sidecar = self._build_sidecar(df_raw, file_type)      <- ADD "contracts" HERE
+        │                                                (before the drop)
         ▼
-  df_validated = validator.validate(df_normalized)  pandera strict 7-col
-        │
+df_normalized, _ = normalizer.apply_plan(df_raw, plan, period)
+        ~108-134  <- Status / Last Billed / Customer ID dropped here
         ▼
-  if account_name_map:
-      df_validated["account"] = map to GL names
-      "Oak Street Dental" → "Service Revenue"       AccountMapper
-        │
+df_validated = validator.validate(df_normalized)       pandera strict, 7 cols
         ▼
-  groupby("account")["amount"].sum()                parser.py ~542–552
-      85 customer rows → ONE preview row
-      account=Service Revenue, amount=3825
-        │
+account_name_map applied      "Oak Street Dental" -> "Service Revenue"
         ▼
-  df_detailed = df_validated.copy()                 parser.py ~555–558
-      already 7-col, already mapped, Status gone
-        │
-        ▼
-orchestrator → consolidator.consolidate
-  _build_item → ReconciliationSource.row_count = 1  consolidator.py ~275
-        (hardcoded; ignores _roll_up's len(tagged) at ~199)
-        │
-        ▼
-hint_computer.compute_hints(item, source_raw_dfs=df_detailed)
-      sees gl_amount=3540, non_gl_total=3825, delta=285
-      No 85. No 82. No 3.
+groupby("account")["amount"].sum()                     85 rows -> 1 preview row
 ```
 
-`df_detailed` is documented as “per-row … for hint_computer dates” (`parser.py` ~506–507). That is **too late** for Status: the normalizer already dropped it. Un-hardcoding `row_count=1` is **still the wrong grain**: 85 Excel lines ≠ 82 billed this month. The GL has **no** customer count.
-
-### C.2 Intercept (exact)
-
-**Where:** `ParserAgent.parse_file_silently`, **after** PII sanitize of `df_raw` and **before** `normalizer.apply_plan` extra-column drop — or inside `apply_plan` gated on `file_type == "contracts"` so P&L files never keep Status.
-
-**Preferred:** keep `apply_plan` golden for all files. In `parse_file_silently`:
-
-1. Orchestrator passes `file_type` (new argument; default `None` = today’s behaviour).
-2. If `file_type == "contracts"` (or `_is_contracts_roster_file(storage_key)` as a belt), copy a sidecar from `df_raw` **using the Discovery header row** so columns are named. Sidecar keeps: Status, Last Billed, Monthly Fee (or the header Discovery mapped to `amount`), Customer ID / customer name. Align on `_orig_row_index`.
-3. Then call `apply_plan` as today (sidecar is already copied; drop is fine).
-4. After `account_name_map` (so we know the GL name) and **before** `groupby`, call `roster_counts.compute(sidecar, period)`.
-5. Return counts with the existing tuple, e.g. `(preview_rows, source_column, df_detailed, roster_counts | None)`.
-
-Do not put Status on `df_detailed` and then run pandera `strict=True` — that fails validation. Sidecar bypasses pandera.
-
-### C.3 `backend/tools/roster_counts.py` (new)
-
-**Responsibility:** pandas counts on a contracts sidecar. No Claude. No DB. No classification.
-
-**Input:** `sidecar: pd.DataFrame`, `period: date`.
-
-**Output** (typed dict or dataclass in `domain/contracts.py` is fine; not a SQL table):
+Add to `_SIDECAR_COLUMNS`:
 
 ```python
-n_active: int              # count(Status == Active)                     # 85
-n_billed_in_period: int    # count(Last Billed in period month)          # 82
-count_delta: int           # n_active - n_billed_in_period               # 3
-fee_sum_active: float      # sum(Monthly Fee | Active)                   # 3825
-fee_sum_billed: float      # sum(Monthly Fee | billed in period)         # 3540 if complete
+"contracts": {
+    "customer_id": ("customer_id", "customer", "account_id", "site_id"),
+    "status": ("status", "account_status", "contract_status"),
+    "monthly_fee": ("monthly_fee", "monthly_amount", "rate", "mrr", "rmr"),
+    "last_billed": ("last_billed", "last_billed_date", "last_invoice_date"),
+},
 ```
 
-Status match: case-insensitive `active`. Last Billed: `pd.to_datetime`, compare year-month to `period`. Never log cell values (customer names, fees). Log `event="roster_counts"` with `n_active`, `n_billed_in_period`, `count_delta`, `rows_in_sidecar` only.
+**Do not** put Status on `df_detailed` — pandera `strict=True` would reject the
+eighth column. The sidecar bypasses pandera by construction, exactly as the
+bank/processor sidecars do.
 
-**Called from:** `parse_file_silently` (and tests).
+### C.2 `backend/tools/roster_counts.py` (new)
 
-**Does not:** fuzzy-match GL names, write `monthly_entries`, force a class, treat `_roll_up.row_count` as subscribers, re-open cutoff dates, split mid-month rate changes (v1 sums fees).
+**Responsibility:** pandas counts on a contracts sidecar. No Claude, no DB, no
+classification, no I/O.
 
-### C.4 `backend/domain/contracts.py` — `ReconciliationHints`
+**Input:** `sidecar: pd.DataFrame`, `period: date`.
+**Output:** a small typed result (dataclass or `TypedDict`; not SQL):
 
-Add optional fields (defaults keep old JSONB parseable), same pattern as `implied_monthly`:
+```python
+n_active: int              # rows whose status normalizes to "active"
+n_billed_in_period: int    # of those, billed inside the period month
+count_delta: int           # n_active - n_billed_in_period
+fee_sum_active: float      # sum(monthly_fee) over active rows
+fee_sum_billed: float      # sum(monthly_fee) over active-and-billed rows
+```
+
+**Does not:** fuzzy-match GL names, write `monthly_entries`, force a class,
+dedupe customers, read `_roll_up.row_count` as a subscriber count, re-open
+cutoff dates, or split mid-period rate changes.
+
+**Logging:** `event="roster_counts"` with the five integers/floats and
+`rows_in_sidecar` only. **Never log a customer name, a customer id, or a fee**
+— CLAUDE.md forbids logging cell values, and a roster is the most
+PII-adjacent file the product ingests.
+
+### C.3 Resolutions — the rules that must not be left as narrative
+
+*Item 1's first pass left seven rules implicit and paid for it in E.1–E.7.
+These are the equivalents for Item 4, decided here rather than during coding.*
+
+**R.1 — "billed in period" is defined over Active rows only.**
+`n_billed_in_period = count(row is active AND last_billed falls in the period month)`.
+Parse with `pd.to_datetime(..., errors="coerce")` and compare **(year, month)**
+to the period; no day-level or timezone logic. A **null, blank or unparseable**
+`last_billed` is **not billed** — absence of billing evidence is not evidence of
+billing, and a never-billed active account is precisely the miss this item
+exists to surface. Restricting the count to Active rows makes `count_delta`
+mean exactly "Active but not billed this month" and guarantees the invariant
+`0 <= n_billed_in_period <= n_active`, so **`count_delta` can never be
+negative**. If a future change breaks that invariant, emit nothing rather than a
+negative count.
+
+**R.2 — "Active" is an exact match on the normalized status token.**
+Normalize with `str(value).strip().casefold()`; a row is active iff the result
+is exactly `"active"`. Everything else — `cancelled`, `suspended`, `pending`,
+`on hold`, `inactive`, `terminated`, and any value not anticipated — is **not
+active**. Rationale: the claim being made is "this many accounts are billable
+this month"; a suspended or pending account is not billable, and stretching the
+definition would invent revenue. Consequence to accept: a roster using
+`"Active - pending cancel"` will under-count. Mitigation: log the **distinct
+non-active status values and their counts** (values only, never rows) so a
+mis-shaped roster is visible in ops rather than silently wrong.
+**If the sidecar has no status column at all, emit no counts** — do not assume
+every row is active.
+
+**R.3 — Mid-period rate changes are out of scope for v1, and rows are
+"accounts", never "customers".**
+`fee_sum_active` sums `monthly_fee` across active rows as the roster presents
+them. One row = one account. If a rate increase is represented as two rows for
+the same site, v1 counts two accounts and sums two fees. This is **deferred, not
+solved**. Two required guards: (a) the prompt and every template must say
+**"accounts"**, never "customers" or "subscribers", so the number we publish is
+the number we actually computed; (b) when `customer_id` is present and contains
+duplicates, log a warning with the duplicate **count** so the limitation is
+observable. Counts are still emitted — a multi-site customer legitimately has
+several accounts, and suppressing that would be its own error.
+
+**R.4 — One roster file per run.**
+If **two or more** uploaded files detect as `contracts`, emit **no counts** and
+log. Merging rosters needs a cross-file identity rule that does not exist, and
+guessing one would double-count or silently drop accounts. Mirrors Item 1's
+"one processor, one UF account, one bank, one period" lock.
+
+**R.5 — Counts attach to exactly one GL account, or not at all.**
+The roster's rows map through `AccountMapper` to a GL revenue name. After
+`account_name_map` is applied and **before** `groupby`, collect the distinct
+mapped account names for sidecar rows. If there is exactly **one**, that is the
+target reconciliation item. If there are **zero or more than one**, emit no
+counts and log — attaching "85 accounts" to a line that only represents some of
+them would be false. This rule was implicit in the first pass ("the recon item
+whose canonical name is the mapped GL revenue account") and is the Item 4
+analogue of Item 1's missing-UF-item case.
+
+**R.6 — `count_delta == 0` produces counts but no forced class.**
+`count_delta > 0` → force `stale_reference`. `count_delta == 0` → the count
+fields are still attached (they are true, and the guardrail may need them) but
+**no class is forced** and the prompt must not produce a "0 accounts" sentence.
+A `$285` dollar gap with `count_delta == 0` stays a dollar-only
+`stale_reference`, told the way it is told today.
+
+**R.7 — Materiality is not retuned, and a dropped item is not resurrected.**
+If `consolidator._is_material` already dropped the account, do **not** bring it
+back as a count-only card, even when `count_delta > 0`; discard the counts and
+log. Do **not** adjust `$100` / `$500` to keep a card alive. Item 5 forbade
+retuning those and that still holds.
+
+**R.8 — Guardrail units: counts are point values, not percentages.**
+`n_active`, `n_billed_in_period` and `count_delta` are **counts**; at the
+guardrail's cent tolerance each is a point value in the **money pool**, exactly
+like Item 1's `candidate_count`. `fee_sum_active` / `fee_sum_billed` are money.
+**No ratio, rate, or percentage may be added to the reference pool** — no churn
+%, no "3 of 85 = 3.5%". That is the mixed-unit bug the guardrail fix removed.
+
+### C.4 `backend/domain/contracts.py`
+
+Add to `ReconciliationHints`, all optional with defaults so existing report
+JSONB still parses:
 
 ```python
 n_active: int | None = None
 n_billed_in_period: int | None = None
 count_delta: int | None = None
 fee_sum_active: float | None = None
+fee_sum_billed: float | None = None
 ```
 
-No new hint **bool** is required if interpreter keys off `count_delta is not None and count_delta > 0`. If a bool is easier for force-class priority, `has_roster_count_gap: bool = False` is allowed — still JSONB, still not a seventh class.
+No new bool is required — the interpreter keys off
+`count_delta is not None and count_delta > 0`. Do **not** hang this off
+`looks_like_annual_prepayment` or `similar_amount_in_other_account`.
 
 ### C.5 `backend/agents/orchestrator.py`
 
-Plumb `file_type` into `parse_file_silently`. After consolidate, attach `roster_counts` onto the recon item whose canonical name is the mapped GL revenue account (the one all customers collapsed to). If consolidate dropped the item as immaterial, **do not** resurrect it as a count card when `count_delta == 0`; if `count_delta > 0` and the dollar delta was under `_is_material`, still attach counts only when the dollar item exists — v1 does **not** retune `_is_material` to keep a $285 card (Sentinel $285 already clears `$100` AND `>5%` if pct is large enough; pin this in the fixture). Do not create a seventh-class “count only” card.
+Add `_attach_roster_counts(recon_items, per_file_data, period, run_id)`,
+modelled directly on the shipped `_attach_batch_matches`: run after
+`consolidate()` and `compute_hints()`, **beside** the consolidator, never inside
+it. It applies R.4 (one roster file), R.5 (one mapped account), and writes the
+five fields onto that item's `hints`. Same skip-and-log discipline: if any gate
+fails, attach nothing and leave today's behaviour untouched.
 
 ### C.6 `backend/agents/consolidator.py::_build_item`
 
-**Leave `row_count=1` hardcoded (~275).** Do not un-hardcode and call that RMR. `_roll_up`’s `len(tagged[...])` (~199–206) is “Excel lines after account map,” still not “billed this month.”
-
-`excel_export.py` (~231, ~287) prints `src.row_count`. After this item it remains “rolled source lines,” **not** `n_active`. Do not change the export header to “accounts” in this item. If a comment exists, add that `row_count` is not a subscriber count.
-
-Attach roster fields on `item.hints`, not on `ReconciliationSource.row_count`.
+**Leave `row_count=1` hardcoded.** Do not un-hardcode it and call it RMR —
+`_roll_up`'s `len(tagged[...])` is "Excel lines after account mapping", not
+"accounts billed this month". `excel_export.py` keeps printing `row_count` as
+rolled source lines; do **not** relabel that column "accounts" in this item.
 
 ### C.7 `backend/tools/hint_computer.py`
 
-Do **not** scan P&L `df_detailed` for Status (it is gone). Read `item.hints` counts if the parser already set them, **or** accept an optional `roster_counts_by_account` map from the orchestrator. Do not set `crosses_period_boundary` from Last Billed. Add a regression test that a contracts sidecar with April Last Billed does **not** flip cutoff.
-
-Do not hang this off `looks_like_annual_prepayment` or `similar_amount_in_other_account`.
+**No change required.** Counts arrive from the parser via the orchestrator, the
+same route Item 1's matches take. Do **not** scan `df_detailed` for Status (it
+is gone by then), and do **not** set `crosses_period_boundary` from Last Billed.
 
 ### C.8 `backend/agents/interpreter.py`
 
-**Force class:** if `count_delta` is not None and `count_delta > 0`, force `stale_reference`, unless an earlier pandas speech act already won (fee, deposit, annual). Insert in `_apply_reconciliation_classifications` **after** annual, **before** Claude’s map — roster counts are not 12× and not a deposit.
+**Force-class order** (the shipped chain, with roster counts inserted):
 
-Coverage / `is_gl_only`: no roster counts (no sidecar). Do not classify coverage.
+```
+coverage -> matches (three-way) -> is_processor_fee_gap -> deposit
+        -> annual 12x -> roster count -> Claude's map -> hint fallback
+```
 
-**Guardrail — `_run_with_guardrail` ~340–347:** for each recon item, also append `hints.n_active`, `hints.n_billed_in_period`, `hints.count_delta` when not None (as `float`, same as other numbers). Claude writing “3 cancelled customers” without `3.0` on the item is a golden-rule failure; this list is how it passes.
+Roster counts sit **after** annual and **before** Claude, per the first pass.
+Rationale: fee / deposit / annual are statements about the money itself and are
+more specific; a stale roster is a statement about the reference list. `matches`
+outranks everything, unchanged.
+
+**Guardrail** — extend the existing loop that already appends `gl_amount`,
+`non_gl_total`, `delta`, `hints.implied_monthly` and Item 1's match fields:
+append `hints.n_active`, `hints.n_billed_in_period`, `hints.count_delta`,
+`hints.fee_sum_active`, `hints.fee_sum_billed` when not None, as floats. Without
+this a correct "3 accounts" sentence fails verification.
 
 ### C.9 `backend/prompts/narrative_prompt.txt`
 
-**Today** `stale_reference` prose says “customer count or rate differences” but the template only has `[amount]`, `[GL amount]`, `[delta]`.
+Today the `stale_reference` prose mentions "customer count or rate differences"
+but the template only has `[amount]`, `[GL amount]`, `[delta]`. Add a count
+template used **only** when `count_delta > 0`:
 
-**After:** when `count_delta` / `n_active` / `n_billed_in_period` are present, use a template that copies those **ints from hints**. Explicit reminder: **Claude must copy `n_active`, `n_billed_in_period`, and `count_delta`. Never write “about 3”. Never subtract 85−82. Never invent a count from the dollar delta.** Same line in `narrative_prompt_reinforced.txt`.
+> "The [account] roster lists [n_active] active accounts but only
+> [n_billed_in_period] were billed in this period, a gap of [count_delta]
+> accounts. The roster shows [fee_sum_active] against [GL amount] in the GL.
+> The reference data may be out of date. Recommended action: reconcile the
+> active list against the GL and update cancelled or re-priced accounts."
 
-When those hints are absent, keep the current dollar-only stale_reference template (negative: $285 with `count_delta=0` or missing).
+Forbidden, in the Item 1 style:
+- Never subtract. Do not compute `n_active - n_billed_in_period`; copy `[count_delta]`.
+- Never approximate a count: no "about 3", no "a few", no "several".
+- Never write a percentage or churn rate.
+- Never say "customers" or "subscribers" — say **accounts** (R.3).
+- Never state a count when `count_delta` is absent, and never write "0 accounts".
 
-### C.10 Files that must NOT change (except tests’ expected values if a new field appears with default)
+Same reminder block in `narrative_prompt_reinforced.txt` so a retry cannot drop
+or reword the count finding.
 
-- Cutoff allowlist needles in `hint_computer.py`.
-- `looks_like_annual_prepayment` logic.
-- `GoldenField` / P&L pandera schema (sidecar, not a 8th golden column).
-- Item 5 flux gates.
+### C.10 Files that must NOT change
+
+Cutoff allowlist needles in `hint_computer.py`; `looks_like_annual_prepayment`;
+`GoldenField` / the P&L pandera schema; Item 5's flux gates; Item 1's matcher,
+`_SIDECAR_COLUMNS` entries for bank/processor/GL, and `_attach_batch_matches`.
 
 ## D. API / routes
 
-No new endpoint. Counts ride on existing `parse_preview.reconciliations` / report JSON.
-
-Old clients: extra hint keys ignored. Auth unchanged.
-
-**Backward compatibility:** non-contracts uploads unchanged. Contracts uploads without Status/Last Billed: `roster_counts` is None; dollar stale_reference as today.
+**Zero API changes.** Counts ride on `parse_preview.reconciliations` and the
+report payload, which already carry `hints`. No new endpoint, no auth change, no
+response-shape change. Old clients ignore unknown hint keys. A contracts upload
+without Status or Last Billed simply yields no counts and behaves as today.
 
 ## E. Frontend
 
-Not required for v1. Cards already show recon narrative. If a count appears in the narrative, it came from pandas via the prompt.
+**No new UI required for v1.** A count-bearing card is still a
+`stale_reference` `ReconciliationCard`; the counts reach the user through the
+narrative that Claude copies from pandas, not through a new component. Existing
+rendering needs no change to display it.
 
-**Do not** add a subscriber dashboard, attrition chart, or a user-typed count threshold. **Do not** relabel `row_count` in the Excel export as “RMR accounts.”
+Explicitly **not** in v1: a subscriber dashboard, an attrition chart, a
+per-customer list, or any user-typed count threshold. Do **not** relabel the
+Excel export's `row_count` column as "accounts".
 
 ## F. Tests
 
-| File | Functions / what they prove |
-|------|------------------------------|
-| `tests/tools/test_roster_counts.py` (new) | `test_sentinel_shape_85_82_3` — n_active=85, n_billed=82, count_delta=3, fee_sum_active=3825. `test_status_case_insensitive`. `test_last_billed_other_month_not_counted`. `test_empty_sidecar_zeros`. |
-| Isolated fixture (new) | 85/82/3 plus GL $3540 vs roster $3825. Pin `count_delta=3`. |
-| `tests/tools/test_hint_computer.py` | Existing Last Billed cutoff tests **must stay False** for contracts filenames (PR #11 regression). Add `test_roster_counts_do_not_set_crosses_period_boundary`. |
-| `tests/tools/test_annual_prepayment.py` | Negative: Software $13,200 / $1,100 stays annual 12×, **not** a count card. `count_delta` absent. |
-| Dollar-only stale_reference | `count_delta=0` (or None) with $285 → class `stale_reference`, narrative must not say “0 accounts.” |
-| `tests/agents/test_interpreter_classify.py` | Force `stale_reference` when `count_delta > 0`; fee/deposit/annual still win if those hints are set; no seventh class. |
-| `tests/agents/test_consolidator.py` | `row_count` on sources remains 1 (or whatever `_build_item` still hardcodes). Do not assert 85. |
-| Parser plumbing | `test_parse_file_silently_contracts_returns_counts_before_groupby` — after map+groupby preview is one row, counts still 85/82/3. `test_pnl_file_has_no_sidecar` — Status column on a GL file is dropped, no counts. |
+| File | What it proves |
+|---|---|
+| `tests/tools/test_roster_counts.py` (new) | `test_sentinel_shape_85_82_3` → `n_active=85`, `n_billed_in_period=82`, `count_delta=3`, `fee_sum_active=3825.00`. `test_status_case_and_whitespace_insensitive`. `test_suspended_pending_onhold_are_not_active` (R.2). `test_null_or_unparseable_last_billed_is_not_billed` (R.1). `test_missing_status_column_emits_nothing`. `test_count_delta_never_negative`. `test_empty_sidecar_zeros`. |
+| Isolated fixture (new) | `tests/tools/fixtures/kova_rmr_roster_mar_2026.csv` — 85 rows, 82 with `Last Billed` in March 2026, 3 Active-but-unbilled, fees summing to `3825.00`; plus a small GL fixture at `3540.00`. **Self-contained** — Sentinel's roster is not in the tracked tree (verified), so nothing may depend on it. Include at least one `Suspended` and one blank-status row as shape noise. |
+| `tests/tools/test_hint_computer.py` | **PR #11 regression:** a contracts sidecar whose `Last Billed` falls in April must still leave `crosses_period_boundary` False. Add `test_roster_counts_do_not_set_crosses_period_boundary`. |
+| `tests/tools/test_annual_prepayment.py` | **Negative:** Software `13,200` / `1,100` stays `accrual_mismatch`; `count_delta` absent; no count card. |
+| Dollar-only negative | `count_delta == 0` (and `None`) with a `285.00` gap → class `stale_reference`, and the narrative contains no "0 accounts" (R.6). |
+| `tests/agents/test_interpreter_classify.py` | Force `stale_reference` when `count_delta > 0`; matches / fee / deposit / annual still outrank it; Claude's contrary class is overridden; no seventh class. |
+| `tests/agents/test_consolidator.py` | `ReconciliationSource.row_count` stays `1`. Do **not** assert 85. |
+| Parser plumbing | `test_contracts_sidecar_survives_groupby` — preview collapses to one row while counts remain 85/82/3. `test_pnl_file_gets_no_roster_sidecar`. |
+| Gate tests | R.4: two contracts files → no counts. R.5: roster mapping to two GL accounts → no counts. R.7: immaterial account → counts discarded, no resurrected card. |
 
 ## G. Sequencing within the item
 
-Two PRs. Bigger than annual 12×; smaller than bank matcher.
+**Two PRs, but PR-A is materially smaller than the first pass assumed**, because
+Item 1 already built the interception, and `contracts` already detects.
 
-| PR | Ships | Default behaviour if merged alone | Safe? |
-|----|-------|-----------------------------------|-------|
-| **PR-A** | `file_type` argument on `parse_file_silently`; contracts sidecar; `roster_counts.py`; attach hint fields on the item; **no** force-class; **no** prompt change; `row_count=1` left alone | Extra JSONB keys, classifications unchanged. Claude may ignore counts. Guardrail: if Claude does not mention 85/82/3, still passes (numbers only checked when used). | **Yes.** Additive hints. |
-| **PR-B** | Interpreter force `stale_reference`; prompt template; guardrail appends the three ints; isolated 85/82/3 fixture; negatives (12×, cutoff, dollar-only) | Speech + force. Without B, counts sit unused. | Merge after A. Behaviour change is classification force + copy. |
+| PR | Ships | If merged alone | Safe? |
+|---|---|---|---|
+| **PR-A** | `contracts` entry in `_SIDECAR_COLUMNS`; `roster_counts.py`; optional hint fields; `_attach_roster_counts` writing them; **no** force-class, **no** prompt change | Extra JSONB keys only. No classification changes anywhere. Claude never sees the counts because the prompt does not mention them. | **Yes** — purely additive |
+| **PR-B** | Interpreter force-class; guardrail append; prompt + reinforced templates; isolated fixture assertions; all negatives | Speech + force. Without B the counts sit unused. | Merge after A |
 
-PR-A does not change default class of any existing fixture. That is why it is safe.
+A single PR is tempting given the smaller PR-A, but the split is still right:
+PR-A changes no card's class, so it can land and be observed on real uploads
+before any narrative depends on it — the same reason Item 1's PR-A was inert.
 
 ## H. Rollback
 
-- Revert PR-B first: force-class and prompt gone; leftover hint keys are ignored.
-- Revert PR-A: sidecar and helper gone. No SQL DOWN. No customer rows to delete (`monthly_entries` never stored them).
-- JSONB on old reports may still contain `n_active`; Pydantic defaults make them optional on read.
+- Revert PR-B: force-class and prompt gone; leftover hint keys are ignored by
+  every reader.
+- Revert PR-A: the `_SIDECAR_COLUMNS` entry, `roster_counts.py` and the attach
+  helper disappear. Item 1's sidecar machinery is untouched.
+- **No SQL to roll back, no backfill.** Nothing was written to `monthly_entries`,
+  no table was created. Old reports whose JSONB already carries `n_active` still
+  parse, because every field is optional with a default.
+
+## Open questions — flag, do not decide while coding
+
+1. **Should non-active statuses be counted separately?** R.2 folds
+   `Suspended` / `Pending` / `On Hold` into "not active". A future
+   `n_suspended` would let the narrative say "3 cancelled, 2 suspended", which
+   is more useful and more honest. Deferred from v1; needs a product call.
+2. **Should Sentinel's 85-row roster be restored to `docs/demo_data/`?** The
+   isolated fixture is required regardless (F), but the demo cannot show this
+   feature without the file. Restoring it is a separate decision from shipping
+   the item.
+3. **Mid-period rate changes (R.3) are deferred.** If real rosters commonly
+   represent a rate increase as two rows, the account count will overstate.
+   Revisit when a real dealer roster is available — not before.
 
 ---
 

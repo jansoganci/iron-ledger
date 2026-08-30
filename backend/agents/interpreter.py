@@ -118,6 +118,12 @@ def _is_annual_prepayment_hint(hints: dict) -> bool:
     )
 
 
+def _has_roster_count_gap(hints: dict) -> bool:
+    """Item 4: active accounts that were not billed this period (R.6)."""
+    delta = hints.get("count_delta")
+    return delta is not None and delta > 0
+
+
 def _is_coverage_item(item: dict) -> bool:
     if item.get("card_kind") == "coverage":
         return True
@@ -178,6 +184,13 @@ def _apply_reconciliation_classifications(
             continue
         if _is_annual_prepayment_hint(hints):
             item["classification"] = "accrual_mismatch"
+            continue
+        # Item 4 (R.6): a stale roster is a statement about the reference list,
+        # so it sits below fee/deposit/annual (statements about the money) and
+        # above Claude's own map. count_delta == 0 attaches counts but forces
+        # nothing — there is no "0 accounts" story.
+        if _has_roster_count_gap(hints):
+            item["classification"] = "stale_reference"
             continue
         account = item.get("account", "")
         if account in cls_map:
@@ -419,6 +432,21 @@ class InterpreterAgent:
                 candidate_count = match.get("candidate_count")
                 if candidate_count is not None:
                     recon_values.append(float(candidate_count))
+            # Item 4: roster counts are point values (R.8) — integers and
+            # money sums, never a ratio. No churn %, no "3 of 85" percentage
+            # may ever enter this pool.
+            if isinstance(hints, dict):
+                for roster_field in (
+                    "n_active",
+                    "n_billed_in_period",
+                    "count_delta",
+                    "fee_sum_active",
+                    "fee_sum_billed",
+                ):
+                    v = hints.get(roster_field)
+                    if v is not None:
+                        recon_values.append(float(v))
+                        recon_values.append(float(abs(v)))
             for count_field in (
                 "unmatched_count",
                 "unmatched_processor_count",
