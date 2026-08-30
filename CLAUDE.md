@@ -286,6 +286,8 @@ Agents import entities from `domain.entities`, never from adapters. Adapters are
 
 **Agents:** Each agent returns a typed dict. No loose string passing between agents.
 
+**Security:** Even when not asked, fix OWASP Top 10 risks you notice in the files you are already working on.
+
 ---
 
 ## Environment Variables
