@@ -20,6 +20,13 @@ SourceFileType = Literal[
     "payroll",
     "supplier_invoices",
     "contracts",
+    # Item 1 (bank/processor three-way). Declared in PR-A but deliberately NOT
+    # wired into orchestrator._FILE_TYPE_PATTERNS / _detect_file_type — that is
+    # PR-B. Until then no file can ever be detected as either of these, and a
+    # bank/processor upload keeps defaulting to supplier_invoices exactly as
+    # before. See kova2-implementation-plan.md item 1, sections C.2 and G.
+    "bank_statement",
+    "processor_settlement",
 ]
 
 DEFAULT_GL_CATEGORIES: list[str] = [
@@ -159,6 +166,81 @@ class NormalizerDropReport(BaseModel):
     total_dropped: int
 
 
+# ---------------------------------------------------------------------------
+# Item 1 — bank/processor three-way. PR-A ships these types INERT: nothing
+# constructs them yet, no detection recognises the new file types, and no
+# matcher exists. See kova2-implementation-plan.md item 1 C.1 / C.5.1.
+# ---------------------------------------------------------------------------
+
+
+class ProcessorSettlementRow(BaseModel):
+    """One FSM / job card-batch row (`processor_settlement`).
+
+    Sidecar only — these columns are copied off the raw frame BEFORE the
+    normalizer drops non-golden columns, so `GoldenField` and the P&L pandera
+    schema stay seven columns. Canonical names per C.5.1's frame table.
+    """
+
+    payout_id: str | None  # join id; None/blank is legal (ambiguous fallback)
+    gross: float  # required on this frame
+    net: float | None = None  # optional; absent in the C.5.3 fixture
+    collected_date: date | None = None
+
+
+class GLUFDetailRow(BaseModel):
+    """One Undeposited-Funds detail row lifted from the GL file.
+
+    Sidecar only the rows that carry a ref OR whose `gl_account` equals the
+    company's UF account name — per C.5.1, "Do not sidecar Rent".
+    """
+
+    gl_ref: str | None
+    gl_account: str | None
+    amount: float
+    gl_date: date | None = None
+
+
+class BankStatementRow(BaseModel):
+    """One bank / processor settlement row (`bank_statement`).
+
+    Per C.5.1: `gross` / `fee` / `net` when the export has them; otherwise
+    `amount` is net. `fee` is never trusted for the match decision — the
+    matcher recomputes it as `gross - net` (N3).
+    """
+
+    bank_ref: str | None
+    settlement_date: date | None = None
+    gross: float | None = None
+    fee: float | None = None  # informational only; never a match key
+    net: float | None = None
+    amount: float | None = None  # when present and `net` is absent, this is net
+
+
+class BatchMatch(BaseModel):
+    """One matched (or deliberately unmatched) cash batch.
+
+    Frozen shape per C.1. Note there is NO `fee_pct` field, by decision E.1:
+    it is an internal pandas gate computed inline in the matcher and must never
+    reach a serialized payload or a prompt placeholder.
+    """
+
+    match_id: str
+    processor_ref: str | None
+    bank_ref: str | None
+    gl_ref: str | None
+    gl_account: str | None
+    gl_amount: float | None  # UF (or wrong-account) line; None if no GL row
+    gross: float
+    fee: float
+    net: float
+    settlement_date: date | None
+    match_kind: Literal["id", "amount_date", "none"]
+    ambiguous: bool
+    candidate_count: int
+    unmatched: bool
+    classification: ReconciliationClassification | None = None
+
+
 class ReconciliationSource(BaseModel):
     source_file: str
     amount: float
@@ -198,3 +280,9 @@ class ReconciliationItem(BaseModel):
     hints: ReconciliationHints = ReconciliationHints()
     # "coverage" = GL line with no uploaded supporting file. Not a 7th class.
     card_kind: Literal["exception", "coverage"] = "exception"
+    # Item 1: several cash batches nested under one UF account line. Optional
+    # with a None default so existing JSONB on reports still parses unchanged.
+    # Nothing populates this in PR-A. Per decision E.6, per-batch classes live
+    # here — NarrativeJSON.reconciliation_classifications keeps its
+    # dict[account -> class] shape and never carries a match_id.
+    matches: list[BatchMatch] | None = None

@@ -1,0 +1,8 @@
+payout_id,collected_date,gross,customer
+PZ-100,2026-03-15,1000.00,Oak Street Dental
+PZ-200,2026-03-31,2000.00,Harbor HVAC
+PZ-300,2026-03-20,500.00,Mill Road Alarm
+PZ-500,2026-03-18,600.00,Pine Ridge
+PZ-900,2026-03-10,300.00,True Negative LLC
+,2026-03-25,100.00,Ambiguous A
+,2026-03-25,100.00,Ambiguous B

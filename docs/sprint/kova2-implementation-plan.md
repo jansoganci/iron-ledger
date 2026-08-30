@@ -627,7 +627,21 @@ Account-total fee-band stays the **fallback** when the user did not upload a set
 
 **Do not** add `batch_id` / `gross` / `fee` / `net` to `GoldenField` for every file (pandera `strict=True` on P&L would then require those columns). Prefer a **sidecar** typed model, e.g. `ProcessorSettlementRow` / `BankStatementRow`, used only when `file_type` is the new literals.
 
-**Modify `ReconciliationItem` (JSONB, no migration):** optional nested `matches: list[BatchMatch] | None = None` (or equivalent) so several batches on one UF line can be classified without a seventh class. `NarrativeJSON.reconciliation_classifications` is `dict[account → class]` today — **insufficient** for per-batch speech. Future interpreter must classify by match id **or** nest class on each match and keep the account-level class as the primary residue. Do not invent a seventh enum. Exact shape to freeze at build time:
+**Modify `ReconciliationItem` (JSONB, no migration):** optional nested `matches: list[BatchMatch] | None = None` so several batches on one UF line can be classified without a seventh class. Do not invent a seventh enum.
+
+**DECIDED (gap E.6 — resolved 30 August 2026).** The earlier "classify by match id **or** nest class on each match" fork is closed in favour of **nesting**. The rule:
+
+1. `NarrativeJSON.reconciliation_classifications` **stays exactly `dict[account → ReconciliationClassification]`. No JSON shape change, no new key, no match ids in Claude's output.**
+2. Per-batch classes live on `BatchMatch.classification`, set by **pandas** in `_classify` and forced by the interpreter. Claude never writes them.
+3. The account-level `ReconciliationItem.classification` is the **residue**: pandas picks the most action-requiring class among that account's matches, using this fixed order (first present wins):
+
+   `missing_je` → `categorical_misclassification` → `stale_reference` → `timing_cutoff` → `structural_explained`
+
+   Rationale: action-required beats no-action. A card must never read "No action required" (`structural_explained` / `timing_cutoff`) while a batch nested under it needs a JE or a reclass.
+
+**Why nesting, not match-id keying.** Keying `reconciliation_classifications` by `match_id` would require Claude to emit pandas-constructed opaque identifiers it cannot verify; one typo becomes an unmatched key and a silently dropped classification. Nesting leaves Claude's output shape untouched, keeps every per-batch class pandas-forced (golden rule), and is backward compatible — old clients that ignore unknown keys keep working, and reports without `matches` behave exactly as today.
+
+Exact shape to freeze at build time:
 
 ```python
 class BatchMatch(BaseModel):
@@ -649,6 +663,37 @@ class BatchMatch(BaseModel):
 ```
 
 Numbers are pandas. Claude copies `gross` / `fee` / `net` / `gl_amount` / `candidate_count`. Never subtracts. Never counts candidates in prose. `fee_pct` is an internal pandas gate only — **not** a prompt placeholder (no “4.5%” in the sentence).
+
+**DECIDED (gap E.1 — resolved 30 August 2026): `fee_pct` is NOT a field on `BatchMatch`.**
+
+The model above is final as written — no `fee_pct` field, private or otherwise. `_classify` computes it inline from `gross` and `fee`, both of which are already on the model:
+
+```python
+def _fee_pct(gross: float, fee: float) -> float | None:
+    """Internal pandas gate for the 3–8% band. Never stored, never serialized,
+    never a prompt placeholder. Returns None when gross is 0."""
+    if gross == 0:
+        return None
+    return abs(fee) / abs(gross)
+```
+
+`_classify` calls it once: `fee_pct = _fee_pct(m.gross, m.fee)`.
+
+**Why inline rather than `PrivateAttr` / `exclude=True`.** A derived gate is not state. Computing it inline means there is **no serialization path at all**, so the Claude-facing exclusion is enforced structurally rather than by Pydantic configuration that a later `model_dump(mode=...)` change could quietly defeat. It also leaves the frozen model byte-identical, so PR-A ships the shape above unchanged. `PrivateAttr` would work but adds a field that must be set at construction and re-audited on every serializer change; the exclusion rule is too important to hang on config.
+
+**DECIDED (gap E.4 — resolved 30 August 2026): `match_id` construction.**
+
+`match_id` is required and must be **deterministic** — the same three input files must always produce the same ids, since C.8 may key per-batch speech off them. Construction by `match_kind`:
+
+| `match_kind` | `match_id` |
+|---|---|
+| `"id"` (Pass 1, unique **or** ambiguous) | `norm(id_val)` — the normalized join id, i.e. `str(id).strip().casefold()`. Example: `PZ-100` → `pz-100`. |
+| `"amount_date"` (Pass 2, unique **or** ambiguous) | `f"ad:{amount:.2f}:{day.isoformat()}"` from the **group key**, not from any member row. Example: the blank-ref `$100` pair → `ad:100.00:2026-03-25`. |
+| `"none"` (Pass 3 leftover) | `f"none:{side}:{norm(ref)}"` when the leftover row has a non-null ref (`side` ∈ `fsm` \| `bank`). Example: DEP-99 → `none:bank:dep-99`. When the ref is null: `f"none:{side}:{amount:.2f}:{day.isoformat()}:{seq}"`, where `seq` is the row's 0-based ordinal among leftovers on the **same side** sharing that amount and date, assigned in ascending `_orig_row_index` order. |
+
+**Uniqueness.** Pass 1 emits exactly one match per `id_val`; Pass 2 emits exactly one match per `(amount, date)` group (unique **or** ambiguous branch, never both); Pass 3 emits one per leftover row. The `ad:` and `none:` prefixes make cross-kind collision impossible, and a Pass-1 id can never reappear as a Pass-3 ref because an id living on ≥2 sides is consumed in Pass 1 while an id on exactly one side is never emitted there.
+
+**Stability across re-runs.** Every input to the construction is derived from file content — the normalized id, the rounded amount, the calendar date — except `seq`, which is derived from `_orig_row_index` (row order within the uploaded file). For identical input files all four are identical, so `match_id` is stable. Do **not** use a UUID, a hash of object identity, an insertion counter, or anything derived from dict/set iteration order.
 
 **Modify `ReconciliationHints` only if a post-match bool is needed** (e.g. `is_three_way_fee_explained`). Prefer putting the speech act on `BatchMatch.classification` + interpreter force, not a new hint that re-runs after `groupby` (groupby already destroyed ids).
 
@@ -735,26 +780,75 @@ A three-way **ID match** is `norm(payout_id) == norm(gl_ref) == norm(bank_ref)` 
 | Fee band for “fee explained” | reuse Kova 1 `_FEE_BAND_MIN/_MAX` = **3%–8% of gross** (`hint_computer.py`) | Already shipped. Do not invent Jobber 2.9% (triage forbade unverified vendor rates in prompts). |
 | ±1 business day | **out of v1** | Was a leftover sentence in this spec. Withdrawn because no research number backs it. Revisit only if a real dealer file shows same-id or same-net pairs that miss same-calendar-date; that is a new go-ahead, not a silent widen. |
 
-**Pandas fee (always, never Claude):**
+**Pandas amounts (always, never Claude).**
 
-```
-if settlement.gross is not None and settlement.net is not None:
-    gross = round(float(settlement.gross), 2)
-    net   = round(float(settlement.net), 2)
-else:
-    gross = round(float(fsm.gross), 2)          # FSM collection
-    net   = round(float(bank.amount), 2)        # bank deposit
-fee = round(gross - net, 2)
-fee_pct = abs(fee) / abs(gross) if gross != 0 else None   # pandas; not copied to the prompt as a %
-```
+**DECIDED (gap E.2 — resolved 30 August 2026).** The earlier two-branch snippet was undefined for a match with no bank/settlement row, which Pass 2 can reach (FSM↔GL on the same amount and date). Three readings were possible — `net := gross`, `net := None`, `net := 0.0` — producing a dropped card, a `TypeError`, and a spurious 100%-fee card respectively. The rules below are exhaustive and ordered. Apply **N1 → N2 → N3**, in that order, for every match regardless of pass.
+
+**N1 — `net`** (cash that actually landed):
+
+1. Settlement/bank row in the match **and** it has `net` → that value.
+2. Settlement/bank row in the match, no `net`, has `amount` → that amount. Per the frame table above, a bank `amount` **is** net.
+3. **No settlement/bank row in the match → `net := gross`** (from N2).
+
+**N2 — `gross`** (amount collected before deductions):
+
+1. Settlement/bank row in the match **and** it has `gross` → that value.
+2. Else FSM row in the match → FSM `gross`.
+3. Else → `gross := net`.
+
+**N3 — `fee`**: `fee = round(gross - net, 2)`. Always. Never from a vendor `fee` column.
+
+All three round to 2dp with `round(float(x), 2)` before use.
+
+**Terminal case (N1.3 and N2.3 both firing).** Only reachable for an **ambiguous group with no FSM and no settlement row** — e.g. two GL rows sharing an amount and date, which Pass 2 marks ambiguous. Set `gross = net = fee = 0.00`. `_classify` returns at the `ambiguous` rule before any amount is read, so these values are never surfaced. A GL-only *leftover* never reaches here at all — Pass 3 leaves unused GL UF lines to coverage/consolidator.
+
+**Ambiguous matches do not borrow amounts from a member row.** When `ambiguous=True`, picking one row's amount would be the silent pick rule (c) forbids. For a Pass-2 ambiguous group, `gross = net = the group's amount key` and `fee = 0.00` — this is what lets the fixture's blank-ref sentence copy `100.00`. For a Pass-1 ambiguous group (same id on more than one row on a side), `gross = net = fee = 0.00`; the narrative may copy only `candidate_count` and the id.
+
+**Why `net := gross` and not `0.0` when there is no bank row.** With no settlement row in the match there is no evidence of any deduction. `net := gross` states "no fee observed"; `net := 0.0` would assert that the entire collection was consumed by fees, producing `fee_pct = 1.0`, falling past the 3–8% band to the residue rule, and emitting a spurious `stale_reference` card for what is actually a clean FSM↔GL pair. Verified against the true-negative path: a clean FSM↔GL match booked to the UF account gets `fee = 0.00` and `gl_amount == net`, so `_classify` rule 6 drops it — **no card** — exactly as PZ-900 does with a bank row present.
 
 If the settlement file also has a `fee` column, **ignore it for the match decision**. Guardrail-safe number is pandas `gross - net`. (A disagreeing fee column is a file-quality issue, not a second match key.)
 
-**Classification priority** (`_classify`, pandas, then interpreter force). First matching rule wins. **Do not apply the 3–8% fee band unless a GL row is in the match** — otherwise PZ-300 (`fee_pct = 0.04`, no GL) would be labelled `structural_explained` and the state table would be a lie.
+**DECIDED (gap E.3 — resolved 30 August 2026): `settlement_date` precedence.**
+
+**S1.** `BatchMatch.settlement_date` is populated **only** from the bank/processor settlement row's `settlement_date`. FSM `collected_date` and GL `gl_date` are **never** used, at any precedence, even when the settlement row is absent.
+
+**S2.** No settlement/bank row in the match → `settlement_date = None`.
+
+**S3.** There is never a within-side conflict to resolve on a **non-ambiguous** match: it holds at most one row per side (Pass 1 routes `len(rows) > 1` to the ambiguous branch before emit; Pass 2's unique branch requires `nf ≤ 1 and ng ≤ 1 and nb ≤ 1`). So "precedence" is a single-source rule, not a tie-break.
+
+**S4 — ambiguous matches.** An ambiguous group may hold several settlement rows, and picking one would be the silent pick rule (c) forbids. Therefore:
+
+- **Pass 2 ambiguous** (grouped by `(amount, date)`): `settlement_date = the group's date key`. Every member shares that date by construction, so no row is being preferred. This is what populates `2026-03-25` on the fixture's blank-ref card.
+- **Pass 1 ambiguous** (same id on more than one row on a side): `settlement_date = None`. Members may carry different dates and there is no key to fall back on.
+
+Either way rule 1 classifies the match `stale_reference` before the cutoff rule is reached, so `settlement_date` on an ambiguous match is display context only — never a classification input.
+
+**Why only the settlement row.** `timing_cutoff` asserts that *the payout settled after the period closed*. Only the settlement row records a settlement event. PZ-200 is the case that forces this: FSM `2026-03-31` and GL `2026-03-31` are both inside the period, and only the bank row's `2026-04-02` is outside it. Sourcing the date from FSM or GL would classify PZ-200 as a fee, and the state table would be wrong.
+
+**Consequence — a no-bank match can never be `timing_cutoff`.** Because the cutoff rule is guarded by `settlement_date is not None`, an FSM↔GL match is ineligible for `timing_cutoff` no matter how late its FSM or GL dates are. **This is intentional.** With no settlement row there is no evidence the money ever moved, so the honest classes are "not in the GL" (`missing_je`), "booked to the wrong account" (`categorical_misclassification`), or residue (`stale_reference`). A late FSM collection with no payout is a missing-payout story, not a cut-off; calling it `timing_cutoff` would assert a settlement event the uploaded files do not show, and would tell the user "expect this to clear next month" about money that may never have settled.
+
+**Classification priority** (`_classify`, pandas, then interpreter force). First matching rule wins.
+
+**CORRECTED (nit E.7 — resolved 30 August 2026).** Earlier prose in and around this document summarised the order as "cutoff → missing GL → wrong UF → fee → `$0` drop → stale". That omitted the **ambiguous** check, which runs **first, above cutoff**. The complete and authoritative order is:
+
+| # | Rule | Result |
+|---|---|---|
+| 1 | `m.ambiguous` | `stale_reference`, `unmatched=True` |
+| 2 | `settlement_date is not None and settlement_date > period_end` | `timing_cutoff` |
+| 3 | `not has_gl` | `missing_je`, `unmatched=True` |
+| 4 | `gl_account != uf_account_name` | `categorical_misclassification` |
+| 5 | `fee_pct` in `[0.03, 0.08]` | `structural_explained` |
+| 6 | `fee == 0 and gl_amount is not None and round(gl_amount,2) == round(net,2)` | **drop — no card** |
+| 7 | otherwise | `stale_reference` (matched residue outside the fee band) |
+
+**Ambiguous outranks cutoff deliberately.** You cannot assert that a *specific* batch settled after `period_end` when you have refused to identify which row that batch is. Rule 1 is a statement about our confidence, not about the money; every later rule presumes a single identified counterpart. Do not "restore" cutoff to the top.
+
+**Do not apply the 3–8% fee band unless a GL row is in the match** — otherwise PZ-300 (`fee_pct = 0.04`, no GL) would be labelled `structural_explained` and the state table would be a lie. This is why rule 3 sits above rule 5.
 
 ```
 def _classify(m, period_end, uf_account_name) -> BatchMatch | None:
     has_gl = m.gl_account is not None or m.gl_ref is not None or m.gl_amount is not None
+    fee_pct = _fee_pct(m.gross, m.fee)   # E.1: computed here, never a model field
 
     if m.ambiguous:
         m.classification = stale_reference          # (c)
@@ -776,7 +870,7 @@ def _classify(m, period_end, uf_account_name) -> BatchMatch | None:
         m.classification = categorical_misclassification  # state 5
         return m
 
-    if m.fee_pct is not None and 0.03 <= m.fee_pct <= 0.08:
+    if fee_pct is not None and 0.03 <= fee_pct <= 0.08:
         m.classification = structural_explained     # state 1
         return m
 
@@ -793,7 +887,17 @@ Unmatched after both passes (Pass 3 leftovers call `_classify` with `match_kind=
 - Bank row with no GL and no unique FSM ID/fallback → `missing_je` (`unmatched_bank`).
 - Ambiguous (rule c below) → `stale_reference`, `ambiguous=True`, `unmatched=True`. **Not** `missing_je` (the money is on more than one row; we refused to pick).
 
-**Fallback never explains fees.** Pass 2 compares **net to net** (`round(..., 2)`), never FSM `gross` to bank `net`. A PZ-100-shaped batch with ids stripped (`1000.00` FSM/GL vs `955.00` bank, same date) does **not** become `structural_explained`. It may ID-fail, then fsm↔gl unique on `1000.00` (dropped as $0 if booked to UF) plus leftover bank `955.00` → `missing_je`. Fee speech requires either (1) an **ID** triple/pair that includes the settlement row’s gross and net, or (2) the Kova 1 **account-total** 3–8% hint when no settlement sidecar exists. Do not “fix” this by widening dollar tolerance into the fee band.
+**Fallback never explains fees — and the reason is the `$0.00` tolerance, not the choice of column.**
+
+**CORRECTED (nit E.5 — resolved 30 August 2026).** Earlier prose here claimed Pass 2 "compares **net to net**, never FSM `gross` to bank `net`." That is not what the pseudocode does. FSM `net` is *optional* (see the frame table above) and the C.5.3 fixture's FSM file has **no `net` column at all**, so in the canonical case the grouping key takes `fsm.net if present else fsm.gross` — an FSM **gross** — and compares it against a bank **net**. Gross and net share one key space.
+
+The guarantee still holds, for a different reason. Grouping requires **exact equality after `round(..., 2)`** — the `$0.00` dollar tolerance locked in the assumptions table. A gross and a net can only land in the same group when `fee == 0`, which is a genuine match, not a fee in disguise. Any batch carrying a real fee has `gross ≠ net`, so the two values fall into different groups and never meet.
+
+Worked through: a PZ-100-shaped batch with ids stripped (`1000.00` FSM/GL vs `955.00` bank, same date) does **not** become `structural_explained`. It ID-fails, then fsm↔gl groups uniquely on `1000.00` (no bank row → N1.3 gives `net := gross`, `fee = 0.00`, dropped by rule 6 if booked to UF), and the leftover bank `955.00` goes to Pass 3 → `missing_je` by rule 3, since `has_gl` is false there. The bank row's own `fee_pct` of `0.045` is never reached.
+
+**The tolerance lock and this guarantee are the same lock.** Widening the dollar tolerance into fee territory would let a gross and a net group together *while a fee exists*, which is precisely how a real exception becomes a false "no action required." Do not treat them as two independent decisions, and do not "fix" a missed match by relaxing the tolerance.
+
+Fee speech requires either (1) an **ID** triple/pair that includes the settlement row’s gross and net, or (2) the Kova 1 **account-total** 3–8% hint when no settlement sidecar exists.
 
 **Pseudocode (literal build order for `batch_matcher.match`):**
 
@@ -1034,6 +1138,25 @@ No `fee` column on purpose: pandas `fee = gross - net`.
 
 `unmatched_processor_count = 0` after ID/fallback (ambiguous FSM rows are consumed as ambiguous, not as unmatched-processor). `unmatched_bank_count = 1` (DEP-99) plus the ambiguous bank pair counted as ambiguous, not unmatched.
 
+**Re-verification after gaps E.1–E.7 were closed (30 August 2026).** Every expected outcome above was re-traced against the new N/S rules and the corrected priority table. **All seven are unchanged** — these were fixes to unstated rules, not changes to intended behaviour. The added column is the `match_id` now produced by the E.4 rule.
+
+| Fixture id | Path | `gross` / `net` / `fee` (N rules) | `settlement_date` (S rules) | Deciding rule | Class | Card? | `match_id` |
+|---|---|---|---|---|---|---|---|
+| PZ-100 | Pass 1 id, 3 sides | N1.1/N2.1 → 1000.00 / 955.00 / 45.00 | S1 → 2026-03-15 | 5 (`fee_pct` 0.045 in band) | `structural_explained` | yes | `pz-100` |
+| PZ-200 | Pass 1 id, 3 sides | N1.1/N2.1 → 2000.00 / 1920.00 / 80.00 | S1 → **2026-04-02** (bank only) | 2 (cutoff, above fee) | `timing_cutoff` | yes | `pz-200` |
+| PZ-300 | Pass 1 id, FSM+bank | N1.1/N2.1 → 500.00 / 480.00 / 20.00 | S1 → 2026-03-20 | 3 (`not has_gl`, above fee) | `missing_je` | yes | `pz-300` |
+| DEP-99 | Pass 3 leftover bank | N1.1/N2.1 → 750.00 / 750.00 / 0.00 | S1 → 2026-03-22 | 3 (`not has_gl`) | `missing_je` | yes | `none:bank:dep-99` |
+| PZ-500 | Pass 1 id, 3 sides | N1.1/N2.1 → 600.00 / 600.00 / 0.00 | S1 → 2026-03-18 | 4 (wrong account, **above** rule 6's drop) | `categorical_misclassification` | yes | `pz-500` |
+| PZ-900 | Pass 1 id, 3 sides | N1.1/N2.1 → 300.00 / 300.00 / 0.00 | S1 → 2026-03-10 | 6 (`fee == 0`, `gl_amount == net`) | — | **no** | `pz-900` |
+| blank ×2 | Pass 2 ambiguous | ambiguous → 100.00 / 100.00 / 0.00 (group key) | S4 → 2026-03-25 (group key) | 1 (ambiguous, above cutoff) | `stale_reference` | yes | `ad:100.00:2026-03-25` |
+
+Two rule interactions worth pinning in the PR-B tests, both load-bearing and neither obvious:
+
+- **PZ-500 survives only because rule 4 outranks rule 6.** It has `fee == 0.00` and `gl_amount == net`, which is rule 6's drop condition verbatim. Rule 4 fires first because the GL booked it to `Accounts Receivable`, not the UF account. If the order were ever reversed, a wrong-account batch would silently vanish instead of raising `categorical_misclassification`.
+- **The blank-ref pair yields `candidate_count = 2`, not 4.** `max(nf, ng, nb) = max(2, 0, 2)`. Counting group members instead of per-side maxima gives 4 and the narrative would overstate the ambiguity.
+
+Also re-verified: `test_does_not_match_on_gross_against_net` (PR-B, section F). With ids stripped, FSM/GL group uniquely on `1000.00` with **no bank row** → N1.3 sets `net := gross`, `fee = 0.00`, and rule 6 drops the card; the bank `955.00` falls to Pass 3 and hits rule 3 (`not has_gl`) → `missing_je`. The bank row's own `fee_pct` of 0.045 is never reached, so no `structural_explained` appears. Unchanged from the original intent.
+
 **Negatives (not in this fixture, still required in PR-B tests):** Vandelay Shopify payouts without a bank file → matcher does not claim three-way. Sentinel Bank Charges $95 is not this item.
 
 **Prompt placeholders Claude may copy from a `BatchMatch`:** `gross`, `fee`, `net`, `gl_amount`, `settlement_date`, `period_end` (already known), `candidate_count`. **Forbidden in the prompt:** “subtract,” “4.5%,” “about 2,” any Jobber/Stripe rate. `fee_pct` is pandas-internal for `_classify` only — do not serialize it onto the item that Claude sees.
@@ -1053,6 +1176,12 @@ Do not scan P&L for `batch_id`.
 ### C.8 `backend/agents/interpreter.py`
 
 **Modify `_apply_reconciliation_classifications` (~115) and `_classify_from_hints` (~71):** if an item has `matches`, force each match’s pandas class; do not let Claude pick `structural_explained` without a match or fee hint (existing guard already blocks unprompted `structural_explained` at ~140–141).
+
+**Account-level residue (per the E.6 decision in C.1).** When an item has `matches`, the item's own `classification` is set by **pandas**, not by Claude, to the most action-requiring class present among its matches, in this order (first present wins):
+
+`missing_je` → `categorical_misclassification` → `stale_reference` → `timing_cutoff` → `structural_explained`
+
+Claude's `reconciliation_classifications` entry for that account is **overridden**, exactly as the existing force path does for hints. `NarrativeJSON.reconciliation_classifications` keeps its `dict[account → class]` shape — Claude never sees or emits a `match_id`. Matches dropped by `_classify` (rule 6, the true negative) contribute nothing; if every match on an account is dropped, the item has no matcher story and falls back to today's account-total behaviour.
 
 **Modify `_run_with_guardrail` (~340–347):** for each recon item, also append pandas `gross`, `fee`, `net`, and unmatched counts (and `abs` of each, same pattern as `delta`). Exact fields: `item["matches"][i]["gross"]`, `["fee"]`, `["net"]`, plus a top-level `unmatched_count` if present. If `matches` is absent, behaviour is today’s list.
 
