@@ -2,8 +2,8 @@
   "name": "monthproof",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c blue,green --kill-others-on-fail \"uvicorn backend.main:app --reload --port 8000\" \"npm --prefix frontend run dev\"",
-    "dev:backend": "uvicorn backend.main:app --reload --port 8000",
+    "dev": "concurrently -n backend,frontend -c blue,green --kill-others-on-fail \".venv/bin/uvicorn backend.main:app --reload --port 8000\" \"npm --prefix frontend run dev\"",
+    "dev:backend": ".venv/bin/uvicorn backend.main:app --reload --port 8000",
     "dev:frontend": "npm --prefix frontend run dev",
     "video:dev": "npm --prefix video run dev",
     "video:render": "npm --prefix video run render",
