@@ -1,3 +1,113 @@
+# IronLedger — Audit Status
+
+> **This file has two parts.** The section immediately below is the **current,
+> post-merge status**, re-verified against `main` at the HEAD named in it.
+> Everything after it — Tours 1, 2 and 3 — is the **historical audit record**
+> as written against the pre-merge snapshot `31492f9`. The historical sections
+> are deliberately **not** edited. Where they are now stale, the
+> "Stale in the historical record" table below says so explicitly.
+
+## Current Status (post-merge)
+
+**Verified against:** `main` @ `3534236` (`documents committed`), in sync with
+`origin/main`. Every row below was re-checked by reading current code, tests,
+migrations and prompts — not carried over from the earlier audit text.
+
+**Test suite on this HEAD: `262 passed, 5 skipped, 0 failed, 0 errors`.**
+
+Note this supersedes the historical `237 passed, 5 skipped`. The count rose
+because the guardrail fix added 25 tests and the stack landed the rest; the
+`test_parser_end_to_end.py` failure and four errors that the Tour 1 audit
+treated as pre-existing are **gone** — PR #1 carried commit `90173b4`, which
+fixed them.
+
+### a. What is actually live on `main` right now
+
+The entire Kova 1 stack, Item 5, and the guardrail fix are all merged. Item 1
+remains spec-only, exactly as designed.
+
+| Area | State |
+|---|---|
+| **Guardrail** | Corrected version live. Unit-aware tolerances, narrative parser, `strict=True` on the Interpreter path. |
+| **Kova 1 (six items)** | All live: materiality AND-gate, coverage/`card_kind`, deposit-vs-fee hints, cutoff allowlist, annual prepayment, PAYROLL tagging. |
+| **Item 5** | Live: `_gates_from_band`, `_BAND_R`, migration `0010`, `PATCH /companies/me`, `RevenueBandField.tsx`. |
+| **Item 1** | **Spec only — no code.** Re-confirmed absent: no `batch_matcher.py`, no `BatchMatch` symbol, `SourceFileType` still exactly four literals, no `kova_cash_*` fixtures. |
+| **Item 4, parked 2/3/6** | Not started. `roster_counts.py` absent; zero `RMR`/`roster_count` references in `backend/`. |
+| **Migrations** | `0001`–`0010`: 10 files, 10 unique prefixes, no gaps, no duplicates. |
+| **Classifications** | Exactly **six**. No seventh value appeared through any merge. |
+
+### Stale in the historical record (Tours 1–3 below)
+
+These statements were true when written and are **false now**. They are left
+in place unedited; this table is the correction.
+
+| Historical claim | Location | Now |
+|---|---|---|
+| "They have not landed on `main`." | Tour 1, Executive conclusion | **False.** The full chain `#1 → #2 → #4 → #9 → #11 → #13 → #14 → #15 → #16 → #17` is merged. |
+| "PRs #2, #4, #5, #9, #11, #13, #16, #17 are all open; most are drafts." | Tour 1, Delivery-state caveat | **False.** All merged except **#5**, closed unmerged as superseded by #16. |
+| "the numeric guardrail does not currently enforce the stated golden rule" | Tour 1, Executive conclusion / §B.1–B.4 | **Fixed** for the Interpreter path. §B.5 (quarterly / opus prompts) is still open — see table (c). |
+| "Verified on stack; not landed" (PAYROLL, `card_kind`, migration `0010`) | Tour 2, §A rows 3, 4, 8 | **Now landed.** |
+| "`237 passed, 5 skipped`" | Tour 1 §A / §D | Superseded: **262 passed, 5 skipped**. |
+| "`guardrail.py:21` cites `docs/sprint/guardrail-fix-pre-analysis.md`, which is not in the repo" | Post-Tour-3 note | **Resolved.** That doc is committed in `3534236`. |
+| "the working tree is also dirty and contains only a partial mixture of coverage/UI edits" | Tour 1, Delivery-state caveat | **Resolved.** Reconciled: two unique items kept, the rest discarded as superseded by #4. |
+
+### b. COMPLETE — verified merged and working as claimed
+
+| Item | Verified on `main` |
+|---|---|
+| **Guardrail — tolerance split** | `flatten_summary_by_unit` present; money `max($0.01, 1e-6×ref)`, percent `0.05pp`. Invented-value acceptance measured at **0.015%**, down from 40.9%. |
+| **Guardrail — narrative parser** | `parse_narrative_numbers` present; ignores dates, ordinals, counts, GL codes. |
+| **Guardrail — `implied_monthly`** | Now **genuinely live**, not inert: `#13` added the hint, and a `1,000.00` implied-monthly value was confirmed to pass the guardrail end-to-end. |
+| **Guardrail — reinforced prompt** | `narrative_prompt_reinforced.txt` carries PART 2, the six-class taxonomy, and the full JSON shape. A retry can no longer silently drop reconciliation findings. |
+| **Kova 1 #2 — materiality AND-gate** | `_is_material(delta, delta_pct=None)` present in `consolidator.py`. |
+| **Kova 1 #4 — coverage / `card_kind`** | `card_kind` on `ReconciliationItem`; coverage is a card kind, not a seventh class. |
+| **Kova 1 #9 — deposit vs processor fee** | `is_customer_deposit` and `is_processor_fee_gap` both present as separate hints. |
+| **Kova 1 #11 — cutoff allowlist** | `_crosses_period_boundary` with roster/renewal exclusions present. |
+| **Kova 1 #13 — annual prepayment** | `implied_monthly` on `ReconciliationHints`; same-item 12× ratio. |
+| **PAYROLL tagging** | `account_tags.py` present with the **newer** `str \| None` signature from #16 — confirming #5 was correctly closed as superseded. |
+| **Item 5 — revenue-scaled materiality** | `_gates_from_band`, `_BAND_R`, `0010`, `PATCH /companies/me`, `RevenueBandField.tsx` all live. |
+| **Item 1 — spec freeze** | `docs/sprint/kova2-implementation-plan.md` on `main`; **no** implementation leaked. |
+| **Cherry-picked items** | `CLAUDE.md` OWASP/Security line and `tests/tools/test_excel_export.py` both committed and tracked in `3534236`; the export test passes now that #4's changes are in. |
+
+### c. COMPLETE WITH OPEN NOTES — shipped, with a known loose end
+
+Every row was re-verified as **still open** on this HEAD. Nothing here is
+resolved by this document.
+
+| # | Item | Open note (verified still open) | Source |
+|---|---|---|---|
+| 1 | Guardrail Stage 1 | `ENFORCE_NARRATIVE_CONSISTENCY = False` — narrative/`numbers_used` mismatches are **logged, not blocking**. Deliberate: one release of measurement before enforcing. | Fix decision 3 |
+| 2 | `quarterly.py` | Still calls `verify_guardrail` **without** `strict=True` → legacy `max(1%, $1,000)`. Its prompt still asks Claude to derive `{N} of {M}` / `year-1` (2 matches), so it cannot be migrated until that prompt is fixed. | Tour 1 §B.5 |
+| 3 | `opus_upgrade.py` | Also still legacy (no `strict=True`); `opus_narrative_prompt.txt` still says "net position if derivable". Drifts from the Interpreter's standard. | Tour 1 §B.5 |
+| 4 | `delta_pct` | Deliberately **excluded** from the guardrail reference pool — adding it would widen the accepted set. Recorded so it is not re-proposed as an oversight. | Fix decision 1 |
+| 5 | Migration `0010` | `ADD COLUMN` is guarded by `IF NOT EXISTS`; `ADD CONSTRAINT` is **not** (Postgres has no such form). Re-running `0010` errors. | Tour 2 E.1 |
+| 6 | Item 5 tests | `test_icp_100k_250k_salaries_flags` and `test_payroll_name_uses_tier2_of_band` **still do not discriminate** Tier 1 from Tier 2 — re-confirmed by probe: both paths flag, so they'd pass even if `is_payroll_account` were deleted. Routing itself is proven by `test_tier2_payroll_fires_at_lower_gates`. | Tour 2 E.2 |
+| 7 | `seed.sql` | Does not set `monthly_revenue_band` (0 matches) → demo company runs on the NULL fail-safe `$50k/$10k` and never exercises Item 5. | Tour 2 E.3 |
+| 8 | `500k_plus` band | Unbounded above; a `$500k/mo` and a `$5M/mo` company get identical gates. | Tour 2 E.4 |
+| 9 | Percentage gates | `_TIER1_PCT`/`_TIER2_PCT` are fixed across bands — only the dollar gates scale. | Tour 2 E.5 |
+| 10 | Hint leakage | `_crosses_period_boundary` still scans the whole involved file rather than rows belonging to the reconciliation account. | Tour 1 E.2 |
+| 11 | Processor-fee signal | `_is_processor_fee_gap` still has **no** file/account-identity or direction check — any two-sided 3–8% gap is forced to `structural_explained`. | Tour 1 E.3 |
+| 12 | `compute_hints` fallback | Still catches every exception and returns an empty hint object; a hint-engine defect degrades classification silently. | Tour 1 E.4 |
+| 13 | Repo formatting | `black --check backend tests` → **7 files would be reformatted**; `flake8` → **535 violations** (systemic: no flake8 config, so the 79-char default fights black's 88). | Tour 1 §D |
+| 14 | Demo data | `docs/demo_data/` holds six named company folders; the `drone_*.xlsx` files referenced in `CLAUDE.md` **do not exist** (0 found). | Tour 2 E.3 |
+
+### d. NOT STARTED — priority ordered
+
+Ordering logic is stated per row on three axes: **ICP value**, **architectural
+risk if built carelessly**, and **dependency on anything not yet built**.
+Remediation of the table (c) loose ends is tracked there, not repeated here.
+
+| Rank | Item | ICP value | Architectural risk | Dependency | Why this rank |
+|---|---|---|---|---|---|
+| **1** | **Item 1 — bank/processor three-way (PR-A/B/C)** | **Highest.** Cash reconciliation is the core field-service close pain; the spec targets exactly the ICP (one processor, one UF account, one bank, one period). | **Moderate but contained.** Spec is frozen, scope-locked, and emits only existing classes. Risk is in the four unresolved spec gaps below, not the design. | **None unbuilt.** Item 5 has shipped, which was its stated roadmap pre-condition. | Highest value, no blocking dependency, and the spec is already frozen — the only work left is closing four gaps and building it. |
+| | ↳ **Prerequisite gaps (Tour 3 E.1–E.4), all re-verified still open** | | | | **E.1** `_classify` reads `m.fee_pct`, which the frozen `BatchMatch` does not declare (confirmed: 1 usage, 0 declarations). **E.2** the fee formula's `else` branch reads `bank.amount`, undefined for a two-way FSM+GL match. **E.3** `settlement_date` precedence unstated — PZ-200's whole classification depends on it. **E.4** `match_id` is required but its construction is unspecified. E.1 and E.4 block **PR-A** specifically, since PR-A ships the model. |
+| **2** | **Item 4 — RMR account-count vs GL** | Medium-high. Recurring-revenue roster vs GL is a real alarm/HVAC close step. | Moderate. Spec says class stays `stale_reference`; the risk is re-widening the #11 cutoff allowlist, which the spec explicitly forbids. | **Blocked on Item 1.** The spec's own pre-condition is "Item 1 shipped (roadmap)". | Real value, but gated behind rank 1 by an explicit roadmap dependency. Nothing exists yet — zero `RMR`/`roster_count` references in `backend/`. |
+| **3** | **Item 3 — central-station wholesale accrual** | Low-medium. Alarm-only; HVAC in the same wave doesn't have this vendor. | Moderate. The honest story is `active_count × rate`; a "if COGS is big, accrue" hint would invent wholesale. | **Blocked on Item 4** — it needs Item 4's counts — and therefore transitively on Item 1. | Deepest dependency chain of the parked set, and narrowest audience. Today's supplier-vs-GL path already covers it when the invoice lands. |
+| **4** | **Item 2 — truck stock / van inventory** | Low for the ICP. 5–40 person shops typically expense van parts on purchase. | **High.** A true cycle-count is a balance-sheet rollforward that `monthly_entries`' unique `(company_id, account_id, period)` cannot hold; JSONB hints can't represent a quantity rollforward. Building it would commit the product to an inventory engine. | None technical — blocked on **evidence**. | Parked on architectural risk, not sequence. **Revisit when** a dealer supplies a real count-vs-GL workbook (SKU, qty, location, opening), not a purchases register. |
+| **5** | **Item 6 — WIP / professional services** | **Not the ICP at all** — documented second vertical. | High. Needs job grain (`job_id`, contract value, cost-to-date, billed-to-date, `% complete`) that Discovery drops and `groupby("account")` destroys. Unbilled vs write-off is human collectability. | Blocked on a **product decision**, plus Items 1 and 5 existing. | Lowest: wrong vertical, highest data-model mismatch, and needs an explicit decision to sell professional services before any spec work. |
+
+---
+
 # IronLedger Development Audit
 
 Audit target: cumulative PR-stack snapshot `31492f9`, compared with `main` at
