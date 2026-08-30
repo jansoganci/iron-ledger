@@ -101,7 +101,7 @@ monthproof/
 ├── supabase/
 │   ├── migrations/
 │   │   └── 0001_initial_schema.sql   # 7 tables + RLS + category seed
-│   └── seed.sql                      # Demo data (DRONE Inc. row)
+│   └── seed.sql                      # Demo company row (Redhawk Alarm & Security LLC)
 ├── docs/                             # All architecture docs
 ├── .env                              # Never commit this
 └── CLAUDE.md                         # This file
@@ -304,14 +304,25 @@ RESEND_API_KEY=
 
 ## Demo Data
 
-DRONE monthly financials are in `docs/demo_data/`.
-- `drone_feb_2026.xlsx` — baseline period (period: 2026-02-01)
-- `drone_mar_2026.xlsx` — analysis period (period: 2026-03-01)
+Seven demo companies live in `docs/demo_data/`: `clearview`, `corebuilt`,
+`harvest`, `helix`, `redhawk`, `sentinel`, `vandelay`.
+
+**`redhawk/` is the seed company** — a small owner-operated alarm dealer that
+matches the ICP (field service, 5 employees, ~$38,090/month revenue →
+`under_100k` band). Four files, period `2026-03-01`:
+- `redhawk_gl_mar_2026.xlsx` — Service Revenue 3,540.00
+- `redhawk_contracts_mar_2026.xlsx` — 85 active accounts
+- `redhawk_payroll_mar_2026.xlsx`
+- `redhawk_vendor_invoices_mar_2026.xlsx`
 
 Expected demo output:
-- G&A: -34% variance (favorable) ✅
-- Travel: +61% variance (flagged) ⚠️
-- Gross margin: 39.4% — 7-quarter high
+- Service Revenue: `stale_reference`, 285.00 gap (GL 3,540.00 vs roster 3,825.00)
+- Roster counts: `n_active` 85, `n_billed_in_period` 82, `count_delta` 3
+- Coverage cards for GL lines with no supporting file (Rent, Licensing)
+
+The earlier DRONE single-file workbooks (`drone_feb_2026.xlsx` /
+`drone_mar_2026.xlsx`) **no longer exist** in the tree. Five integration tests
+still reference them and skip accordingly — that is expected, not a failure.
 
 ---
 
