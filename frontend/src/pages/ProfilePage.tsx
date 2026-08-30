@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { FormEvent, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
   History as HistoryIcon,
@@ -8,14 +9,15 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useCompany } from "../hooks/useCompany";
+import type { Company } from "../hooks/useCompany";
 import { apiFetch } from "../lib/api";
 import { signOut } from "../lib/auth";
-
-/**
- * Profile / Account page per docs/design.md §8.
- * Every field is already exposed by existing endpoints; no backend changes
- * required.
- */
+import { CLIENT_MESSAGES } from "../lib/messages";
+import {
+  RevenueBandField,
+  bandLabel,
+  type RevenueBand,
+} from "../components/RevenueBandField";
 
 interface HasHistoryResponse {
   has_history: boolean;
@@ -24,6 +26,7 @@ interface HasHistoryResponse {
 
 export default function ProfilePage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: company, isLoading: companyLoading } = useCompany();
   const { data: history } = useQuery<HasHistoryResponse>({
     queryKey: ["has-history"],
@@ -32,10 +35,40 @@ export default function ProfilePage() {
   });
   const navigate = useNavigate();
 
+  const [band, setBand] = useState<RevenueBand | "">("");
+  const [saving, setSaving] = useState(false);
+  const [bandError, setBandError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (company?.monthly_revenue_band) {
+      setBand(company.monthly_revenue_band as RevenueBand);
+    }
+  }, [company?.monthly_revenue_band]);
+
   async function handleSignOut() {
     await signOut();
     navigate("/login", { replace: true });
   }
+
+  async function handleSaveBand(e: FormEvent) {
+    e.preventDefault();
+    if (!band) return;
+    setBandError(null);
+    setSaving(true);
+    try {
+      const updated = await apiFetch<Company>("/companies/me", {
+        method: "PATCH",
+        json: { monthly_revenue_band: band },
+      });
+      queryClient.setQueryData<Company>(["company-me"], updated);
+    } catch {
+      setBandError(CLIENT_MESSAGES.PROFILE_BAND_FAILED);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const bandUnset = !companyLoading && company != null && !company.monthly_revenue_band;
 
   return (
     <div className="px-4 py-6 md:py-8">
@@ -96,7 +129,47 @@ export default function ProfilePage() {
                 {company?.currency ?? "—"}
               </dd>
             </div>
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <dt className="text-sm text-text-secondary shrink-0">
+                Typical monthly revenue
+              </dt>
+              <dd className="text-sm text-text-primary">
+                {companyLoading
+                  ? "Loading…"
+                  : bandLabel(company?.monthly_revenue_band ?? null)}
+              </dd>
+            </div>
           </dl>
+          {bandUnset && (
+            <div
+              role="status"
+              className="mx-4 mt-3 rounded-md bg-severity-medium-bg px-3 py-2 text-sm text-severity-medium-fg"
+            >
+              Set typical monthly revenue so close flags match your shop size.
+            </div>
+          )}
+          <form onSubmit={handleSaveBand} className="px-4 py-4 space-y-3">
+            <RevenueBandField
+              value={band}
+              onChange={setBand}
+              disabled={saving || companyLoading}
+            />
+            {bandError && (
+              <div
+                role="alert"
+                className="rounded-md bg-severity-high-bg px-3 py-2 text-sm text-severity-high-fg"
+              >
+                {bandError}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={saving || !band || companyLoading}
+              className="rounded-md bg-accent text-white py-2 px-4 text-sm font-medium transition-opacity hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed min-h-[44px] lg:min-h-[40px]"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </form>
         </section>
 
         {/* Usage */}

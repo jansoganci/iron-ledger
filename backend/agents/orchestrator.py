@@ -10,6 +10,7 @@ from backend.agents.parser import ParserAgent
 from backend.api.deps import (
     get_accounts_repo,
     get_anomalies_repo,
+    get_companies_repo,
     get_entries_repo,
     get_file_storage,
     get_llm_client,
@@ -339,6 +340,7 @@ def run_comparison_and_report(
             anomalies_repo=get_anomalies_repo(),
             runs_repo=get_runs_repo(),
             accounts_repo=get_accounts_repo(),
+            companies_repo=get_companies_repo(),
         )
         interpreter = InterpreterAgent(
             llm_client=get_llm_client(),

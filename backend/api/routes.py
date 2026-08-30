@@ -3,7 +3,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import List
+from typing import List, Literal
 from uuid import UUID
 
 from fastapi import (
@@ -31,7 +31,12 @@ from backend.agents.orchestrator import (
     run_parser_after_discovery_approval,
     run_parser_until_preview,
 )
-from backend.api.auth import get_cached_company, get_company_id, get_current_user
+from backend.api.auth import (
+    get_cached_company,
+    get_company_id,
+    get_current_user,
+    invalidate_company_cache,
+)
 from backend.api.deps import (
     get_account_mapper,
     get_accounts_repo,
@@ -111,6 +116,11 @@ class ConfirmDiscoveryRequest(BaseModel):
 class CreateCompanyRequest(BaseModel):
     name: str
     sector: str | None = None
+    monthly_revenue_band: Literal["under_100k", "100k_250k", "250k_500k", "500k_plus"]
+
+
+class UpdateCompanyRequest(BaseModel):
+    monthly_revenue_band: Literal["under_100k", "100k_250k", "250k_500k", "500k_plus"]
 
 
 # ------------------------------------------------------------------ #
@@ -120,6 +130,16 @@ class CreateCompanyRequest(BaseModel):
 
 _REVENUE_LIKE = {"REVENUE", "OTHER_INCOME"}
 _EXPENSE_LIKE = {"COGS", "OPEX", "G&A", "R&D"}
+
+
+def _company_public(company: dict) -> dict:
+    return {
+        "id": company["id"],
+        "name": company.get("name", ""),
+        "sector": company.get("sector"),
+        "currency": company.get("currency", "USD"),
+        "monthly_revenue_band": company.get("monthly_revenue_band"),
+    }
 
 
 def _fmt_ts(val):
@@ -1217,12 +1237,7 @@ async def get_my_company(
     company: dict = Depends(get_cached_company),
 ):
     """Return the authenticated user's company profile."""
-    return {
-        "id": company["id"],
-        "name": company.get("name", ""),
-        "sector": company.get("sector"),
-        "currency": company.get("currency", "USD"),
-    }
+    return _company_public(company)
 
 
 @router.get("/companies/me/has-history")
@@ -1269,12 +1284,7 @@ async def create_company(
         )
         return JSONResponse(
             status_code=200,
-            content={
-                "id": existing["id"],
-                "name": existing.get("name", ""),
-                "sector": existing.get("sector"),
-                "currency": existing.get("currency", "USD"),
-            },
+            content=_company_public(existing),
         )
     except RLSForbiddenError:
         pass
@@ -1285,6 +1295,7 @@ async def create_company(
             name=body.name,
             sector=body.sector,
             currency="USD",
+            monthly_revenue_band=body.monthly_revenue_band,
         )
     except Exception as exc:
         logger.error(
@@ -1299,12 +1310,36 @@ async def create_company(
         "company_created",
         extra={"user_id": user_id, "company_id": company["id"]},
     )
-    return {
-        "id": company["id"],
-        "name": company.get("name", ""),
-        "sector": company.get("sector"),
-        "currency": company.get("currency", "USD"),
-    }
+    return _company_public(company)
+
+
+@router.patch("/companies/me")
+@limiter.limit("5/hour")
+async def update_my_company(
+    request: Request,
+    body: UpdateCompanyRequest,
+    user_id: str = Depends(get_current_user),
+    company: dict = Depends(get_cached_company),
+):
+    """Update typical monthly revenue band. The only writer for an existing row."""
+    try:
+        updated = get_companies_repo().update(
+            company["id"],
+            monthly_revenue_band=body.monthly_revenue_band,
+        )
+    except RLSForbiddenError as exc:
+        raise HTTPException(status_code=403, detail=messages.FORBIDDEN) from exc
+    except Exception as exc:
+        logger.error(
+            "company_update_failed",
+            extra={"user_id": user_id, "error": str(exc)},
+        )
+        raise HTTPException(
+            status_code=503, detail=messages.COMPANY_UPDATE_FAILED
+        ) from exc
+
+    invalidate_company_cache(user_id)
+    return _company_public(updated)
 
 
 @router.get("/reports")

@@ -7,23 +7,43 @@ from uuid import UUID
 
 from backend.domain.contracts import AccountSummary, PandasSummary
 from backend.domain.entities import Anomaly
-from backend.domain.ports import AccountsRepo, AnomaliesRepo, EntriesRepo, RunsRepo
-from backend.domain.run_state_machine import RunStatus
+from backend.domain.ports import (
+    AccountsRepo,
+    AnomaliesRepo,
+    CompaniesRepo,
+    EntriesRepo,
+    RunsRepo,
+)
 from backend.logger import get_logger
+from backend.tools.account_tags import is_payroll_account
 
 logger = get_logger(__name__)
 
 
-# Tier 2 applies to high-stakes categories where small % gaps matter.
-_TIER2_CATEGORIES = {"REVENUE", "PAYROLL", "DEFERRED_REVENUE"}
-
-# Tier 1 (all other accounts): both gates must clear to flag.
+# Fail-safe constants — also the 500k_plus / NULL-band gates.
+# Claude never sees these. Pandas only.
 _TIER1_DOLLAR = 50_000.0
 _TIER1_PCT = 10.0
-
-# Tier 2 (REVENUE / PAYROLL / DEFERRED_REVENUE): lower gates.
 _TIER2_DOLLAR = 10_000.0
 _TIER2_PCT = 3.0
+
+_BAND_R: dict[str, float] = {
+    "under_100k": 50_000.0,
+    "100k_250k": 175_000.0,
+    "250k_500k": 375_000.0,
+    "500k_plus": 2_000_000.0,
+}
+
+
+def _gates_from_band(band: str | None) -> tuple[float, float]:
+    """Return (dollar_t1, dollar_t2). Claude never sees R. Pandas only.
+
+    NULL / unknown strings fail-safe to today's $50k / $10k — never $0.
+    """
+    if not band or band not in _BAND_R:
+        return _TIER1_DOLLAR, _TIER2_DOLLAR
+    r = _BAND_R[band]
+    return max(500.0, 0.025 * r), max(250.0, 0.005 * r)
 
 
 def calculate_variance(
@@ -31,14 +51,17 @@ def calculate_variance(
     historical_avg: float,
     history_count: int,
     category: str = "OTHER",
+    *,
+    account_name: str | None = None,
+    dollar_t1: float | None = None,
+    dollar_t2: float | None = None,
 ) -> dict:
     """Return variance dict. All arithmetic happens here — Claude never sees this.
 
-    Tiered materiality (Track 4):
-      Tier 2 (REVENUE, PAYROLL, DEFERRED_REVENUE): flag if |delta| > $10K AND |pct| > 3%
-      Tier 1 (all others):                         flag if |delta| > $50K AND |pct| > 10%
-    Both gates must be exceeded — dollar floor prevents noise on tiny accounts,
-    percentage floor prevents noise on giant accounts with small swings.
+    Tier 2 (REVENUE or payroll-tagged GL name): |delta| > dollar_t2 AND |pct| > 3%
+    Tier 1 (everything else):                   |delta| > dollar_t1 AND |pct| > 10%
+    Omitted gates fail-safe to $50k / $10k. PAYROLL / DEFERRED_REVENUE category
+    strings are not live gates — those categories are not seeded.
     """
     if not historical_avg:
         return {"variance_pct": None, "severity": "no_history", "flag": False}
@@ -47,8 +70,10 @@ def calculate_variance(
     abs_delta = abs(current - historical_avg)
     abs_pct = abs(variance_pct)
 
-    is_tier2 = category in _TIER2_CATEGORIES
-    dollar_gate = _TIER2_DOLLAR if is_tier2 else _TIER1_DOLLAR
+    t1 = _TIER1_DOLLAR if dollar_t1 is None else dollar_t1
+    t2 = _TIER2_DOLLAR if dollar_t2 is None else dollar_t2
+    is_tier2 = category == "REVENUE" or is_payroll_account(account_name)
+    dollar_gate = t2 if is_tier2 else t1
     pct_gate = _TIER2_PCT if is_tier2 else _TIER1_PCT
 
     flag = abs_delta > dollar_gate and abs_pct > pct_gate
@@ -64,11 +89,13 @@ class ComparisonAgent:
         anomalies_repo: AnomaliesRepo,
         runs_repo: RunsRepo,
         accounts_repo: AccountsRepo,
+        companies_repo: CompaniesRepo,
     ) -> None:
         self._entries = entries_repo
         self._anomalies = anomalies_repo
         self._runs = runs_repo
         self._accounts = accounts_repo
+        self._companies = companies_repo
 
     def run(
         self,
@@ -96,6 +123,9 @@ class ComparisonAgent:
             logger.warning(
                 "comparison progress update failed", extra={"error": str(exc)}
             )
+
+        company = self._companies.get_by_id(company_id)
+        dollar_t1, dollar_t2 = _gates_from_band(company.get("monthly_revenue_band"))
 
         # 1. Fetch prior flag counts once — avoids N+1 queries inside the loop
         prior_flag_counts = self._anomalies.list_account_flag_counts_before(
@@ -135,7 +165,13 @@ class ComparisonAgent:
             current_val = float(entry.actual_amount)
 
             result = calculate_variance(
-                current_val, historical_avg, len(hist_amounts), category
+                current_val,
+                historical_avg,
+                len(hist_amounts),
+                category,
+                account_name=account_name,
+                dollar_t1=dollar_t1,
+                dollar_t2=dollar_t2,
             )
 
             # Build AccountSummary
@@ -209,6 +245,7 @@ class ComparisonAgent:
                 "company_id": company_id,
                 "accounts_processed": len(summaries),
                 "anomalies_flagged": len(flagged_anomalies),
+                "monthly_revenue_band": company.get("monthly_revenue_band"),
             },
         )
 

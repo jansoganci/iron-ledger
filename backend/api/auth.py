@@ -21,7 +21,7 @@ _company_cache: dict[str, tuple[dict, float]] = (
     {}
 )  # user_id → (company_dict, expires_at)
 _TOKEN_TTL = 30.0  # seconds — conservative window for token revocation
-_COMPANY_TTL = 300.0  # seconds — company row is immutable within a session
+_COMPANY_TTL = 300.0  # seconds — bust via invalidate_company_cache after PATCH
 
 
 async def _validate_jwt(token: str) -> str:
@@ -109,3 +109,8 @@ async def get_cached_company(user_id: str = Depends(get_current_user)) -> dict:
 
     _company_cache[user_id] = (company, time.monotonic() + _COMPANY_TTL)
     return company
+
+
+def invalidate_company_cache(user_id: str) -> None:
+    """Drop the cached company row so GET /companies/me sees a PATCH."""
+    _company_cache.pop(user_id, None)
