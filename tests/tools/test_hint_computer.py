@@ -349,6 +349,8 @@ def test_compute_hints_installation_timing() -> None:
     hints = compute_hints(item, df, PERIOD, raw_dfs)
     assert hints.crosses_period_boundary is True
     assert hints.is_round_fraction is False  # 11000/15000 = 0.73, not 0.5
+    assert hints.is_customer_deposit is False
+    assert hints.is_processor_fee_gap is False
     assert hints.similar_amount_in_other_account is False
 
 

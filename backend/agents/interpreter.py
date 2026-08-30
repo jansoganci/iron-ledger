@@ -57,26 +57,42 @@ def _guardrail_user_message(exc_str: str) -> str:
     )
 
 
+def _hints_as_dict(hints) -> dict:
+    if not hints:
+        return {}
+    if isinstance(hints, dict):
+        return hints
+    if hasattr(hints, "model_dump"):
+        return hints.model_dump()
+    return {}
+
+
 def _classify_from_hints(hints: dict) -> str | None:
     """Rule-based fallback when Claude doesn't return a classification.
 
     Priority order:
     1. GL-only → no exception class (coverage card; not missing_je).
     2. Source-only → missing_je.
-    3. Cross-period date → timing_cutoff.
-    4. Both sources present, similar amount in another account → categorical_misclassification.
-    5. Both sources present, accrual pattern → accrual_mismatch.
-    6. Both sources present, general delta → stale_reference.
+    3. Processor/platform netting → structural_explained.
+    4. Customer deposit / 50% peşinat → timing_cutoff (not accrual_mismatch).
+    5. Cross-period date → timing_cutoff.
+    6. Both sources present, similar amount in another account → categorical_misclassification.
+    7. Annual vendor invoice pattern → accrual_mismatch.
+    8. Both sources present, general delta → stale_reference.
     """
     if hints.get("is_gl_only"):
         return None
     if hints.get("is_source_only"):
         return "missing_je"
+    if hints.get("is_processor_fee_gap"):
+        return "structural_explained"
+    if hints.get("is_customer_deposit") or hints.get("is_round_fraction"):
+        return "timing_cutoff"
     if hints.get("crosses_period_boundary"):
         return "timing_cutoff"
     if hints.get("similar_amount_in_other_account"):
         return "categorical_misclassification"
-    if hints.get("is_round_fraction"):
+    if hints.get("delta_matches_known_vendor"):
         return "accrual_mismatch"
     return "stale_reference"
 
@@ -84,27 +100,37 @@ def _classify_from_hints(hints: dict) -> str | None:
 def _is_coverage_item(item: dict) -> bool:
     if item.get("card_kind") == "coverage":
         return True
-    hints = item.get("hints") or {}
-    if isinstance(hints, dict):
-        return bool(hints.get("is_gl_only"))
-    return bool(getattr(hints, "is_gl_only", False))
+    hints = _hints_as_dict(item.get("hints"))
+    return bool(hints.get("is_gl_only"))
 
 
 def _apply_reconciliation_classifications(
     reconciliations: list[dict],
     cls_map: dict[str, str],
 ) -> None:
-    """Merge Claude classes; coverage items stay unclassified."""
+    """Merge Claude classes; pandas hints win for coverage / deposit / fee."""
     for item in reconciliations:
         if _is_coverage_item(item):
             item["card_kind"] = "coverage"
             item["classification"] = None
             continue
+        hints = _hints_as_dict(item.get("hints"))
+        # Pandas-backed speech acts are not Claude's to override.
+        if hints.get("is_processor_fee_gap"):
+            item["classification"] = "structural_explained"
+            continue
+        if hints.get("is_customer_deposit") or hints.get("is_round_fraction"):
+            item["classification"] = "timing_cutoff"
+            continue
         account = item.get("account", "")
         if account in cls_map:
-            item["classification"] = cls_map[account]
+            proposed = cls_map[account]
+            if proposed == "structural_explained":
+                item["classification"] = _classify_from_hints(hints)
+            else:
+                item["classification"] = proposed
         elif not item.get("classification"):
-            item["classification"] = _classify_from_hints(item.get("hints") or {})
+            item["classification"] = _classify_from_hints(hints)
 
 
 class InterpreterAgent:
