@@ -92,7 +92,7 @@ Or via API directly (JWT required — `company_id` is derived from the token):
 #   curl -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" \
 #     -H "apikey: $SUPABASE_ANON_KEY" \
 #     -H "Content-Type: application/json" \
-#     -d '{"email":"demo@dronedemo.com","password":"..."}'
+#     -d '{"email":"demo@redhawkdemo.com","password":"..."}'
 # Use the returned access_token:
 
 curl -X POST http://localhost:8000/upload \

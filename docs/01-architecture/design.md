@@ -462,7 +462,7 @@ Read-only account surface. Not a "settings" screen — no editable fields in MVP
 ├──────────────────────────────────────────────────┤
 │                                                  │
 │  ┌─ ✉ Account ───────────────────────────────┐   │
-│  │  Email         demo@dronedemo.com         │   │
+│  │  Email         demo@redhawkdemo.com       │   │
 │  │  User ID       8ab2…f9e1  (monospace)     │   │
 │  └───────────────────────────────────────────┘   │
 │                                                  │

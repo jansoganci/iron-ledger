@@ -11,7 +11,7 @@ Read this the night before. Do not improvise on demo day.
 - [ ] Railway backend is running — ping `GET /health`, expect 200
 - [ ] Vercel frontend is live — open in browser, check no console errors
 - [ ] Supabase has DRONE Inc. baseline data (February 2026) already loaded
-- [ ] Demo user seeded in Supabase Auth: `demo@dronedemo.com` — test login once before demo
+- [ ] Demo user seeded in Supabase Auth: `demo@redhawkdemo.com` — test login once before demo
 - [ ] Browser is pre-logged-in with demo user (Supabase persists session) to skip the login step on stage
 - [ ] Demo Excel files ready on desktop: `drone_feb_2026.xlsx`, `drone_mar_2026.xlsx`
 - [ ] Resend email verified and working — send a test email
