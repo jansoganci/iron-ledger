@@ -579,7 +579,7 @@ This section is the freeze so a later build has zero open product questions. Do 
 
 Kova 1 already has **account-total** `is_processor_fee_gap` (3–8%, two-sided, not a deposit) → interpreter forces `structural_explained`. That is **not** this item. This item is identity matching **before** `groupby("account")`.
 
-**MVP boundary (locked):** one processor, one Undeposited Funds (or merchant clearing) GL account, one bank, one period. Match **batch/reference id first**; exact net amount + date window only as fallback. Pandas computes gross, fee, net, unmatched counts. Claude copies; never subtracts. Emit existing classes only. No A2X, no auto-JE, no multi-currency, no many-to-many splits, no connectors.
+**MVP boundary (locked):** one processor, one Undeposited Funds (or merchant clearing) GL account, one bank, one period. Match **batch/reference id first**; fallback is **exact cents + same calendar date (0-day window)** — not a multi-day lag. Pandas computes gross, fee, net, unmatched counts. Claude copies; never subtracts. Emit existing classes only. No A2X, no auto-JE, no multi-currency, no many-to-many splits, no connectors.
 
 | Matcher state | Class (existing six only) |
 |---------------|---------------------------|
@@ -635,14 +635,20 @@ class BatchMatch(BaseModel):
     processor_ref: str | None
     bank_ref: str | None
     gl_ref: str | None
+    gl_account: str | None
+    gl_amount: float | None   # UF (or wrong-account) line; None if no GL row
     gross: float
     fee: float
     net: float
+    settlement_date: date | None
+    match_kind: Literal["id", "amount_date", "none"]
+    ambiguous: bool
+    candidate_count: int
     unmatched: bool
     classification: ReconciliationClassification | None = None
 ```
 
-Numbers are pandas. Claude copies `gross` / `fee` / `net`.
+Numbers are pandas. Claude copies `gross` / `fee` / `net` / `gl_amount` / `candidate_count`. Never subtracts. Never counts candidates in prose. `fee_pct` is an internal pandas gate only — **not** a prompt placeholder (no “4.5%” in the sentence).
 
 **Modify `ReconciliationHints` only if a post-match bool is needed** (e.g. `is_three_way_fee_explained`). Prefer putting the speech act on `BatchMatch.classification` + interpreter force, not a new hint that re-runs after `groupby` (groupby already destroyed ids).
 
@@ -675,20 +681,362 @@ Sidecar columns (pandas): `batch_id` / `payout_id` / bank reference, `gross`, `f
 
 ### C.5 `backend/tools/batch_matcher.py` (new)
 
-**Responsibility:** deterministic pandas matcher. No Claude. No DB.
+**Responsibility:** deterministic pandas matcher. No Claude. No DB. No WRatio. No amount “close enough.”
 
-**Input:** three frames (processor sidecar, GL UF lines or GL sidecar, bank sidecar) + `period`.  
-**Output:** `list[BatchMatch]` plus unmatched counts.  
-**Called from:** orchestrator, **after** parse, **before or beside** consolidator — consolidator must **not** become the matcher.  
-**Does not:** post JEs, call A2X, fuzzy-match GL account names (that is consolidator’s WRatio job), write `monthly_entries`, invent a seventh class.
+**Input:** three sidecar frames + `period: date` + `uf_account_name: str` (the company’s single Undeposited Funds / merchant-clearing GL name for this MVP).
+**Output:** `list[BatchMatch]`, plus `unmatched_processor_count: int`, `unmatched_bank_count: int`.
+**Called from:** orchestrator, **after** parse, **beside** consolidator — consolidator must **not** become the matcher.
+**Does not:** post JEs, call A2X, fuzzy-match GL account names, write `monthly_entries`, invent a seventh class, call the LLM.
 
-Match order (locked):
+The earlier one-line “±1 business day” fallback is **withdrawn**. It was not backed by the research docs. v1 fallback is **same calendar date and exact cents only**. See C.5.1 assumptions.
 
-1. Exact `batch_id` / `payout_id` / bank reference across processor ↔ GL ↔ bank.
-2. Fallback: exact `net` amount and settlement date within the period window (same calendar date first; ±1 business day only if id match is empty — freeze the window at build time as **same date only** unless a fixture proves otherwise; do not silently widen).
-3. Unmatched processor batch → `missing_je`. Unmatched bank deposit → `missing_je`. Matched gross/fee/net with residue in the fee band → `structural_explained`. Date after `period_end` → `timing_cutoff`. Amount on the wrong GL clearing name → `categorical_misclassification`.
+#### C.5.1 Exact matching algorithm (pandas pseudocode)
 
-Pandas computes `gross`, `fee`, `net` (`gross - net` is pandas, not Claude). Unmatched counts are `int`.
+**Canonical sidecar columns after Discovery mapping** (not `GoldenField`; not SQL). Header names on disk vary; Discovery maps onto these:
+
+| Frame | Join id | Amount components | Date |
+|-------|---------|-------------------|------|
+| FSM / card-batch (`processor_settlement`) | `payout_id` | `gross` required; `net` optional | `collected_date` |
+| GL UF-detail sidecar (from the GL file, not the whole P&L) | `gl_ref` | `amount` | `gl_date` |
+| Bank / processor settlement (`bank_statement`) | `bank_ref` | `gross`, `fee`, `net` when the export has them; otherwise `amount` is **net** | `settlement_date` |
+
+MVP file roles (locked, three files only):
+
+1. FSM/job card-batch export → `payout_id`, `gross`, `collected_date`.
+2. GL with Undeposited Funds **line detail** → `gl_ref`, `gl_account`, `amount`, `gl_date`. Sidecar only rows that have a ref **or** whose `gl_account` equals `uf_account_name`. Do not sidecar Rent.
+3. Bank **or** processor payout CSV → `bank_ref`, `settlement_date`, `net` (and `gross`/`fee` when present). One processor, one bank.
+
+**Join-key hierarchy**
+
+```
+norm(id) := None if id is null/blank else str(id).strip().casefold()
+```
+
+| Side | Field that feeds `norm` |
+|------|-------------------------|
+| FSM / processor | `payout_id` |
+| GL | `gl_ref` (memo / Check No. / payout id booked on the UF line) |
+| Bank | `bank_ref` (payout id or bank reference). On a Stripe-style payout export this **is** the payout id. |
+
+A three-way **ID match** is `norm(payout_id) == norm(gl_ref) == norm(bank_ref)` and that value is not `None`.
+
+**When one side has an id and another does not:**
+
+- Do **not** invent an id. Do **not** match that pair on ID.
+- That pair may still match in the amount+date fallback **only if both rows are still unmatched after the ID pass**.
+- Example: FSM `payout_id=PZ-100`, GL `gl_ref` blank, bank `bank_ref=PZ-100` → ID-match FSM↔bank on `pz-100`; GL is not in that ID triple. GL may join the same bank row later only via amount+date, and only if that join is unique.
+
+**Assumptions (not in the research docs — do not present as derived):**
+
+| Knob | v1 lock | What the docs actually say |
+|------|---------|----------------------------|
+| Date window | **0 days** — `settlement_date.date() == collected_date.date() == gl_date.date()` | Field-service research: practitioners reconcile cash **daily**; month-end is residue (unbooked fees, **straddling** batches, undeposited ≠ 0). **No day-count** (no T+1, T+2, “2 business days”). E-commerce Amazon “14-day settlement” in `close-process-by-sector.md` is a **different vertical** — do not import it. |
+| Dollar tolerance | **$0.00** after `round(..., 2)` | No cent-slack in the research. Card nets are exact. |
+| Fee band for “fee explained” | reuse Kova 1 `_FEE_BAND_MIN/_MAX` = **3%–8% of gross** (`hint_computer.py`) | Already shipped. Do not invent Jobber 2.9% (triage forbade unverified vendor rates in prompts). |
+| ±1 business day | **out of v1** | Was a leftover sentence in this spec. Withdrawn because no research number backs it. Revisit only if a real dealer file shows same-id or same-net pairs that miss same-calendar-date; that is a new go-ahead, not a silent widen. |
+
+**Pandas fee (always, never Claude):**
+
+```
+if settlement.gross is not None and settlement.net is not None:
+    gross = round(float(settlement.gross), 2)
+    net   = round(float(settlement.net), 2)
+else:
+    gross = round(float(fsm.gross), 2)          # FSM collection
+    net   = round(float(bank.amount), 2)        # bank deposit
+fee = round(gross - net, 2)
+fee_pct = abs(fee) / abs(gross) if gross != 0 else None   # pandas; not copied to the prompt as a %
+```
+
+If the settlement file also has a `fee` column, **ignore it for the match decision**. Guardrail-safe number is pandas `gross - net`. (A disagreeing fee column is a file-quality issue, not a second match key.)
+
+**Classification priority** (`_classify`, pandas, then interpreter force). First matching rule wins. **Do not apply the 3–8% fee band unless a GL row is in the match** — otherwise PZ-300 (`fee_pct = 0.04`, no GL) would be labelled `structural_explained` and the state table would be a lie.
+
+```
+def _classify(m, period_end, uf_account_name) -> BatchMatch | None:
+    has_gl = m.gl_account is not None or m.gl_ref is not None or m.gl_amount is not None
+
+    if m.ambiguous:
+        m.classification = stale_reference          # (c)
+        m.unmatched = True
+        return m
+
+    # Cutoff beats fee AND beats missing-GL. A payout that settled after
+    # period_end is month-end residue even if the GL line is absent.
+    if m.settlement_date is not None and m.settlement_date > period_end:
+        m.classification = timing_cutoff            # state 2
+        return m
+
+    if not has_gl:
+        m.classification = missing_je               # states 3 and 4
+        m.unmatched = True
+        return m
+
+    if m.gl_account != uf_account_name:
+        m.classification = categorical_misclassification  # state 5
+        return m
+
+    if m.fee_pct is not None and 0.03 <= m.fee_pct <= 0.08:
+        m.classification = structural_explained     # state 1
+        return m
+
+    if m.fee == 0 and m.gl_amount is not None and round(m.gl_amount, 2) == round(m.net, 2):
+        return None                                 # true negative: drop, no card
+
+    m.classification = stale_reference              # matched residue outside the fee band
+    return m
+```
+
+Unmatched after both passes (Pass 3 leftovers call `_classify` with `match_kind="none"`, `has_gl=False` → `missing_je`):
+
+- Processor/FSM row with no GL and no unique bank ID/fallback → `missing_je` (`unmatched_processor`).
+- Bank row with no GL and no unique FSM ID/fallback → `missing_je` (`unmatched_bank`).
+- Ambiguous (rule c below) → `stale_reference`, `ambiguous=True`, `unmatched=True`. **Not** `missing_je` (the money is on more than one row; we refused to pick).
+
+**Fallback never explains fees.** Pass 2 compares **net to net** (`round(..., 2)`), never FSM `gross` to bank `net`. A PZ-100-shaped batch with ids stripped (`1000.00` FSM/GL vs `955.00` bank, same date) does **not** become `structural_explained`. It may ID-fail, then fsm↔gl unique on `1000.00` (dropped as $0 if booked to UF) plus leftover bank `955.00` → `missing_je`. Fee speech requires either (1) an **ID** triple/pair that includes the settlement row’s gross and net, or (2) the Kova 1 **account-total** 3–8% hint when no settlement sidecar exists. Do not “fix” this by widening dollar tolerance into the fee band.
+
+**Pseudocode (literal build order for `batch_matcher.match`):**
+
+```
+def match(fsm_df, gl_df, bank_df, period, uf_account_name) -> list[BatchMatch]:
+    period_end = last_day_of(period)   # pandas; March 2026 → 2026-03-31
+
+    fsm  = _norm_ids(fsm_df,  id_col="payout_id")
+    gl   = _norm_ids(gl_df,   id_col="gl_ref")
+    bank = _norm_ids(bank_df, id_col="bank_ref")
+
+    used_fsm, used_gl, used_bank = empty sets of row indices
+    matches = []
+
+    # ---- Pass 1: exact ID, 1:1 only ---------------------------------
+    for id_val in unique_non_null(concat(fsm.id, gl.id, bank.id)):
+        f_rows = fsm[fsm.id == id_val]
+        g_rows = gl[gl.id == id_val]
+        b_rows = bank[bank.id == id_val]
+        # (c) ambiguous ID: more than one row on any side
+        if len(f_rows) > 1 or len(g_rows) > 1 or len(b_rows) > 1:
+            matches.append(_ambiguous_group(id_val, f_rows, g_rows, b_rows))
+            mark all those indices used
+            continue
+        if len(f_rows) + len(g_rows) + len(b_rows) < 2:
+            continue   # id lives on only one side; leave for fallback / unmatched
+        # (a) exact unique ID match across the sides that have it
+        matches.append(_emit(f_rows, g_rows, b_rows, match_kind="id"))
+        mark those indices used
+
+    # ---- Pass 2: fallback exact net + same calendar date ------------
+    # Only unused rows. Dollar: round to 2dp equality. Date: equality, 0-day window.
+    # NET never GROSS: fsm.net if present else fsm.gross; gl.amount;
+    #                  bank.net if present else bank.amount.
+    leftover_f = fsm[~used_fsm]
+    leftover_g = gl[~used_gl]
+    leftover_b = bank[~used_bank]
+
+    # Group leftover rows by (round(net, 2), calendar_date). Looping
+    # per bank row would split two $100 blanks into one stale_reference
+    # plus a leftover missing_je — the fixture requires ONE card.
+    for (amt, day), grp in leftover grouped by (net, date):
+        nf, ng, nb = counts of fsm/gl/bank in grp
+        if nf + ng + nb < 2:
+            continue
+        unique = (nf <= 1 and ng <= 1 and nb <= 1)
+        if unique:
+            # (b) at most one row per side
+            matches.append(_emit(grp, match_kind="amount_date"))
+            mark grp used
+        else:
+            # (c) do NOT pick first / largest / closest
+            matches.append(_ambiguous_amount_date(
+                grp,
+                candidate_count=max(nf, ng, nb),   # fixture blanks: 2
+                match_kind="amount_date",
+            ))
+            mark ALL rows in grp used
+
+    # No second fsm↔gl pass: no-bank pairs are already in the same groups (nb=0).
+
+    # ---- Pass 3: leftovers ------------------------------------------
+    for row in fsm still unused:   # (d)
+        matches.append(_unmatched_processor(row))   # missing_je via _classify
+    for row in bank still unused:  # (d)
+        matches.append(_unmatched_bank(row))        # missing_je via _classify
+    # unused GL-only UF lines are coverage/consolidator territory, not this matcher.
+
+    out = []
+    for m in matches:
+        classified = _classify(m, period_end, uf_account_name)
+        if classified is not None:          # PZ-900 dropped here
+            out.append(classified)
+    return out
+```
+
+**(a) Exact match found:** `match_kind="id"`, `ambiguous=False`, `candidate_count=1`, `unmatched=False`. Then apply classification priority.
+
+**(b) Fallback match found:** `match_kind="amount_date"`, same uniqueness. Then the same classification priority. No LLM. No WRatio. No “closest amount.”
+
+**(c) Multiple candidates (ambiguous):** `ambiguous=True`, `candidate_count=max(nf, ng, nb)` (pandas `int`; fixture blanks = 2, not 4), `match_kind` is `"id"` or `"amount_date"`, `unmatched=True`, class `stale_reference`. **Never silently pick** the first / largest / closest row. A wrong silent pick would label a real miss as a fee.
+
+**(d) No match:** `match_kind="none"`, `unmatched=True`, class `missing_je` for leftover FSM or leftover bank.
+
+Every branch above is pandas/Python. Claude is not called inside `batch_matcher.py`.
+
+#### C.5.2 Worked examples — five states + true negative
+
+Period `2026-03-01`. `period_end = 2026-03-31`. `uf_account_name = "Undeposited Funds"`. All dollars below are fixture literals; `fee` and `fee_pct` are pandas.
+
+**State 1 — Gross vs net, fee explained → `structural_explained`**
+
+| Side | Id | Gross | Fee | Net | Date | GL account |
+|------|----|------:|----:|----:|------|------------|
+| FSM | PZ-100 | 1000.00 | — | — | 2026-03-15 | — |
+| GL | PZ-100 | — | — | 1000.00 | 2026-03-15 | Undeposited Funds |
+| Bank | PZ-100 | 1000.00 | — | 955.00 | 2026-03-15 | — |
+
+- Pass 1: ID `pz-100` unique on all three → (a).
+- Pandas: `fee = 1000.00 - 955.00 = 45.00`; `fee_pct = 0.045` ∈ [0.03, 0.08].
+- Date 2026-03-15 ≤ period_end. GL account is UF. `_classify`: not cutoff, `has_gl`, account is UF, then fee band.
+- Class: `structural_explained`.
+- Guardrail-safe sentence (copy only; never subtract):
+  `"Undeposited Funds shows a 45.00 difference between sources. Gross is 1000.00 and the net payout is 955.00. This is structurally explained by processor or platform fees deducted before the net payout landed. This is not a missing journal entry, not a customer deposit, and not unearned revenue. No action required."`
+
+**State 2 — Payout dated after period_end → `timing_cutoff`**
+
+| Side | Id | Gross | Net | Date | GL account |
+|------|----|------:|----:|------|------------|
+| FSM | PZ-200 | 2000.00 | — | 2026-03-31 | — |
+| GL | PZ-200 | — | 2000.00 | 2026-03-31 | Undeposited Funds |
+| Bank | PZ-200 | 2000.00 | 1920.00 | **2026-04-02** | — |
+
+- Pass 1: ID `pz-200` unique → (a).
+- Pandas: `fee = 80.00`; `fee_pct = 0.04` (would be a fee **if** cutoff did not win).
+- `_classify`: `2026-04-02 > 2026-03-31` → **cutoff wins** (before `has_gl` and before the fee band).
+- Class: `timing_cutoff`.
+- Guardrail-safe sentence:
+  `"Undeposited Funds shows a 80.00 difference between sources. Gross is 2000.00 and the net payout is 1920.00. The payout date is 2026-04-02, after the period closed on 2026-03-31. This appears to be a timing cut-off. No action required — expect this to clear next month."`
+
+**State 3 — Processor batch not in GL → `missing_je`**
+
+| Side | Id | Gross | Net | Date | GL account |
+|------|----|------:|----:|------|------------|
+| FSM | PZ-300 | 500.00 | — | 2026-03-20 | — |
+| GL | — | — | — | — | **no row** |
+| Bank | PZ-300 | 500.00 | 480.00 | 2026-03-20 | — |
+
+- Pass 1: ID `pz-300` on FSM+bank only (two sides, unique) → (a) two-way, GL missing.
+- Pandas: `fee = 20.00`; `fee_pct = 0.04` ∈ [0.03, 0.08] — **ignored**. `_classify` hits `not has_gl` before the fee band. Two-way with no GL is **not** a fee story.
+- Class: `missing_je`. `unmatched` relative to GL = true. Pandas still stores gross 500.00, net 480.00, fee 20.00 so Claude may copy them; the speech is missing JE, not fee.
+- Guardrail-safe sentence:
+  `"Undeposited Funds shows 500.00 in the card-batch file with no matching entry in the GL. A journal entry may be missing. Recommended action: verify whether this transaction has been posted and enter the missing JE if not."`
+
+**State 4 — Bank deposit not in GL / UF → `missing_je`**
+
+| Side | Id | Amount | Date |
+|------|----|-------:|------|
+| FSM | — | — | **no row** |
+| GL | — | — | **no row** |
+| Bank | DEP-99 | 750.00 | 2026-03-22 |
+
+- Pass 1: id `dep-99` lives on one side only → skip.
+- Pass 2: no FSM/GL leftover with net 750.00 on 2026-03-22 → (d).
+- Class: `missing_je`. `unmatched_bank_count` includes this row.
+- Guardrail-safe sentence:
+  `"The bank file shows 750.00 with no matching entry in the GL. A journal entry may be missing. Recommended action: verify whether this deposit has been posted and enter the missing JE if not."`
+
+**State 5 — Posted to the wrong clearing account → `categorical_misclassification`**
+
+| Side | Id | Gross | Net | Date | GL account |
+|------|----|------:|----:|------|------------|
+| FSM | PZ-500 | 600.00 | — | 2026-03-18 | — |
+| GL | PZ-500 | — | 600.00 | 2026-03-18 | **Accounts Receivable** |
+| Bank | PZ-500 | 600.00 | 600.00 | 2026-03-18 | — |
+
+- Pass 1: ID `pz-500` unique → (a).
+- Pandas: `fee = 0.00`. Date in period. `_classify`: `has_gl`, then `Accounts Receivable != Undeposited Funds`.
+- Class: `categorical_misclassification`.
+- Guardrail-safe sentence:
+  `"Undeposited Funds shows a 0.00 fee and a 600.00 payout. The GL booked 600.00 under Accounts Receivable. The GL appears to have booked this amount under a different category. Recommended action: review the GL coding and reclassify to align with Undeposited Funds."`
+
+**True negative — clean three-way, no card**
+
+| Side | Id | Gross | Net | Date | GL account |
+|------|----|------:|----:|------|------------|
+| FSM | PZ-900 | 300.00 | — | 2026-03-10 | — |
+| GL | PZ-900 | — | 300.00 | 2026-03-10 | Undeposited Funds |
+| Bank | PZ-900 | 300.00 | 300.00 | 2026-03-10 | — |
+
+- Pass 1: ID match. Pandas `fee = 0.00`. GL amount == net. Rule 4 → **drop**. Not in `matches` that become exception cards. Consolidator `_is_material` would also drop a $0 UF delta. Acceptance: zero cards for `PZ-900`.
+
+**Ambiguous fallback (not a sixth class — extra fixture rows):** two bank deposits of `100.00` on `2026-03-25` with **blank** `bank_ref`, two FSM rows of `100.00` the same day with blank `payout_id`. Pass 2 sees `len(cand_f) > 1` → (c) `stale_reference`, `candidate_count=2`, do not pick. Sentence copies `100.00` and `2` (the pandas count), never “about two.”
+
+#### C.5.3 Isolated three-file fixture (acceptance spec for PR-B)
+
+**Self-contained.** No Sentinel files, no Vandelay Shopify/Amazon payouts, no DRONE P&L. Filenames must **not** be wired in PR-A (`_detect_file_type` stays supplier-default until PR-B). Suggested names for PR-B:
+
+- `tests/tools/fixtures/kova_cash_fsm_mar_2026.csv`
+- `tests/tools/fixtures/kova_cash_gl_mar_2026.csv`
+- `tests/tools/fixtures/kova_cash_bank_mar_2026.csv`
+
+`period = 2026-03-01`. Company UF name in the test harness: `"Undeposited Funds"`.
+
+**File 1 — FSM / job card-batch** (`processor_settlement` once PR-B wires types)
+
+| payout_id | collected_date | gross | customer |
+|-----------|----------------|------:|----------|
+| PZ-100 | 2026-03-15 | 1000.00 | Oak Street Dental |
+| PZ-200 | 2026-03-31 | 2000.00 | Harbor HVAC |
+| PZ-300 | 2026-03-20 | 500.00 | Mill Road Alarm |
+| PZ-500 | 2026-03-18 | 600.00 | Pine Ridge |
+| PZ-900 | 2026-03-10 | 300.00 | True Negative LLC |
+| | 2026-03-25 | 100.00 | Ambiguous A |
+| | 2026-03-25 | 100.00 | Ambiguous B |
+
+`customer` is dropped by the normalizer (not a GoldenField). Sidecar keeps `payout_id`, `collected_date`, `gross` **before** that drop.
+
+**File 2 — GL with UF detail** (`general_ledger`)
+
+| date | account | amount | memo |
+|------|---------|-------:|------|
+| 2026-03-15 | Undeposited Funds | 1000.00 | PZ-100 |
+| 2026-03-31 | Undeposited Funds | 2000.00 | PZ-200 |
+| 2026-03-18 | Accounts Receivable | 600.00 | PZ-500 |
+| 2026-03-10 | Undeposited Funds | 300.00 | PZ-900 |
+| 2026-03-01 | Service Revenue | 3540.00 | |
+| 2026-03-01 | Rent | 3200.00 | |
+
+`memo` → sidecar `gl_ref`. Rent / Service Revenue have no ref and are not UF → **not** matcher inputs. There is **no** GL row for PZ-300 and **no** GL row for DEP-99.
+
+**File 3 — Bank / processor settlement** (`bank_statement` once PR-B wires types)
+
+| bank_ref | settlement_date | gross | net |
+|----------|-----------------|------:|----:|
+| PZ-100 | 2026-03-15 | 1000.00 | 955.00 |
+| PZ-200 | 2026-04-02 | 2000.00 | 1920.00 |
+| PZ-300 | 2026-03-20 | 500.00 | 480.00 |
+| DEP-99 | 2026-03-22 | 750.00 | 750.00 |
+| PZ-500 | 2026-03-18 | 600.00 | 600.00 |
+| PZ-900 | 2026-03-10 | 300.00 | 300.00 |
+| | 2026-03-25 | 100.00 | 100.00 |
+| | 2026-03-25 | 100.00 | 100.00 |
+
+No `fee` column on purpose: pandas `fee = gross - net`.
+
+**Expected matcher output (PR-B acceptance — pin these):**
+
+| match_id / refs | match_kind | fee (pandas) | settlement_date | gl_account | class | card? |
+|-----------------|------------|-------------:|-----------------|------------|-------|-------|
+| PZ-100 | id | 45.00 | 2026-03-15 | Undeposited Funds | `structural_explained` | yes |
+| PZ-200 | id | 80.00 | 2026-04-02 | Undeposited Funds | `timing_cutoff` | yes |
+| PZ-300 | id (FSM+bank, no GL) | 20.00 | 2026-03-20 | None | `missing_je` | yes |
+| DEP-99 | none | 0.00 | 2026-03-22 | None | `missing_je` | yes |
+| PZ-500 | id | 0.00 | 2026-03-18 | Accounts Receivable | `categorical_misclassification` | yes |
+| PZ-900 | id | 0.00 | 2026-03-10 | Undeposited Funds | — | **no** |
+| two blank $100 on 2026-03-25 | amount_date | 0.00 | 2026-03-25 | — | `stale_reference` (`ambiguous=True`, `candidate_count=2`) | yes |
+
+`unmatched_processor_count = 0` after ID/fallback (ambiguous FSM rows are consumed as ambiguous, not as unmatched-processor). `unmatched_bank_count = 1` (DEP-99) plus the ambiguous bank pair counted as ambiguous, not unmatched.
+
+**Negatives (not in this fixture, still required in PR-B tests):** Vandelay Shopify payouts without a bank file → matcher does not claim three-way. Sentinel Bank Charges $95 is not this item.
+
+**Prompt placeholders Claude may copy from a `BatchMatch`:** `gross`, `fee`, `net`, `gl_amount`, `settlement_date`, `period_end` (already known), `candidate_count`. **Forbidden in the prompt:** “subtract,” “4.5%,” “about 2,” any Jobber/Stripe rate. `fee_pct` is pandas-internal for `_classify` only — do not serialize it onto the item that Claude sees.
 
 ### C.6 `backend/agents/consolidator.py`
 
@@ -722,15 +1070,19 @@ Do not scan P&L for `batch_id`.
 
 ## D. API / routes
 
-***Design for future PR, not to be implemented yet.***
+***Design for future PR, not to be implemented yet.*** Matcher freeze is C.5.1; column contracts and expected cards are C.5.3. This section is ingest only.
 
 No new endpoint in v1. Reconciliations already flow through existing run parse-preview JSONB and report payload.
 
+**Do not** add `SourceFileType` literals (`bank_statement`, `processor_settlement`) in a docs-only PR. Describe them here; ship the enum in PR-A with no `_detect_file_type` wiring (see G). Parser maps uploaded headers onto the C.5.3 sidecar names (rename only — no arithmetic).
+
 | Endpoint | Change |
 |----------|--------|
-| `POST /upload` (and multi-file run start) | None required. Filename detection is server-side. |
+| `POST /upload` (and multi-file run start) | None required. Filename detection is server-side (PR-B). MVP: **one** `processor_settlement` and **one** `bank_statement` per `(company_id, period)`. A second file of the same kind is rejected in plain English (“This close already has a processor file. Remove it first or upload a replacement.”). |
 | Mapping confirm | `file_type` already on mapping draft items (`MappingReview.tsx`). New types must round-trip. |
 | Report GET | Response may include nested `matches` on recon items. Old clients that ignore unknown keys keep working. |
+
+**Period vs bank dates:** the run period is still the close month (`2026-03-01` in the fixture). Bank rows with `settlement_date > period_end` are **kept at ingest** (PZ-200 is `2026-04-02`). Dropping them would make `timing_cutoff` impossible. They are not a second period’s close.
 
 Auth / `company_id`: unchanged.
 
@@ -738,7 +1090,21 @@ Auth / `company_id`: unchanged.
 
 ## E. Frontend
 
-***Design for future PR, not to be implemented yet.***
+***Design for future PR, not to be implemented yet.*** Cards use the six existing classes only. Frozen mapping from C.5.3:
+
+| Three-way state | Fixture id | Classification | Card? |
+|---|---|---|---|
+| Gross vs net / fee-explained | PZ-100 | `structural_explained` | yes |
+| Payout dated after `period_end` | PZ-200 | `timing_cutoff` | yes |
+| Processor batch not in GL | PZ-300 | `missing_je` | yes |
+| Bank deposit not in GL / UF | DEP-99 | `missing_je` | yes |
+| Posted to wrong clearing account | PZ-500 | `categorical_misclassification` | yes |
+| Clean three-way, fee `$0` | PZ-900 | none | **no** |
+| Ambiguous leftover (blank id, same amount+date) | (blank)×2 | `stale_reference` | yes |
+
+No 7th class. No `unmatched_cash`. The existing coverage-card renderer + `AnomalyCard` already handle these six. `is_material` still applies (Kova 1 AND-gate unchanged). PZ-900 never reaches the renderer.
+
+Narrative sentences are C.5.2: pandas supplies every dollar and date; the prompt forbids computing the fee, a %, or the class. Claude never sees a candidate list and is never asked to pick among ambiguous matches.
 
 - `frontend/src/components/FileUpload.tsx`: optional helper copy that a bank CSV and a processor payout file can be uploaded **together** with the GL. No new file-type picker required if detection stays filename-based. Do not ask the user to type match keys.
 - `frontend/src/components/MappingReview.tsx`: payroll has a “Set All to Salaries & Wages” special case (~232). Do **not** add a similar “set all to COGS” for bank files. Optionally a UF quick-apply if the GL pool contains an Undeposited Funds name — only if a fixture has that name; otherwise skip.
@@ -747,15 +1113,18 @@ Auth / `company_id`: unchanged.
 
 ## F. Tests
 
+Acceptance dollars, ids, and classes are C.5.3 — this table is the function list, not a second spec.
+
 | File | Functions / what they prove |
 |------|------------------------------|
-| `tests/tools/test_batch_matcher.py` (new) | `test_id_match_three_way_fee_explained` — id hits, pandas fee = gross−net, class `structural_explained`. `test_unmatched_processor_batch_missing_je`. `test_unmatched_bank_deposit_missing_je`. `test_payout_after_period_end_timing_cutoff`. `test_wrong_clearing_account_categorical`. `test_fallback_amount_date_only_when_id_absent`. `test_does_not_match_on_gross_against_net` (negative). |
-| Isolated three-file fixture | Hand-crafted processor / UF / bank frames. Pin dollar values. |
+| `tests/tools/test_batch_matcher.py` (new) | Load C.5.3 CSVs. Pin: PZ-100 `structural_explained` / `match_kind="id"` / `fee==45.00`; PZ-200 `timing_cutoff` (not fee, even though `fee==80.00`); PZ-300 `missing_je` (not `structural_explained` despite `fee_pct==0.04`); DEP-99 `missing_je` / `match_kind="none"`; PZ-500 `categorical_misclassification`; PZ-900 **absent** from cards; two blank `$100` on `2026-03-25` → one `stale_reference` with `ambiguous is True` and `candidate_count == 2`. |
+| Same file | `test_does_not_match_on_gross_against_net` — copy of PZ-100 with ids stripped must **not** emit `structural_explained`. `test_fallback_amount_date_only_when_id_absent`. Fee comes from `gross - net`, never from a settlement `fee` column (fixture has none). |
+| Isolated three-file fixture | `tests/tools/fixtures/kova_cash_{fsm,gl,bank}_mar_2026.csv` as specified in C.5.3. **Do not** reuse Sentinel or Vandelay CSVs. Check in at PR-A; matcher assertions at PR-B. |
 | `tests/tools/test_detect_file_type.py` or orchestrator tests | PR-B: `stripe_payouts` → `processor_settlement`; `bank_statement` → `bank_statement`; unknown still `supplier_invoices`. **PR-A: these must still be supplier/unknown** (detection not wired). |
 | Vandelay negative | Shopify/Amazon payouts **without** a bank file: matcher does **not** claim three-way. Account-total fee fallback may still fire. |
 | Sentinel negative | No bank file. Bank Charges $95 is not this item. |
 | `tests/agents/test_interpreter_classify.py` | Force class from `matches`; Claude cannot override to a different class; no seventh class in the Literal. |
-| Guardrail | `numbers_used` containing pandas `gross`/`fee`/`net` passes; a Claude-invented `gross - net` that is not on the item fails. |
+| Guardrail | `numbers_used` containing pandas `1000.00` / `955.00` / `45.00` for PZ-100 passes. A Claude-invented `45` that is not on the item fails. Do **not** put `4.5` in `numbers_used` — `fee_pct` is not a prompt field. |
 | Kova 1 fee tests | `is_processor_fee_gap` still true on two-sided 3–8% **without** matches. Do not retune `_FEE_BAND_*`. |
 
 ## G. Sequencing within the item
