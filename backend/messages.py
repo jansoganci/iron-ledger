@@ -27,6 +27,10 @@ GUARDRAIL_FAILED = (
     "We couldn't verify the report numbers after two attempts. "
     "Download the raw data below and try again."
 )
+REPORT_WRITE_FAILED = (
+    "We verified your numbers but couldn't save the report. "
+    "Please try running this period again."
+)
 NOT_FOUND = "No verified report found for this company and period."
 
 MAIL_FAILED = (

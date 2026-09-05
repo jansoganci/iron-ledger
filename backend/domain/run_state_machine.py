@@ -20,6 +20,12 @@ class RunStatus(str, Enum):
     UPLOAD_FAILED = "upload_failed"
     PARSING_FAILED = "parsing_failed"
     GUARDRAIL_FAILED = "guardrail_failed"
+    # The narrative passed the guardrail but the reports row could not be
+    # written. Distinct from GUARDRAIL_FAILED: the numbers were fine, the
+    # persistence was not, so "download the raw data and retry" is the wrong
+    # advice. Before this existed a failed report write left the run stuck in
+    # GENERATING forever, because GENERATING had no edge to any failed state.
+    REPORT_FAILED = "report_failed"
 
 
 # Terminal states have empty allowed-next sets.
@@ -58,11 +64,18 @@ _ALLOWED: dict[RunStatus, frozenset[RunStatus]] = {
         {RunStatus.COMPARING, RunStatus.PARSING_FAILED}
     ),
     RunStatus.COMPARING: frozenset({RunStatus.GENERATING, RunStatus.PARSING_FAILED}),
-    RunStatus.GENERATING: frozenset({RunStatus.COMPLETE, RunStatus.GUARDRAIL_FAILED}),
+    RunStatus.GENERATING: frozenset(
+        {
+            RunStatus.COMPLETE,
+            RunStatus.GUARDRAIL_FAILED,
+            RunStatus.REPORT_FAILED,
+        }
+    ),
     RunStatus.COMPLETE: frozenset(),
     RunStatus.UPLOAD_FAILED: frozenset(),
     RunStatus.PARSING_FAILED: frozenset(),
     RunStatus.GUARDRAIL_FAILED: frozenset(),
+    RunStatus.REPORT_FAILED: frozenset(),
 }
 
 

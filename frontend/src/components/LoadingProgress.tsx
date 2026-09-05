@@ -17,6 +17,10 @@ const STEPS = [
 const TERMINAL_FAILED = new Set([
   "upload_failed",
   "parsing_failed",
+  // Numbers verified, reports row could not be written. Without this the
+  // poller never stops and the user sits at 98% forever — the exact stall
+  // this status was added to end.
+  "report_failed",
 ]);
 
 import type { LowConfidenceColumn } from "./MappingConfirmPanel";

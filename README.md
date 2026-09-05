@@ -6,7 +6,7 @@
 
 ## What it does
 
-Drop your messy financial Excel files. Month Proof's agent reads them, compares to history, finds anomalies, writes a plain-language report, and emails it — in under 2 minutes.
+Drop your messy financial Excel files. Month Proof reads them, compares them with history, finds anomalies, writes a plain-language report, verifies its numbers, and exports a close package.
 
 Built for US finance teams spending 10-15 hours/month on manual close work.
 
@@ -26,9 +26,9 @@ Claude Code was used to:
 
 To see Claude Code in action on this codebase, run:
 ```bash
-claude "explain how the numeric guardrail works in tools/guardrail.py"
-claude "add support for .xlsm files in tools/file_reader.py"
-claude "write a test for the variance calculation in agents/comparison.py"
+claude "explain how the numeric guardrail works in backend/tools/guardrail.py"
+claude "add support for .xlsm files in backend/tools/file_reader.py"
+claude "write a test for the variance calculation in backend/agents/comparison.py"
 ```
 
 ---
@@ -40,12 +40,11 @@ claude "write a test for the variance calculation in agents/comparison.py"
 - Node.js 18+
 - Supabase account
 - Anthropic API key
-- Resend API key (for email)
 
 ### 1. Clone and install
 ```bash
-git clone https://github.com/YOUR_USERNAME/monthproof
-cd monthproof
+git clone https://github.com/jansoganci/iron-ledger.git
+cd iron-ledger
 cp .env.example .env   # fill in your keys
 pip install -r requirements.txt
 cd frontend && npm install
@@ -53,20 +52,14 @@ cd frontend && npm install
 
 ### 2. Set up database + auth
 ```bash
-# Apply migrations to your Supabase project (6 migration files)
-# In Supabase Dashboard → SQL Editor, run each migration in order:
-#   - supabase/migrations/0001_initial_schema.sql
-#   - supabase/migrations/0002_add_pandas_summary.sql
-#   - supabase/migrations/0003_add_source_column.sql
-#   - supabase/migrations/0004_add_storage_key.sql
-#   - supabase/migrations/0005_add_parse_preview.sql
-#   - supabase/migrations/0006_add_discovery_plan.sql
-# Or use Supabase CLI: supabase db push
+# Apply all 10 migrations in supabase/migrations/ in numeric order.
+# Recommended: use the Supabase CLI so no migration is skipped:
+supabase db push
 
 # In Supabase Dashboard → Authentication → Users, create a demo user:
-#   email:    demo@monthproof.com
+#   email:    demo@redhawkdemo.com
 #   password: (your choice)
-# The app will guide you through company setup on first login
+# Then run supabase/seed.sql to create Redhawk Alarm & Security LLC for that user.
 ```
 
 ### 3. Run the backend
@@ -97,7 +90,7 @@ Or via API directly (JWT required — `company_id` is derived from the token):
 
 curl -X POST http://localhost:8000/upload \
   -H "Authorization: Bearer $JWT" \
-  -F "file=@drone_mar_2026.xlsx" \
+  -F "files=@docs/demo_data/redhawk/redhawk_gl_mar_2026.xlsx" \
   -F "period=2026-03-01"
 ```
 
@@ -106,11 +99,13 @@ curl -X POST http://localhost:8000/upload \
 ## Architecture
 
 ```
-File Upload → Parser Agent → Comparison Agent → Interpretation Agent
-                                                        ↓
-                                             Numeric Guardrail
-                                                        ↓
-                                        Dashboard + Email Report
+File Upload → Discovery → Account Mapping → Parse/Normalize
+                                                    ↓
+                         Multi-source Consolidation + Reconciliation
+                                                    ↓
+                         Comparison → Interpretation → Numeric Guardrail
+                                                    ↓
+                                 Verified Monthly/Quarterly Reports + Excel Export
 ```
 
 **Key principle:** Numbers come from pandas. Prose comes from Claude. A numeric guardrail verifies that Claude's narrative matches the pandas output before any report is saved.
@@ -119,7 +114,7 @@ File Upload → Parser Agent → Comparison Agent → Interpretation Agent
 
 ## Demo
 
-Live demo: *(Deployment pending — Day 6)*
+Live demo: no public deployment URL is currently documented.
 
 ### Demo datasets (included in the repo)
 
@@ -127,19 +122,20 @@ The `docs/demo_data/` folder ships with curated multi-file scenarios designed to
 
 | Scenario | Folder / Files | What it demonstrates |
 |---|---|---|
-| **DRONE Inc. — single-file variance** | `docs/demo_data/Drone Inc - {Jan,Feb,Mar} 26.xlsx` | Month-over-month variance analysis on a clean GL export. Highlights: G&A down 34%, Travel up 61%. |
-| **Sentinel Secure — multi-file reconciliation** | `docs/demo_data/sentinel/sentinel_*.xlsx` (5 files: GL, supplier invoices, payroll, contracts, installation payments) | Multi-source consolidation + cross-source reconciliation. Produces 30+ reconciliation items across `missing_je` and `categorical_misclassification` classifications. |
+| **Redhawk Alarm & Security LLC — seeded demo** | `docs/demo_data/redhawk/` (GL, contracts, payroll, and vendor invoices) | Primary four-file reconciliation scenario for `demo@redhawkdemo.com`, including the deterministic $285 service-revenue roster gap. |
+| **Additional sector scenarios** | `docs/demo_data/{clearview,corebuilt,harvest,helix,vandelay}/` | Multi-source fixtures for healthcare, construction, food service, professional services, and e-commerce workflows. |
+| **Sentinel Secure — multi-period GL** | `docs/demo_data/sentinel/` (February and March GL files) | The only checked-in two-period company fixture. The former payroll, supplier, contracts, and installation files are no longer in the repository. |
 
 Drop these into the upload form (or use the `/upload` endpoint) to see the system run without preparing your own data.
 
 ### Demo walkthrough
 1. Sign in or create account
 2. Set up company profile (first-time onboarding)
-3. Choose a demo dataset above (single-file for variance, Sentinel multi-file for reconciliation)
+3. Choose a demo dataset above (Redhawk is the seeded end-to-end scenario)
 4. Upload the files, select the period (`2026-03-01`), click Analyze
 5. Review the parsed preview, confirm
 6. Plain-language report generated and verified by the numeric guardrail
-7. Download raw data, export Excel, or send email report
+7. Download raw data, export the verified Excel close package, or open a prefilled draft in the local email client
 
 ---
 
@@ -147,15 +143,15 @@ Drop these into the upload form (or use the `/upload` endpoint) to see the syste
 
 This is a hackathon MVP. It is intentionally narrow. Things you should know before testing with your own data:
 
-- **Tested input formats.** The pipeline has been smoke-tested against the curated datasets in `docs/demo_data/`. Real-world exports from QuickBooks, NetSuite, Xero, Shopify, Stripe, and similar platforms may require manual adjustment of the column mappings the Discovery agent produces. The frontend exposes a confirmation step for low-confidence mappings, but unusual file shapes can still produce surprising results.
-- **Account-name normalization is not yet automatic.** The pipeline expects each input file to contain a column whose values are recognizable account names (or names that fuzzy-match across files at ≥90% WRatio). Files that use vendor names, employee names, or SKU codes as the primary identifier will produce a flood of `missing_je` reconciliations because the consolidator can't link those values to GL accounts. An AI-assisted account mapping layer is on the v1.1 roadmap (see `docs/02-planning/account_mapper_sprint_plan.md`).
+- **Supported input formats.** The reader accepts `.xlsx`, `.xls`, `.xlsm`, and `.csv`, including the NetSuite XML Spreadsheet 2003 edge case. `docs/demo_data/` contains curated sector fixtures, but not every checked-in workbook is exercised by an automated end-to-end test. Real-world exports can still require discovery or mapping review.
+- **Account mapping still needs review for ambiguous values.** The implemented account-mapping layer uses Claude Haiku to map non-GL source values into the canonical GL account pool and validates its output. Uncertain mappings pause for user confirmation; unusual vendor, employee, or SKU identifiers can still require manual reassignment.
 - **Single user, single company per account.** RLS enforces `companies.owner_id = auth.uid()`. Multi-entity / multi-user is post-MVP.
-- **Single-period analysis.** The variance engine compares one period to history; it does not yet support custom comparison ranges or YoY views.
+- **Fixed monthly and quarterly views.** Monthly runs compare one period with history. Persisted quarterly reports aggregate calendar quarters and can include prior-year deltas when enough data exists, but arbitrary date ranges are not supported.
 - **No PDF, no API integrations.** Excel/CSV only. Direct ERP integrations are post-MVP.
-- **Email is scaffolded but disabled by default.** Set `RESEND_API_KEY` and toggle the send flag in the report panel to enable.
+- **No server-side email delivery.** `MailButton` opens a prefilled `mailto:` draft in the user's local email client. The `/mail/send` route and `ResendEmailSender` remain stubs; setting `RESEND_API_KEY` does not enable backend delivery.
 - **In-memory rate limiting.** A single backend container is assumed. Redis-backed rate limiting is post-MVP.
 
-If you want to evaluate the system, **start with `docs/demo_data/`** — every file there has been verified to flow through the pipeline cleanly.
+If you want to evaluate the system, **start with the seeded Redhawk scenario in `docs/demo_data/redhawk/`**. The other folders are additional sector fixtures and may expose mapping decisions that need review.
 
 ---
 
@@ -166,14 +162,19 @@ If you want to evaluate the system, **start with `docs/demo_data/`** — every f
 ANTHROPIC_API_KEY=your_key_here
 SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_KEY=your_service_key
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_JWT_SECRET=your_jwt_secret
 RESEND_API_KEY=your_resend_key
+RESEND_FROM_EMAIL=reports@yourdomain.com
+FRONTEND_URL=http://localhost:5173
+APP_ENV=development
 ```
 
 ---
 
 ## Future Roadmap
 
-See `docs/sprint/risks.md` section "Post-MVP Backlog" for full list. Highlights:
+See `docs/03-sprint/risks.md` section "Post-MVP Backlog" for the original backlog. Highlights:
 
 - **pgvector** for long-term pattern recognition across fiscal years
 - **ERP API integrations** (NetSuite, QuickBooks, SAP direct)

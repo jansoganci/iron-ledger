@@ -21,14 +21,16 @@ Inspired by Mercury (finance calm), Notion (content density), Airtable (color wi
 
 | Token | Hex | Use |
 |---|---|---|
-| Background | `#FAFAF9` | Warm off-white app canvas |
+| Background | `#FAFAF8` | Warm off-white app canvas |
 | Surface / Card | `#FFFFFF` | Cards, modals, report body |
-| Border | `#E5E4E2` | 1px card and divider borders |
-| Text — primary | `#1A1A1A` | Headings, numeric values |
-| Text — secondary | `#6B6B6B` | Labels, metadata, hints |
-| Accent | `#0D9488` | Primary actions, links, focus ring (Tailwind `teal-600`) |
+| Border | `#E9E8E4` | 1px card and divider borders |
+| Text — primary | `#252421` | Headings, numeric values |
+| Text — secondary | `#787670` | Labels, metadata, hints |
+| Primary accent | `#F08408` | Primary actions, links, and focus rings (amber) |
+| Agent activity | `#6651D4` | Discovery/mapping progress (violet) |
+| Utility / verified | `#0D9488` | Verified/guardrail trust signals (teal) |
 
-Purple is avoided (too AI-consumer). Navy is avoided (too corporate ERP). Warm off-white over pure white — less clinical, Mercury-inspired. Accent is teal — trustworthy, non-alarming, and visually separated from all severity hues so CTAs never read as warnings.
+The current v2 system uses warm stone neutrals, amber for primary actions, violet for agent activity, emerald for favorable outcomes, and teal only for utility/verified trust signals. These meanings are kept separate from severity colors.
 
 **Severity system**
 
@@ -36,10 +38,10 @@ Color carries meaning, not decoration. Severity describes an anomaly's status. V
 
 | State | Background | Text/Icon | Use |
 |---|---|---|---|
-| High (severity) | `#FEE2E2` | `#C53030` | Critical anomaly chip |
-| Medium (severity) | `#FEF3C7` | `#B45309` | Needs-attention anomaly chip |
-| Normal (severity) | `#F3F4F6` | `#6B7280` | Within-range items — neutral gray, **not green** |
-| Favorable variance | `#ECFDF5` | `#166534` | Variance that moved in the right direction (e.g. G&A −34%) |
+| High (severity) | `#FEF0F0` | `#B91C1C` | Critical anomaly chip |
+| Medium (severity) | `#FFF8ED` | `#9A4D00` | Needs-attention anomaly chip |
+| Normal (severity) | `#F4F3F0` | `#787670` | Within-range items — neutral gray, **not green** |
+| Favorable variance | `#EDFAF3` | `#0A613C` | Variance that moved in the right direction (e.g. G&A −34%) |
 
 Severity chips are always color + text label (never color alone) for accessibility.
 
@@ -68,7 +70,7 @@ Severity chips are always color + text label (never color alone) for accessibili
 │   └──────────────────────────────┘     │
 │                                        │
 │   Which period? [March 2026 ▼]         │
-│   Company: [DRONE Inc. ▼]             │
+│   Company: Redhawk Alarm & Security LLC  │
 │                                        │
 │   [Analyze]                            │
 │                                        │
@@ -90,24 +92,20 @@ Severity chips are always color + text label (never color alone) for accessibili
 ### 3. Report Page
 ```
 ┌────────────────────────────────────────┐
-│  March 2026 — DRONE Inc.              │
-│  2 critical, 1 needs attention        │
+│  March 2026 — Redhawk Alarm & Security LLC │
+│  Reconciliation items and variances       │
 ├────────────────────────────────────────┤
 │                                        │
-│  ⚠️ ELECTRICITY EXPENSE      HIGH    │
-│  This month $18,400 / Avg. $12,000         │
-│  +53% vs last month                  │
-│  → Check vendor pricing    │
+│  ⚠️ SERVICE REVENUE        HIGH    │
+│  GL $3,540.00 / Contract roster $3,825.00 │
+│  $285.00 reconciliation gap             │
+│  → Reconcile active accounts           │
 │                                        │
-│  ⚠️ PAYROLL EXPENSE          MEDIUM  │
-│  This month $45,000 / Avg. $38,000         │
-│  +18% vs last month                  │
-│  → Normal if new hires were planned  │
-│                                        │
-│  ✅ Other 36 items within normal range│
+│  ℹ️ RENT EXPENSE          COVERAGE │
+│  Present in the GL; no supporting file  │
 │                                        │
 ├────────────────────────────────────────┤
-│  [Download Report]  [Send Email]       │
+│  [Download Excel]  [Open in Email]      │
 └────────────────────────────────────────┘
 ```
 
@@ -148,7 +146,7 @@ Clicking **Retry Analysis** starts a **fresh run with a new `run_id`**. It does 
 
 ### 5. Login Screen
 
-Email + password. Shown at `/login`. For the hackathon demo the session is pre-warmed (demo user already signed in), but the screen ships for completeness and is the entry point for any first-time sign-in.
+Email + password. Shown at `/login`; it is the normal entry point for the seeded demo user and returning users.
 
 **Default state**
 
@@ -171,7 +169,7 @@ Email + password. Shown at `/login`. For the hackathon demo the session is pre-w
 │   │  └────────────────────────┘  │     │
 │   │                              │     │
 │   │  ┌────────────────────────┐  │     │
-│   │  │       Sign in          │  │ ← primary, teal #0D9488
+│   │  │       Sign in          │  │ ← primary, amber #F08408
 │   │  └────────────────────────┘  │     │
 │   │                              │     │
 │   └──────────────────────────────┘     │
@@ -201,8 +199,8 @@ Inline error above the Sign in button. Plain English, no mention of which field 
 │   │  │ ••••••••••             │  │     │
 │   │  └────────────────────────┘  │     │
 │   │                              │     │
-│   │  ⚠ Email or password is      │ ← inline, #C53030 text
-│   │    incorrect. Please try     │    on #FEE2E2 background
+│   │  ⚠ Email or password is      │ ← inline, #B91C1C text
+│   │    incorrect. Please try     │    on #FEF0F0 background
 │   │    again.                    │     │
 │   │                              │     │
 │   │  ┌────────────────────────┐  │     │
@@ -218,22 +216,22 @@ Inline error above the Sign in button. Plain English, no mention of which field 
 
 | Element | Detail |
 |---|---|
-| Layout | Single centered card, `max-width: 400px`, surface `#FFFFFF` on `#FAFAF9` canvas, 1px `#E5E4E2` border, 24px internal padding |
+| Layout | Single centered card, `max-width: 400px`, surface `#FFFFFF` on `#FAFAF8` canvas, 1px `#E9E8E4` border, 24px internal padding |
 | Fields | Email (`type="email"`, autocomplete `username`), Password (`type="password"`, autocomplete `current-password`). Both required. |
-| Sign in button | Full-width primary. Background `#0D9488` (teal accent). White text. Disabled while request in flight. |
+| Sign in button | Full-width primary. Background `#F08408` (amber accent). White text. Disabled while request is in flight. |
 | Disabled / loading state | Button label swaps to "Signing in…" with a spinner. Button background desaturates; fields become read-only. |
-| Error message | Inline above the button. Severity = high palette (`#FEE2E2` bg / `#C53030` text). Do NOT use a toast — auth errors are blocking, not transient. |
+| Error message | Inline above the button. Severity = high palette (`#FEF0F0` bg / `#B91C1C` text). Do NOT use a toast — auth errors are blocking, not transient. |
 | Social login | **None for MVP.** |
 | Forgot password | **None for MVP.** Add post-hackathon. |
-| Sign up | **None on this screen for MVP.** Accounts are provisioned out-of-band for the demo. |
-| Demo behavior | The demo environment is pre-logged-in; users will not see this screen during the jury walkthrough. The screen exists for completeness and to round-trip auth for reviewers who log out. |
-| Post-login redirect | Success → `/upload` (Home Page — Upload, screen 1). If a `?next=` param is present and points to a same-origin path, honor it. |
+| Sign up | Links to the implemented `/register` route. New users continue through onboarding. |
+| Demo behavior | The seeded demo user is `demo@redhawkdemo.com`; authentication still uses the normal login flow. |
+| Post-login redirect | Users with completed onboarding go to a safe same-origin `?next=` path or `/upload`; incomplete users go to `/onboarding`. |
 
 ---
 
 ### 4. Dashboard
 
-Route: `/dashboard` (auth-guarded, inside `AppShell`). Entry from the **Dashboard** item in the SideNav (desktop) or drawer (tablet). Kept deliberately "basit" — no trend charts, no P&L aggregates — because the demo corpus is two months and those visualisations would look absurd at that sample size.
+Route: `/dashboard` (auth-guarded, inside `AppShell`). Entry from the **Dashboard** item in the SideNav or mobile drawer. The implemented dashboard includes monthly/quarterly tabs, financial KPI cards, month-over-month comparisons, anomaly counts, and report history.
 
 **Scope question this screen answers**
 1. What data do I have?
@@ -243,23 +241,16 @@ Route: `/dashboard` (auth-guarded, inside `AppShell`). Entry from the **Dashboar
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  Dashboard                                               │
-│  DRONE Inc. · Overview of your loaded data and recent    │
-│  reports.                                                │
+│  Redhawk Alarm & Security LLC · Loaded data and reports │
 ├──────────────────────────────────────────────────────────┤
 │                                                          │
-│  ┌─ Periods loaded ─┐ ┌─ Latest report ─┐ ┌─ Total ─────┐│
-│  │       3          │ │  Mar 2026       │ │     3       ││
-│  │  months of data  │ │  2 items flagged│ │  across 3   ││
-│  └──────────────────┘ └─────────────────┘ │  periods    ││
-│                                           └─────────────┘│
+│  Revenue · Gross Margin · Net Income                 │
+│  Operating Expenses · Critical Issues · Health       │
 │                                                          │
-│  Recent reports                                          │
+│  Recent reports                  [Monthly] [Quarterly]    │
 │  ┌──────────────────────────────────────────────────┐    │
 │  │ Mar 2026                                        →│    │
-│  │ 2 anomalies · Generated Mar 15, 2026             │    │
-│  ├──────────────────────────────────────────────────┤    │
-│  │ Feb 2026                                        →│    │
-│  │ No anomalies · Generated Feb 14, 2026            │    │
+│  │ Current anomaly count · generated timestamp       │    │
 │  └──────────────────────────────────────────────────┘    │
 │                                                          │
 │                              [ ↑ Upload new period ]     │
@@ -271,17 +262,17 @@ Route: `/dashboard` (auth-guarded, inside `AppShell`). Entry from the **Dashboar
 | Region | Content |
 |---|---|
 | Header | `<h1>` "Dashboard", company name + tagline in secondary-text below. |
-| **Metric strip** | Three `MetricCard` tiles. Each tile: icon + uppercase label + large tabular-numeral value + secondary-text subtext. Never color-coded — severity chips do color; metric tiles are neutral. |
-| **Recent reports** | `HistoryList` fed by `GET /reports?limit=12`. One row per verified report: `{formatPeriod}` title + "N anomalies · Generated {date}" subtext + chevron. Click → `/report/:period`. |
-| **Action** | Single primary CTA `Upload new period` → `/upload`. Teal `#0D9488`, right-aligned. No competing secondary action — dashboard is a read surface, not a control panel. |
+| **Metric grid** | Six `MetricCard` tiles: revenue, gross margin, net income, operating expenses, critical anomalies, and financial health. Current-vs-previous values use favorable/unfavorable direction styling. |
+| **Recent reports** | `HistoryList` is fed by `GET /reports?limit=50` and filtered by the selected monthly/quarterly tab. Monthly rows link to `/report/:period`; quarterly rows use the quarterly report route. |
+| **Action** | Single primary CTA `Upload new period` → `/upload`. Amber `#F08408`, right-aligned. No competing secondary action — dashboard is a read surface, not a control panel. |
 
-**Metric tiles (MVP — three)**
+**Metric tiles (current — six)**
 
 | Tile | Source | Fallback |
 |---|---|---|
-| Periods loaded | `GET /companies/me/has-history` → `periods_loaded` | `0` + "—" subtext |
-| Latest report | `GET /reports[0]` — formatted period, anomaly-count subtext | "—" + "Upload a file to generate your first report" |
-| Total anomalies | Sum of `anomaly_count` across all reports in the `/reports` response | `0` + "—" |
+| Revenue, gross margin, net income, OpEx | Latest monthly `GET /report/{company_id}/{period}` financials; prior report supplies MoM comparison | `—` when unavailable |
+| Critical anomalies | High/medium anomalies in the latest monthly report | `0` |
+| Financial health | Latest net income and net margin | `—` when unavailable |
 
 **Empty state (first-time users)**
 
@@ -293,7 +284,7 @@ The Dashboard itself is still reachable with zero reports — it doesn't gate be
 |---|---|
 | **≥1024px** (desktop) | 3-col `MetricCard` row (`lg:grid-cols-3`). `HistoryList` full-width inside `max-w-5xl` container. |
 | **768–1023** (tablet) | 2-col `MetricCard` row (`md:grid-cols-2`) — the third tile wraps to the next line. `HistoryList` unchanged. |
-| **<768** (mobile) | **Not rendered.** `AppShell` detects `max-width: 767px` on route change and redirects `/dashboard` → `/upload` with an info toast: "Dashboard is available on larger screens." Dashboard destination UX is desktop-first by explicit spec (line 623). |
+| **<768** (mobile) | **Not rendered.** `AppShell` detects `max-width: 767px` on route change and redirects `/dashboard` → `/upload` with an info toast: "Dashboard is available on larger screens." |
 
 **Data freshness**
 - `has-history` and `/reports` both use a 30s React Query `staleTime`. Opening the page twice in quick succession hits the cache. The Dashboard is a soft overview; stale-by-30s is fine. Hard refresh on an upload completion is handled elsewhere (UploadPage triggers `queryClient.invalidateQueries(["has-history"])` when a run finishes).
@@ -301,15 +292,12 @@ The Dashboard itself is still reachable with zero reports — it doesn't gate be
 **What this screen is explicitly NOT** (post-MVP)
 
 - **TrendChart** — ≥6 periods required for a meaningful bar chart; demo has 2.
-- **Total revenue / COGS / OpEx KPIs** — needs category-aware aggregation of `monthly_entries`; net-new backend work.
 - **Date range picker / filters** — dashboard shows everything; filtering happens on a future `/reports` page.
-- **Export** — CSV/PDF download is post-MVP.
-
-These remain listed under `Optional (if time permits)` in the Component List so they can return when the TrendChart, MetricCard, HistoryList components are promoted out of post-MVP status.
+- **PDF export** — the monthly close package exports as a three-sheet `.xlsx`; PDF remains post-MVP.
 
 ---
 
-### 4b. Dashboard — post-MVP additions (not in scope for hackathon)
+### 4b. Earlier dashboard concept (superseded)
 ```
 ┌─────────────┬──────────────────────────┐
 │  Summary       │  Monthly Trend             │
@@ -366,13 +354,13 @@ Tone: friendly, inviting, not alarming. The user has done nothing wrong.
 │   Which period is this? [Feb 2026 ▼]   │
 │                                        │
 │   ┌────────────────────────┐           │
-│   │  Upload baseline       │           │ ← primary, teal #0D9488
+│   │  Upload baseline       │           │ ← primary, amber #F08408
 │   └────────────────────────┘           │
 │                                        │
 │   ─────────────────────────────        │
 │                                        │
 │   Not sure what to upload?             │
-│   → See a sample Excel file            │ ← link, teal
+│   → See a sample Excel file            │ ← link, amber
 │                                        │
 └────────────────────────────────────────┘
 ```
@@ -381,22 +369,22 @@ Tone: friendly, inviting, not alarming. The user has done nothing wrong.
 
 | Element | Detail |
 |---|---|
-| Headline | "Let's set up your baseline." Semibold, primary text `#1A1A1A`. |
-| Body copy | Two short paragraphs. Secondary text `#6B6B6B`. Explains *why* (comparison requires history) and *what next* (upload one prior month, then the current month next time). |
+| Headline | "Let's set up your baseline." Semibold, primary text `#252421`. |
+| Body copy | Two short paragraphs. Secondary text `#787670`. Explains *why* (comparison requires history) and *what next* (upload one prior month, then the current month next time). |
 | Illustration | Muted folder glyph. Do NOT use warning/alert iconography — the empty state is not an error. |
 | Period default | Defaults to the previous calendar month relative to today (e.g. today = Apr 2026 → default = `Feb 2026`). User can change via the `PeriodSelector`. |
-| Primary CTA | "Upload baseline" — full-width below the dropzone. Teal `#0D9488`. Disabled until a file is selected and a period chosen. |
+| Primary CTA | "Upload baseline" — full-width below the dropzone. Amber `#F08408`. Disabled until a file is selected and a period chosen. |
 | Sample file link | Secondary text-link. Downloads a pre-filled Excel template so hesitant first-time users have something concrete to mimic. Optional for MVP if time is tight. |
 | Severity / alert colors | **None.** The empty state uses only neutral palette. No red, no amber. Anything hinting at failure would confuse a brand-new user. |
-| Dashboard link / nav | Dashboard, history, and reports nav items may be visible but are disabled/dimmed until the baseline upload completes. Hovering shows a tooltip: "Available after your first upload." |
+| Dashboard link / nav | Dashboard, Data, and Reports remain available in the navigation; their own empty states handle a company with no loaded data. |
 | Trigger | Rendered when the authenticated user's `company_id` has zero rows in `monthly_entries` across all periods. |
 | After upload | On successful baseline upload, redirect to a confirmation screen ("Baseline saved. Come back at month-end to run your first close.") — NOT to the full report page, since there is still no comparison to show. |
 
 ---
 
-### 7. Mapping Confirm Modal
+### 7. Mapping Confirmation Surfaces
 
-Triggered mid-parse when the column-mapping step (Claude Haiku) returns a confidence below 80% on one or more columns. **Never show the full column list** — only the flagged ones. Goal is to feel like "the agent needs two taps of help," not "the user has to audit 40 columns."
+`MappingReview` pauses multi-source runs when source values need a canonical GL account. `MappingConfirmPanel` handles up to three low-confidence column/category mappings. The compact panel shows only the lowest-confidence columns so review stays focused.
 
 Blocks the pipeline until resolved. Background is dimmed; rest of the UI is non-interactive.
 
@@ -425,7 +413,7 @@ Blocks the pipeline until resolved. Background is dimmed; rest of the UI is non-
 │  └────────────────────────────────────────────┘  │
 │                                                  │
 ├──────────────────────────────────────────────────┤
-│                   [ Cancel ]   [ Confirm Mapping ] ← primary teal
+│                   [ Cancel ]   [ Confirm Mapping ] ← primary amber
 └──────────────────────────────────────────────────┘
 ```
 
@@ -437,8 +425,8 @@ Blocks the pipeline until resolved. Background is dimmed; rest of the UI is non-
 | Maximum rows shown at once | **3.** If more than 3 columns are below threshold, show the 3 lowest-confidence first. The remainder are mapped to `OTHER` and surfaced post-run as a non-blocking review item (out of scope for MVP if it slips). |
 | Row layout | Card per column. Fields: `column name` (from the uploaded file, verbatim), `agent's guess` (mapped category), `confidence %` (secondary text), `Map to` dropdown (US GAAP categories from `account_categories`), `Skip this column` link (skipped columns are not loaded into `monthly_entries`). |
 | Dropdown options | `REVENUE`, `COGS`, `OPEX`, `G&A`, `R&D`, `OTHER_INCOME`, `OTHER`, `SKIP`. Default = agent's guess. **OTHER** is a real seeded `account_categories` row (id=7) — selecting it writes the column to the import as the OTHER bucket. **SKIP** is a frontend-only sentinel — selecting it removes the column from the persisted mapping; the column is **never written to `accounts` or `monthly_entries`**. The backend `POST /runs/{run_id}/mapping/confirm` handler accepts `SKIP` in the request body and treats it as a delete-by-omission. |
-| Confidence display | Plain percentage, secondary text color `#6B6B6B`. No progress bar — keeps the density Notion-like. |
-| Primary CTA | **Confirm Mapping** — teal `#0D9488`, right-aligned in footer. Disabled until every flagged row has either an approved dropdown choice or an explicit Skip. |
+| Confidence display | Plain percentage, secondary text color `#787670`. No progress bar — keeps the density Notion-like. |
+| Primary CTA | **Confirm Mapping** — amber `#F08408`, right-aligned in footer. Disabled until every flagged row has either an approved dropdown choice or an explicit Skip. |
 | Secondary CTA | **Cancel** — text button, left of the primary. Cancels the current run; the uploaded file stays in Supabase Storage for retry. |
 | Close ("×") behavior | Same as Cancel. |
 | Accessibility | Focus trapped inside modal. `Esc` = Cancel. Tab order: rows top-to-bottom, then footer. |
@@ -448,7 +436,7 @@ Blocks the pipeline until resolved. Background is dimmed; rest of the UI is non-
 
 ### 8. Profile Page
 
-Read-only account surface. Not a "settings" screen — no editable fields in MVP. Destination for the user footer click in the `AppShell` (both desktop sidebar and mobile drawer). Pure consumer of existing endpoints (`GET /companies/me`, `GET /companies/me/has-history`) plus the Supabase Auth session — **no new backend work**.
+Account surface with read-only identity/company fields plus an editable typical-monthly-revenue band. It consumes `GET /companies/me`, `GET /companies/me/has-history`, the Supabase Auth session, and `PATCH /companies/me` for the revenue-band setting.
 
 **Route:** `/profile` (auth-guarded, inside `AppShell`).
 
@@ -457,8 +445,7 @@ Read-only account surface. Not a "settings" screen — no editable fields in MVP
 ```
 ┌──────────────────────────────────────────────────┐
 │  Your account                         [ 👤 ]     │
-│  Read-only for MVP. Edit controls ship post-     │
-│  hackathon.                                      │
+│  Company identity and close-scale settings.     │
 ├──────────────────────────────────────────────────┤
 │                                                  │
 │  ┌─ ✉ Account ───────────────────────────────┐   │
@@ -467,9 +454,10 @@ Read-only account surface. Not a "settings" screen — no editable fields in MVP
 │  └───────────────────────────────────────────┘   │
 │                                                  │
 │  ┌─ 🏢 Company ──────────────────────────────┐   │
-│  │  Name          DRONE Inc.                 │   │
-│  │  Sector        Industrial                 │   │
+│  │  Name          Redhawk Alarm & Security LLC │ │
+│  │  Sector        Field Service — Alarm & Security │ │
 │  │  Currency      USD                        │   │
+│  │  Monthly rev.  Under $100K          [Save]│   │
 │  └───────────────────────────────────────────┘   │
 │                                                  │
 │  ┌─ 🕘 Usage ────────────────────────────────┐   │
@@ -488,15 +476,15 @@ Read-only account surface. Not a "settings" screen — no editable fields in MVP
 
 | Property | Value |
 |---|---|
-| Page width | Single column, `max-width: 640px`, centered. Same constraint across desktop / tablet / mobile — the card-stack layout doesn't benefit from wider columns. |
+| Page width | Single column, `max-w-6xl` (72rem), centered; cards remain stacked. |
 | Padding | `px-4` always; `py-6` mobile, `py-8` md+. |
-| Card radius / border | `rounded-lg` + `border border-border` (#E5E4E2) on `bg-surface`. Matches ReportSummary + AnomalyCard. |
+| Card radius / border | `rounded-lg` + `border border-border` (`#E9E8E4`) on `bg-surface`. Matches ReportSummary + AnomalyCard. |
 | Section header | Icon (lucide, `h-4 w-4`, `text-text-secondary`) + section label (14px, semibold, `text-text-primary`). Bottom border divides header from `<dl>`. |
 | Key/value row | `<dt>` left (14px, `text-text-secondary`), `<dd>` right (14px, `text-text-primary`). Dividers between rows via `divide-y divide-border`. Numeric values carry `tabular-nums` + `data-numeric`. |
 | Baseline chip | `favorable` palette if `has_history === true` ("Active"). `severity.normal` palette if false ("Not set up"). Never red — this is not a warning state. |
-| Sign out button | Full-width, bordered, non-accent (sign-out is a neutral action, not primary). Accent teal is reserved for primary CTAs like Analyze / Send / Confirm. `min-h-[44px]` on touch, `min-h-[40px]` on `lg`. |
+| Sign out button | Full-width, bordered, non-accent (sign-out is a neutral action, not primary). Amber is reserved for primary CTAs. `min-h-[44px]` on touch, `min-h-[40px]` on `lg`. |
 
-**Fields displayed (MVP read-only)**
+**Fields displayed**
 
 | Section | Field | Source | Notes |
 |---|---|---|---|
@@ -505,6 +493,7 @@ Read-only account surface. Not a "settings" screen — no editable fields in MVP
 | Company | Name | `GET /companies/me` → `name` | |
 | Company | Sector | `GET /companies/me` → `sector` | `—` when null. |
 | Company | Currency | `GET /companies/me` → `currency` | Tabular numerals in case of non-USD codes. |
+| Company | Typical monthly revenue | `GET /companies/me` → `monthly_revenue_band` | Editable via `PATCH /companies/me`; drives scaled materiality thresholds. |
 | Usage | Periods loaded | `GET /companies/me/has-history` → `periods_loaded` | |
 | Usage | Baseline status | `GET /companies/me/has-history` → `has_history` | Chip: favorable / normal. |
 
@@ -512,25 +501,26 @@ Read-only account surface. Not a "settings" screen — no editable fields in MVP
 
 | Action | Behavior |
 |---|---|
+| Save revenue band | Sends `PATCH /companies/me` and refreshes the cached company record. |
 | Sign out | Calls `supabase.auth.signOut()`, navigates to `/login`. Redundant with the sidebar/drawer Sign out button — kept here because users expect it on an account page. |
 
 **Explicitly NOT in MVP** (post-hackathon):
 - Change password (via `supabase.auth.updateUser`)
-- Edit company name / sector / currency
+- Edit company name / sector / currency (the revenue band is editable)
 - Delete account
 - Team members / role management
 - Billing / subscription
 - API keys / integrations
 - 2FA settings
 
-Any of these would require new backend endpoints and auth flows that are out of hackathon scope. The MVP profile page is deliberately a consumer-only view — it proves the nav destination works without opening a write surface.
+These remain outside the current profile surface; the revenue-band field is the sole supported company-setting write.
 
 **Responsive behavior**
 
 | Breakpoint | Behavior |
 |---|---|
-| ≥1024px | Profile renders right of the fixed SideNav; content column capped at 640px. |
-| 768–1023px | No sidebar; content takes full width under the top bar, still capped at 640px. |
+| ≥1024px | Profile renders right of the fixed SideNav inside the 72rem content cap. |
+| 768–1023px | No sidebar; content takes full width under the top bar inside the same cap. |
 | <768px | Same as tablet. Card gutters `px-4` give ~16px to screen edge. Sign out button spans full card width. |
 
 **Accessibility**
@@ -551,24 +541,24 @@ Any of these would require new backend endpoints and auth flows that are out of 
   - On rejection, show a plain-English toast/inline message (e.g. "`report.pdf` is not a supported format — upload an Excel or CSV file." or "`huge_export.xlsx` is larger than 10 MB — please split the file.")
   - Rejected files never hit `POST /upload`. Valid files are POSTed with the JWT `Authorization` header.
 - `PeriodSelector` — month/year selection
-- `CompanySelector` — company selection
-- `LoadingProgress` — 4-step progress bar
+- Company identity is display-only; `company_id` is resolved from the authenticated user and is never selected or supplied by the browser.
+- `LoadingProgress` — 5-step progress display (reading, discovery, mapping, comparison, generation)
 - `AnomalyCard` — single anomaly card.
-  - **API:** `{ value: number, direction: 'favorable' | 'unfavorable' | 'neutral', severity: 'high' | 'medium' | 'normal', ... }`. Direction drives color (favorable = green chip `#ECFDF5/#166534`; unfavorable = severity red/amber; neutral = gray). Severity drives the chip label. Do NOT color by sign of `value` — a negative variance can be favorable (e.g. G&A −34%) or unfavorable (e.g. revenue −12%) depending on direction.
-  - **Provenance:** every figure rendered inside the card is hoverable. The hover/popover shows the source filename and original column name, e.g. `drone_mar_2026.xlsx — column 'Amount'`. This surfaces the guardrail story to the user — each number is traceable back to the file it came from.
+  - **API:** `{ value: number, direction: 'favorable' | 'unfavorable' | 'neutral', severity: 'high' | 'medium' | 'normal', ... }`. Direction drives color (favorable = emerald chip `#EDFAF3/#0A613C`; unfavorable = severity red/amber; neutral = warm gray). Severity drives the chip label. Do NOT color by sign of `value` — a negative variance can be favorable (e.g. G&A −34%) or unfavorable (e.g. revenue −12%) depending on direction.
+  - **Provenance:** every figure rendered inside the card is hoverable. The hover/popover shows the source filename and original column name, e.g. `redhawk_gl_mar_2026.xlsx — column 'Amount'`. This surfaces the guardrail story to the user — each number is traceable back to the file it came from.
 - `ReportSummary` — plain-language summary.
   - **Verified badge:** renders the "Verified · Guardrail Passed" badge (checkmark icon + teal accent) next to the period header whenever the report was produced by a run whose guardrail passed. Never render this badge on raw/unverified downloads.
-  - **Provenance:** every number in the narrative prose is hoverable. Hover reveals source filename and original column name (e.g. `drone_mar_2026.xlsx — column 'Amount'`). Numbers are visibly distinguishable from surrounding prose (tabular numerals + subtle underline on hover) so the user learns they are inspectable.
-- `MailButton` — send email
+  - **Provenance:** every number in the narrative prose is hoverable. Hover reveals source filename and original column name (e.g. `redhawk_gl_mar_2026.xlsx — column 'Amount'`). Numbers are visibly distinguishable from surrounding prose (tabular numerals + subtle underline on hover) so the user learns they are inspectable.
+- `MailButton` — builds a prefilled `mailto:` URL and opens the user's local email client; it does not call the stub backend email route
 - `GuardrailWarning` — shown when numeric validation fails after retry, offers retry/download raw options
-- `MappingConfirmModal` — shown when column mapping confidence is below 80%, lists only the flagged columns for user confirmation
+- `DiscoveryReview`, `MappingReview`, `MappingConfirmPanel`, and `ParsePreviewPanel` — staged review surfaces for structure, source-value mapping, low-confidence categories, and parsed rows
 - `AppShell` — two-column responsive shell (fixed left `SideNav` ≥1024px / top bar + hamburger-drawer below). Houses the main nav and the clickable user footer that navigates to `/profile`. Per `§Responsive Breakpoints`.
-- `ProfilePage` — read-only account view at `/profile` per §8 above. Surfaces Supabase Auth email + user ID, `GET /companies/me` fields, and `GET /companies/me/has-history` usage stats. Sign-out action. No editable fields in MVP.
+- `ProfilePage` — account view at `/profile` per §8 above. Surfaces Auth identity, company/history data, editable revenue band, and sign-out.
+
+`MetricCard` and `HistoryList` are implemented dashboard components.
 
 ### Optional (if time permits)
 - `TrendChart` — monthly bar chart
-- `MetricCard` — revenue/expenses/net summary
-- `HistoryList` — past reports
 
 ---
 
@@ -587,13 +577,13 @@ While the agent runs, the user sees what is happening. Not a black box.
 English only. Demo is in English (hackathon jury).
 
 **Mail:**
-Report summary + anomaly list. Also include full report link.
+`MailButton` opens a prefilled `mailto:` draft containing the period, anomaly count, and summary, and reminds the user to attach the exported Excel package. `/mail/send` and the Resend adapter remain unused stubs.
 
 **Guardrail failure:**
 If the numeric guardrail fails, the system retries once automatically. If the second attempt also fails, show the GuardrailWarning screen. Never show an unverified report as if it were verified. The raw pandas data can be offered as a download so the user is never left empty-handed.
 
 **Column mapping confirmation:**
-Columns mapped with 80%+ confidence are accepted silently. Only columns below 80% confidence are shown to the user in the MappingConfirmModal. The modal shows: column name, what the agent thinks it is, and a simple approve/reassign dropdown. Goal: user sees at most 2-3 flagged columns, never the full list.
+Columns mapped with 80%+ confidence are accepted silently. Lower-confidence category mappings are shown in `MappingConfirmPanel`; source-value-to-GL decisions use the separate `MappingReview` screen. Both use explicit approve/reassign controls.
 
 ---
 
@@ -607,7 +597,7 @@ US accounting conventions. Apply everywhere — tables, cards, narrative, export
 | Thousands separator | comma (`1,234,567`) |
 | Decimal separator | period (`1,234.56`) |
 | Decimal places — tables | 2 (`$45,000.00`) |
-| Decimal places — narrative | abbreviated (`$4.73M`, `$128K`) |
+| Decimal places — narrative | Exact source values with `$`, separators, and/or two decimals; do not abbreviate or re-round (`$4,730,000.00`, not `$4.73M`) |
 | Negative numbers | parentheses, **never** a minus sign — `($1,234.00)`, not `-$1,234.00` |
 | Tabular numerals | `font-feature-settings: "tnum"` on ALL numeric cells |
 | Fiscal year | January–December (US standard) |
@@ -643,16 +633,16 @@ Top-right of the viewport, stacked vertically (newest on top). Offset 16px from 
 
 | Type | Background | Icon/Accent | Dismiss | Example |
 |---|---|---|---|---|
-| success | `#ECFDF5` | `#166534` ✓ check | auto after **4s**; also dismissible manually | "Report emailed to cfo@drone.com." |
-| error | `#FEE2E2` | `#C53030` ⚠ alert | **manual dismiss only** — no auto-timeout | "Network error — couldn't send email. Please try again." |
-| warning | `#FEF3C7` | `#B45309` ⚠ alert | auto after **6s**; dismissible manually | "You're sending a lot of requests — please wait a moment." (429 rate limit) |
-| info | `#F3F4F6` | `#6B7280` ⓘ info | auto after **4s**; dismissible manually | "Your baseline has been saved." |
+| success | `#EDFAF3` | `#0A613C` ✓ check | auto after **4s**; also dismissible manually | "Report generated and verified." |
+| error | `#FEF0F0` | `#B91C1C` ⚠ alert | **manual dismiss only** — no auto-timeout | "Network error — please try again." |
+| warning | `#FFF8ED` | `#9A4D00` ⚠ alert | auto after **6s**; dismissible manually | "You're sending a lot of requests — please wait a moment." (429 rate limit) |
+| info | `#F4F3F0` | `#787670` ⓘ info | auto after **4s**; dismissible manually | "Your baseline has been saved." |
 
 **When to use each**
 
 | Event | Type |
 |---|---|
-| Mail sent (Resend success) | success |
+| Mail sent | Not emitted today; `MailButton` hands off to the local email client |
 | Report generated & verified (if user was on a different screen) | success |
 | Rate limit hit (HTTP 429) | warning |
 | Network error / unreachable API | error |
@@ -661,7 +651,7 @@ Top-right of the viewport, stacked vertically (newest on top). Offset 16px from 
 | Non-blocking informational ("We saved your draft") | info |
 | **Guardrail failure** | **NOT a toast** — inline on the GuardrailWarning screen |
 | **Auth error (wrong password)** | **NOT a toast** — inline on the Login screen |
-| **Column mapping confidence low** | **NOT a toast** — opens the MappingConfirmModal |
+| **Column mapping confidence low** | **NOT a toast** — opens the appropriate mapping review surface |
 
 **Wireframe**
 
@@ -670,13 +660,12 @@ Top-right of the viewport, stacked vertically (newest on top). Offset 16px from 
                                                    │
                                                    ▼
                        ┌─────────────────────────────────┐
-                       │ ✓  Report emailed to            │
-                       │    cfo@drone.com.       [ × ]   │  ← success, auto 4s
+                       │ ✓  Report generated and         │
+                       │    verified.            [ × ]   │  ← success, auto 4s
                        └─────────────────────────────────┘
                        ┌─────────────────────────────────┐
-                       │ ⚠  Network error — couldn't     │
-                       │    send email. Please try       │
-                       │    again.               [ × ]   │  ← error, manual
+                       │ ⚠  Network error — please       │
+                       │    try again.            [ × ]   │  ← error, manual
                        └─────────────────────────────────┘
 ```
 
@@ -702,10 +691,10 @@ Every component ships with these states defined. A component with no defined loa
 
 | State | Visual | Notes |
 |---|---|---|
-| Idle / default | Dashed 1px border `#E5E4E2`, surface `#FFFFFF`, copy "Drop your files here or click to select. Excel · CSV". | Baseline state. |
-| Dragging (file over zone) | Border becomes solid teal `#0D9488` 2px, background tints `#ECFDF5` faintly, copy swaps to "Release to upload". | Triggered by `dragenter`/`dragover`. Revert on `dragleave`. |
-| Uploading | Border returns to `#E5E4E2`. Inline linear progress bar in teal under the dropzone. Filename list visible with per-file spinner. Dropzone is disabled during upload. | No toast — progress is local to the component. |
-| Wrong file type (client-side reject) | **Inline** message under dropzone: red text `#C53030` on `#FEE2E2` background, 8px padding. Copy: `` `report.pdf` is not a supported format — upload an Excel or CSV file. `` Also emit an error toast if the rejection happens via the hidden file input (out-of-view drop). Rejected file is NOT added to the pending list. | Accepted extensions: `.xlsx`, `.csv`, `.xls`, `.xlsm`. |
+| Idle / default | Dashed 1px border `#E9E8E4`, surface `#FFFFFF`, copy "Drop your files here or click to select. Excel · CSV". | Baseline state. |
+| Dragging (file over zone) | Border becomes solid amber `#F08408` 2px, background tints favorable emerald, copy swaps to "Release to upload". | Triggered by `dragenter`/`dragover`. Revert on `dragleave`. |
+| Uploading | Border returns to `#E9E8E4`. Inline linear progress bar in amber under the dropzone. Filename list visible with per-file spinner. Dropzone is disabled during upload. | No toast — progress is local to the component. |
+| Wrong file type (client-side reject) | **Inline** message under dropzone: red text `#B91C1C` on `#FEF0F0` background, 8px padding. Copy: `` `report.pdf` is not a supported format — upload an Excel or CSV file. `` Also emit an error toast if the rejection happens via the hidden file input (out-of-view drop). Rejected file is NOT added to the pending list. | Accepted extensions: `.xlsx`, `.csv`, `.xls`, `.xlsm`. |
 | File too large (client-side reject) | Same inline pattern. Copy: `` `huge_export.xlsx` is larger than 10 MB — please split the file. `` | 10 MB per-file cap. |
 | Server-side upload failure | Error toast: "We couldn't upload `filename.xlsx`. Please try again." Dropzone returns to idle. | Retry button inside the toast (or re-drop). |
 
@@ -714,7 +703,7 @@ Every component ships with these states defined. A component with no defined loa
 | State | Visual | Notes |
 |---|---|---|
 | Loaded (default) | Chip with severity color (high/medium/normal) + text label; value with tabular numerals; variance % with favorable/unfavorable/neutral direction color; provenance underline on hover. | See Component List for API. |
-| Loading skeleton | Card shell rendered at correct height with shimmer placeholders for chip, number, label. Uses `#F3F4F6` base and `#E5E4E2` highlight. No icons, no text. | Prevents layout shift when data arrives. |
+| Loading skeleton | Card shell rendered at correct height with shimmer placeholders for chip, number, label. Uses `#F4F3F0` base and `#E9E8E4` highlight. No icons, no text. | Prevents layout shift when data arrives. |
 | Empty — no anomalies in category | **Not a card — a summary row.** Copy: "✅ All 36 items within normal range." Neutral palette, no severity color. Collapsed by default with a text-link "Show details" to expand. | Avoids printing 36 "normal" cards which would drown the real anomalies. |
 | Report has zero anomalies total | Full-card placeholder: teal check icon, headline "No anomalies this period." Secondary copy: "Every account is within expected range vs. your history." | Rare but should look celebratory, not empty. |
 
@@ -725,16 +714,17 @@ Every component ships with these states defined. A component with no defined loa
 | Generating | Header shows period + "Generating verified report…" with a teal spinner in place of the Verified badge. Body is replaced by skeleton paragraphs (two 90%-width shimmer bars, one 70%, one 50%). | Shown while interpreter + guardrail are running. |
 | Guardrail failed | ReportSummary is **not rendered.** The GuardrailWarning screen (3b) replaces it. Do not render a partial or muted ReportSummary that could be mistaken for a verified one. | Hard rule: no unverified prose ever appears in this component. |
 | Verified | Full narrative renders. "Verified · Guardrail Passed" badge next to the period header — checkmark icon + teal accent `#0D9488`. Every number is hoverable (provenance popover). | This is the only state where the Verified badge renders. |
-| Stale (report exists but source file re-uploaded since) | Verified badge replaced by an amber "Out of date" chip (`#FEF3C7/#B45309`). Copy above body: "This report was generated before you re-uploaded the source file. [Regenerate report]." | Prevents the user from emailing a stale verified report. |
+| Stale (report exists but source file re-uploaded since) | Verified badge replaced by an amber "Out of date" chip (`#FFF8ED/#9A4D00`). Copy above body: "This report was generated before you re-uploaded the source file. [Regenerate report]." | Prevents the user from emailing a stale verified report. |
 
 ### `LoadingProgress`
 
-Four sequential steps, each with a label and an integer % (0–100). One step active at a time; previous steps show ✓; future steps are dimmed. Parent polls the `/runs/{run_id}` endpoint to drive updates.
+Five sequential steps, each with a label and an integer % (0–100). One step is active at a time; review states can pause after discovery, mapping, or parsing. Parent polls `/runs/{run_id}/status`.
 
 ```
 ┌────────────────────────────────────────┐
 │  ✓ Reading files                 100%  │ ← complete
-│  ● Mapping accounts               62%  │ ← active, teal progress
+│  ✓ Analyzing structure            100%  │ ← complete
+│  ● Mapping accounts               62%  │ ← active, violet progress
 │  ○ Comparing to history            0%  │ ← pending, dimmed
 │  ○ Generating report               0%  │ ← pending, dimmed
 └────────────────────────────────────────┘
@@ -743,11 +733,12 @@ Four sequential steps, each with a label and an integer % (0–100). One step ac
 | Step | Label | Backend signal | Notes |
 |---|---|---|---|
 | 1 | Reading files | Parser: file read + PII sanitize + pandera validate complete | `%` = rows processed ÷ total rows |
-| 2 | Mapping accounts | Parser: Haiku mapping done + `monthly_entries` written | `%` = columns mapped ÷ total columns |
-| 3 | Comparing to history | Comparison agent running | `%` = accounts compared ÷ total accounts |
-| 4 | Generating report | Interpreter + guardrail running | `%` hits 100 only after guardrail passes. On guardrail fail, switch to GuardrailWarning screen. |
+| 2 | Analyzing structure | Discovery plan produced or awaiting user approval | Backend-reported progress |
+| 3 | Mapping accounts | Category/source-value mapping and preview preparation | Backend-reported progress |
+| 4 | Comparing to history | Comparison agent running after preview confirmation | Backend-reported progress |
+| 5 | Generating report | Interpreter + guardrail running | Completes only after guardrail passes. |
 
-Completed steps use ✓ icon in `#166534`. Active step uses a filled circle ● in teal `#0D9488` with a linear progress bar under the label. Pending steps use an empty circle ○ in `#6B6B6B`.
+Completed steps use an emerald ✓. Active steps use violet `#6651D4` with a violet-to-emerald progress treatment. Pending steps use warm gray `#787670`.
 
 ---
 
@@ -770,11 +761,11 @@ Tailwind tokens: `sm` = 640px (unused), `md` = 768px (tablet), `lg` = 1024px (de
 | Region | ≥1024px (desktop) | 768–1023px (tablet) | <768px (mobile, min 375px) |
 |---|---|---|---|
 | App shell (nav + content) | Two-column: left nav + content | Top nav bar + single column content | Top nav bar + single column content |
-| Dashboard (screen 4) | Two-column: Summary + Trend | Single column, stacked | **Hidden — not a supported mobile screen** |
+| Dashboard (screen 4) | Six KPI cards in a 3-column grid + report history | KPI cards in a 2-column grid + report history | **Hidden — not a supported mobile screen** |
 | Report page (screen 3) | Single column, max-width 960px centered | Same, fluid width | Same, fluid width |
 | AnomalyCard grid | 2 columns on 1280px+, 1 column below | 1 column | 1 column |
 | LoadingProgress | Inline, 480px wide | Full width, 32px gutters | Full width, 16px gutters |
-| MappingConfirmModal | Centered, 560px wide | Centered, 90vw | Full-screen sheet, slide-up from bottom |
+| Mapping review surfaces | Centered content/modal as appropriate | Fluid centered content | Full-width review flow |
 | Toast stack | Top-right, 360px wide | Top-right, 360px | Top, full width minus 16px gutters |
 
 **Which components are hidden per breakpoint**
@@ -787,8 +778,8 @@ Tailwind tokens: `sm` = 640px (unused), `md` = 768px (tablet), `lg` = 1024px (de
 | `LoadingProgress` | ✅ | ✅ | ✅ |
 | `GuardrailWarning` | ✅ | ✅ | ✅ |
 | `MailButton` | ✅ | ✅ | ✅ |
-| `MappingConfirmModal` | ✅ | ✅ | ✅ (as full-screen sheet) |
-| `TrendChart` (Dashboard) | ✅ | ✅ | ❌ hidden |
+| Mapping review surfaces | ✅ | ✅ | ✅ |
+| `TrendChart` (not implemented) | — | — | — |
 | `MetricCard` (Dashboard) | ✅ | ✅ | ❌ hidden |
 | `HistoryList` | ✅ | ✅ | ❌ hidden |
 | Left nav rail | ✅ | ❌ collapsed to top bar + hamburger | ❌ collapsed to top bar + hamburger |

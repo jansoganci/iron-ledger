@@ -328,8 +328,25 @@ class SupabaseReportsRepo:
         return _row_to_report(resp.data[0])
 
     def write(self, report: Report) -> Report:
+        """Replace the monthly report for this (company_id, period).
+
+        Delete-then-insert, mirroring `EntriesRepo.replace_period` and the
+        re-upload convention in CLAUDE.md: a re-run of a period replaces that
+        period's data and leaves no rows from the prior run behind. Explicitly
+        NOT an upsert, for the same reason given there.
+
+        The delete is scoped to report_type='monthly' because
+        `reports_monthly_unique` is a partial index on that type — a quarterly
+        report for the same company must not be touched.
+
+        Without this, a second run of a period died on the unique index after
+        the narrative and guardrail had already succeeded.
+        """
         try:
             row = _report_to_row(report)
+            self._db.table("reports").delete().eq(
+                "company_id", report.company_id
+            ).eq("period", str(report.period)).eq("report_type", "monthly").execute()
             resp = self._db.table("reports").insert(row).execute()
         except Exception as exc:
             raise _wrap_db(exc) from exc

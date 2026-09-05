@@ -312,20 +312,49 @@ class InterpreterAgent:
             cls_map = narrative.reconciliation_classifications or {}
             _apply_reconciliation_classifications(reconciliations, cls_map)
 
-        # Write reports row
-        report = self._reports.write(
-            Report(
-                id=str(uuid.uuid4()),
-                company_id=str(pandas_summary.company_id),
-                period=pandas_summary.period,
-                summary=narrative.narrative,
-                anomaly_count=len(
-                    [a for a in anomalies if a.severity in ("high", "medium")]
-                ),
-                error_count=0,
-                reconciliations=reconciliations,
+        # Write reports row. The numbers are already verified by this point, so
+        # a failure here is persistence, not correctness — it gets its own
+        # terminal state rather than being reported as a guardrail failure.
+        # Unhandled, this used to strand the run in GENERATING forever.
+        try:
+            report = self._reports.write(
+                Report(
+                    id=str(uuid.uuid4()),
+                    company_id=str(pandas_summary.company_id),
+                    period=pandas_summary.period,
+                    summary=narrative.narrative,
+                    anomaly_count=len(
+                        [a for a in anomalies if a.severity in ("high", "medium")]
+                    ),
+                    error_count=0,
+                    reconciliations=reconciliations,
+                )
             )
-        )
+        except Exception as exc:
+            logger.error(
+                "report_write_failed",
+                extra={
+                    "run_id": run_id,
+                    "error": str(exc),
+                    "trace_id": get_trace_id(),
+                },
+                exc_info=True,
+            )
+            try:
+                fail_status = RunStateMachine.transition(
+                    RunStatus.GENERATING, RunStatus.REPORT_FAILED
+                )
+                self._runs.update_status(
+                    run_id,
+                    fail_status,
+                    extra={"error_message": messages.REPORT_WRITE_FAILED},
+                )
+            except Exception as inner:
+                logger.error(
+                    "failed to set report_failed status",
+                    extra={"run_id": run_id, "inner_error": str(inner)},
+                )
+            return False
 
         # generating → complete
         try:

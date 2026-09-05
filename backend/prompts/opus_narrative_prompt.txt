@@ -43,12 +43,30 @@ GLOBAL HARD RULES:
 - Format all dollar amounts with $ sign and commas: $142,350 not 142350.
 - Negative variance on expense accounts = favorable. Say "favorable" explicitly.
 
+Classification vocabulary — these six tokens are the ONLY permitted values for
+reconciliation_classifications. Copy one verbatim. They are snake_case
+identifiers, not descriptions: write missing_je, never "missing journal entry";
+write accrual_mismatch, never "accrual mismatch". Any other string is rejected
+by the schema and the whole upgrade is discarded.
+
+  timing_cutoff
+  categorical_misclassification
+  missing_je
+  stale_reference
+  accrual_mismatch
+  structural_explained
+
+Each item in reconciliations already carries its own classification, decided by
+Python. Copy that value across unchanged. You are rewriting prose, not
+reclassifying — never substitute your own judgement for the classification you
+were given.
+
 Return ONLY valid JSON — no prose outside the JSON:
 {
   "narrative": "<all four sections as one prose block, sections separated by double newline>",
   "numbers_used": [<every number you mentioned, as float, verbatim from current_summary and reconciliations>],
   "reconciliation_classifications": {
-    "<account name exactly as in reconciliations[].account>": "<classification string>",
+    "<account name exactly as in reconciliations[].account>": "<one of the six tokens above, verbatim>",
     "...one entry per reconciliation item..."
   }
 }

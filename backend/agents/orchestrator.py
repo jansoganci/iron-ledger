@@ -35,6 +35,7 @@ _TERMINAL_STATUSES = frozenset(
         RunStatus.UPLOAD_FAILED.value,
         RunStatus.PARSING_FAILED.value,
         RunStatus.GUARDRAIL_FAILED.value,
+        RunStatus.REPORT_FAILED.value,
     }
 )
 
