@@ -6,7 +6,7 @@ from datetime import date
 from backend import messages
 from backend.domain.contracts import NarrativeJSON, PandasSummary
 from backend.domain.entities import Anomaly, Report
-from backend.domain.errors import GuardrailError
+from backend.domain.errors import DuplicateEntryError, GuardrailError
 from backend.domain.ports import FileStorage, LLMClient, ReportsRepo, RunsRepo
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
@@ -331,10 +331,15 @@ class InterpreterAgent:
                 )
             )
         except Exception as exc:
+            # A duplicate is a different story from a database failure. The
+            # period already has a verified report, and this run must not
+            # decide on its own to replace it — say so plainly instead.
+            duplicate = isinstance(exc, DuplicateEntryError)
             logger.error(
                 "report_write_failed",
                 extra={
                     "run_id": run_id,
+                    "reason": "duplicate" if duplicate else "write_error",
                     "error": str(exc),
                     "trace_id": get_trace_id(),
                 },
@@ -347,7 +352,13 @@ class InterpreterAgent:
                 self._runs.update_status(
                     run_id,
                     fail_status,
-                    extra={"error_message": messages.REPORT_WRITE_FAILED},
+                    extra={
+                        "error_message": (
+                            messages.REPORT_ALREADY_EXISTS
+                            if duplicate
+                            else messages.REPORT_WRITE_FAILED
+                        )
+                    },
                 )
             except Exception as inner:
                 logger.error(

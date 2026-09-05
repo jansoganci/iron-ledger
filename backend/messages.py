@@ -31,6 +31,10 @@ REPORT_WRITE_FAILED = (
     "We verified your numbers but couldn't save the report. "
     "Please try running this period again."
 )
+REPORT_ALREADY_EXISTS = (
+    "A report already exists for this period. "
+    "Delete it explicitly first if you want to regenerate it."
+)
 NOT_FOUND = "No verified report found for this company and period."
 
 MAIL_FAILED = (

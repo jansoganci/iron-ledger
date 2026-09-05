@@ -328,25 +328,23 @@ class SupabaseReportsRepo:
         return _row_to_report(resp.data[0])
 
     def write(self, report: Report) -> Report:
-        """Replace the monthly report for this (company_id, period).
+        """Insert the monthly report for this (company_id, period).
 
-        Delete-then-insert, mirroring `EntriesRepo.replace_period` and the
-        re-upload convention in CLAUDE.md: a re-run of a period replaces that
-        period's data and leaves no rows from the prior run behind. Explicitly
-        NOT an upsert, for the same reason given there.
+        Insert only. A report that already exists is NEVER silently replaced:
+        deleting a verified report — and, in practice, the run and entries a
+        caller then tidies up alongside it — is not something a re-run may
+        decide on its own. Regenerating a period is an explicit, separate act.
 
-        The delete is scoped to report_type='monthly' because
-        `reports_monthly_unique` is a partial index on that type — a quarterly
-        report for the same company must not be touched.
-
-        Without this, a second run of a period died on the unique index after
-        the narrative and guardrail had already succeeded.
+        A duplicate surfaces as `DuplicateEntryError`, raised by
+        `reports_monthly_unique` (partial index on report_type='monthly') and
+        mapped by `_wrap_db`. The constraint is the single source of truth
+        here rather than a read-then-insert check, which would still race
+        under concurrency and cost an extra query on every write. The
+        interpreter turns that error into a REPORT_FAILED run carrying
+        `messages.REPORT_ALREADY_EXISTS`.
         """
         try:
             row = _report_to_row(report)
-            self._db.table("reports").delete().eq(
-                "company_id", report.company_id
-            ).eq("period", str(report.period)).eq("report_type", "monthly").execute()
             resp = self._db.table("reports").insert(row).execute()
         except Exception as exc:
             raise _wrap_db(exc) from exc
