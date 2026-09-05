@@ -109,15 +109,15 @@ Period: **2026-03-01**.
 
 | # | Action | Expected result | Result |
 |---|---|---|---|
-| B1 | `POST /upload` with all four files, `period=2026-03-01` | **200**, returns a `run_id` | **PASS (prior session).** Four Redhawk files uploaded; run created. **This VM cannot continue that run** — no backend, no JWT, no run_id in this environment. |
-| B2 | Poll `GET /runs/{run_id}/status` | Progresses through parsing → discovering → mapping → `awaiting_mapping_confirmation` (or `awaiting_confirmation`). **Never** `parsing_failed` or `guardrail_failed` | **PASS (prior session).** Status reached `awaiting_mapping_confirmation`. 81/85 contract roster names low-confidence/unmapped — expected for arbitrary customer names. |
-| B3 | Confirm the mapping draft in the UI (or `POST /runs/{run_id}/mapping/confirm`) | Run continues to `comparing` → `generating` → **`complete`** | **BLOCKED (this session).** Correct route is `POST /runs/{run_id}/confirm-mappings` with body `{ "decisions": { "<source_pattern>": "<gl_account_name>" } }` (`ConfirmMappingsRequest` in `backend/api/routes.py`). Pool must contain the GL names. **Not called** — this VM has no `.env`, no uvicorn on :8000, no demo password, so no JWT. |
-| B4 | Open the report | Reconciliation cards render. At least one card exists for **Service Revenue** | ☐ PASS ☐ FAIL |
-| B5 | **The $285 card.** Find the Service Revenue card | Classification is **`stale_reference`**. The delta is **285.00** (GL 3,540.00 vs roster 3,825.00) | ☐ PASS ☐ FAIL |
-| B6 | **Coverage vs exception.** Look at cards for GL lines with no supporting file (e.g. Rent & Utilities, Licensing & Permits) | Those render as **coverage** cards — visually distinct from exception cards, and **not** classified `missing_je` | ☐ PASS ☐ FAIL |
-| B7 | **Guardrail badge** | Green for the whole report. If it is red/amber, capture the `error_message` and the run's `guardrail_failed` reason and **stop** | ☐ PASS ☐ FAIL |
-| B8 | `GET /report/{company_id}/2026-03-01/export.xlsx` | Downloads a real `.xlsx` that opens. **Three sheets**: consolidated P&L, Reconciliations, Source Breakdown | ☐ PASS ☐ FAIL |
-| B9 | In the exported workbook, check the Source Breakdown `row_count` column | Values are **rolled source lines**. The column is **not** labelled "accounts" and does **not** show 85 | ☐ PASS ☐ FAIL |
+| B1 | `POST /upload` with all four files, `period=2026-03-01` | **200**, returns a `run_id` | **PASS (live, 5 Sep, run `cc19d60d`).** 200, `files_received: 4`. |
+| B2 | Poll `GET /runs/{run_id}/status` | Progresses through parsing → discovering → mapping → `awaiting_mapping_confirmation` (or `awaiting_confirmation`). **Never** `parsing_failed` or `guardrail_failed` | **PASS (live).** `pending` → `parsing` → `awaiting_mapping_confirmation` at 43s. No failed state. Draft: 95 items (85 contracts, 5 payroll, 5 supplier). |
+| B3 | Confirm the mapping draft in the UI (or `POST /runs/{run_id}/confirm-mappings`) | Run continues to `comparing` → `generating` → **`complete`** | **PASS (live).** All 85 roster names mapped to `Service Revenue` (R.5: exactly 1 GL account). `applying_mapping` → `awaiting_confirmation` (17s) → `POST /confirm` 200 `entries_written: 16` → `comparing` → `generating` → **`complete`**, `progress_pct` 100, `report_id` `2241af54`. No stall, no duplicate conflict. |
+| B4 | Open the report | Reconciliation cards render. At least one card exists for **Service Revenue** | **PASS.** 8 cards; Service Revenue present as an `exception` card. |
+| B5 | **The $285 card.** Find the Service Revenue card | Classification is **`stale_reference`**. The delta is **285.00** (GL 3,540.00 vs roster 3,825.00) | **PASS.** `classification: stale_reference`, `gl_amount` 3540.0, `non_gl_total` 3825.0, `delta` 285.0. |
+| B6 | **Coverage vs exception.** Look at cards for GL lines with no supporting file (e.g. Rent & Utilities, Licensing & Permits) | Those render as **coverage** cards — visually distinct from exception cards, and **not** classified `missing_je` | **PASS.** 7 coverage / 1 exception. Rent & Utilities and Licensing & Permits both `card_kind: coverage`, `classification: null`. No coverage card is `missing_je`. |
+| B7 | **Guardrail badge** | Green for the whole report. If it is red/amber, capture the `error_message` and the run's `guardrail_failed` reason and **stop** | **PASS.** Guardrail passed on attempt 1 — the report row is only written after it passes, and the run reached `complete` with `error_message: null`. |
+| B8 | `GET /report/{company_id}/2026-03-01/export.xlsx` | Downloads a real `.xlsx` that opens. **Three sheets**: consolidated P&L, Reconciliations, Source Breakdown | **FAIL — 403 on every request. See E.0.** The endpoint is broken for all users; not a data problem. |
+| B9 | In the exported workbook, check the Source Breakdown `row_count` column | Values are **rolled source lines**. The column is **not** labelled "accounts" and does **not** show 85 | **BLOCKED by B8** — no workbook can be downloaded. |
 
 ---
 
@@ -146,6 +146,46 @@ produces the pinned PZ-100/PZ-200/PZ-300 cards through a real upload is a
 separate question and remains open. Blocked on the same duplicate-report bug
 described in D.0 (any second run of a period that already has a report fails),
 plus the C.0 gap below.
+
+### C.0b BLOCKED LIVE — the fixtures cannot be uploaded at all (5 Sep 2026)
+
+The C.0 rename workaround below **is necessary but not sufficient**. Applying
+it and uploading the three fixtures through the real `POST /upload` was tried
+on 5 Sep and the run died at `parsing_failed` in 13s:
+
+    run 25ce0fd9, period 2026-04-01, 3 files
+    file : kova_cash_bank_mar_2026.csv
+    error: "We couldn't read the 'unknown column' column."
+
+The rename itself works — all three route correctly now:
+
+    kova_cash_processor_payouts_mar_2026.csv -> processor_settlement  ✓
+    kova_cash_gl_mar_2026.csv                -> general_ledger        ✓
+    kova_cash_bank_mar_2026.csv              -> bank_statement        ✓
+
+The real blocker is shape. Every uploaded file must normalize into the Golden
+Schema, which requires an `account` column, and two of the three fixtures have
+none:
+
+    kova_cash_bank_mar_2026.csv  cols=[bank_ref, settlement_date, gross, net]     account: NO
+    kova_cash_fsm_mar_2026.csv   cols=[payout_id, collected_date, gross, customer] account: NO
+    kova_cash_gl_mar_2026.csv    cols=[date, account, amount, memo]                account: YES
+
+A bank statement and a processor payout file simply are not P&L-shaped. These
+are unit-test fixtures for `_build_sidecar` and `batch_matcher`, never intended
+to survive `normalizer.apply_plan` + pandera. They cannot be made to pass by
+renaming.
+
+**C1–C11 are therefore BLOCKED and were not run.** Adding an `account` column
+to the fixtures would be inventing demo data and would change what is being
+tested, so it was not done. What C.0 already recommends is the actual fix: a
+real demo set — a dealer with a GL, processor payouts and a bank statement —
+whose non-GL files carry whatever the ingestion path requires. Until that
+exists, Item 1 is verified only at the unit level.
+
+Item 1's sidecar extraction is separately proven (C.0a) and its matcher logic
+is covered by `tests/agents/test_item1_end_to_end.py`. What remains unproven is
+the matcher over a real HTTP upload.
 
 ### C.0 KNOWN GAP — read before running
 
@@ -210,55 +250,69 @@ Upload the **three** cash files together (renamed FSM copy, GL, bank), period
 
 Use the Redhawk run from Section B (contracts + GL are both in it).
 
-### D.0 Live run of record (5 September 2026)
+### D.0 Live run of record (5 September 2026, second attempt)
 
-Run `a84d3e60-351b-4f97-b4f9-f3e740d52714`, driven through the real HTTP
-endpoints (`POST /upload` → `POST /runs/{id}/confirm-mappings` →
-`POST /runs/{id}/confirm`) against the live Supabase project, company Redhawk
-Alarm & Security LLC, period `2026-03-01`, all four demo files. All 85 roster
-names were mapped to **one** GL account, `Service Revenue`, satisfying R.5.
+Run `cc19d60d-a90b-42f7-922b-bde02027904d`, driven through the real HTTP
+endpoints against the live project, company Redhawk Alarm & Security LLC,
+period `2026-03-01`, all four demo files, all 85 roster names mapped to the
+single `Service Revenue` account (R.5 satisfied).
 
-**Counts only started working on 5 Sep 2026.** Before commit `852f01d`,
-`_build_sidecar` matched column aliases by name against `file_reader.read_file`
-output, whose columns are integer positions — so the sidecar was `None` on
-every real upload and Items 1 and 4 were both silently dead in production. The
-earlier run `086ce7f0` shows null counts for that reason, not because of
-mapping or staleness. Do not use `086ce7f0` as evidence of anything.
+**This run reached `complete`** — the first one to do so. `report_id`
+`2241af54-c982-4974-a13f-5e2458a36bc4`, `progress_pct` 100, `error_message`
+null. The values below are read from the **`reports` row**, not from
+`runs.parse_preview`, so D3–D7 are answerable this time.
 
-**D3–D7 are BLOCKED, and not by Item 4.** This run reached `generating` and
-then failed to write its `reports` row: `reports_monthly_unique` on
-`(company_id, report_type, period)` already had a row for `2026-03-01` from
-run `086ce7f0`. The interpreter inserts without deleting first, so any second
-run of a period that already has a report dies with `DuplicateEntryError`. The
-run is now stuck at `generating` — the outer handler could not transition it to
-a terminal state either (`Cannot transition run from 'RunStatus.GENERATING' to
-'RunStatus.PARSING_FAILED'`). Reported, deliberately not patched. Everything
-D3–D7 asks about lives in the report narrative, which was never persisted.
+Two earlier runs are superseded and should not be cited: `086ce7f0` (null
+counts — the sidecar bug, fixed in `852f01d`) and `a84d3e60` (stranded in
+`generating` — the duplicate-report bug, fixed in `7bb0a49`). Both, and their
+report and entries, were deleted from the live project on 5 Sep.
 
 | # | Action | Expected result | Result |
 |---|---|---|---|
-| D1 | Inspect the Service Revenue item's `hints` in the report JSON | `n_active` = **85**, `n_billed_in_period` = **82**, `count_delta` = **3** | **PASS** — observed `85 / 82 / 3` in `runs.parse_preview` for run `a84d3e60`. Backend log: `roster_counts_attached account="Service Revenue" n_active=85 n_billed_in_period=82 count_delta=3`. Read from `runs.parse_preview`, not `reports`, because the report row could not be written (D.0) |
-| D2 | Same hints, fee sums | `fee_sum_active` = **3825.00**, `fee_sum_billed` = **3540.00** | **PASS** — observed `3825.0 / 3540.0`. Card also carries `gl_amount` 3540.0, `non_gl_total` 3825.0, `delta` 285.0 |
-| D3 | The card's classification | **`stale_reference`** — forced by pandas. Even if Claude proposed something else, this must win | **BLOCKED** (D.0) — `classification` is `null` in `parse_preview`; it is set by the interpreter, whose output was never persisted. Note the Opus upgrade *did* propose `accrual mismatch` for Service Revenue on this run, so the force-class path is worth re-testing specifically once unblocked |
-| D4 | Read the narrative sentence | Mentions **"3 accounts"** and the **285.00** gap | **BLOCKED** (D.0) — narrative not persisted |
-| D5 | **Wording check.** Search the narrative for `customers` and `subscribers` | **Neither word appears.** The count is of roster rows, so it must say "accounts" | **BLOCKED** (D.0) — narrative not persisted |
-| D6 | **Approximation check.** Search for `about`, `approximately`, `roughly`, `several`, `a few` near the count | None present. The count is exact | **BLOCKED** (D.0) — narrative not persisted |
-| D7 | **Percentage check.** Search the narrative for `%` near the count | No churn rate, no "3 of 85", no percentage derived from the counts | **BLOCKED** (D.0) — narrative not persisted |
-| D8 | Upload **only** the Redhawk GL (no contracts file), fresh run | No count fields appear. The card is dollar-only or absent. **No "0 accounts" sentence anywhere** | **NOT RUN** — needs a period with no existing report, or the D.0 duplicate-report bug fixed first. Covered by unit test `test_dollar_only_when_no_roster` |
+| D1 | Inspect the Service Revenue item's `hints` in the report JSON | `n_active` = **85**, `n_billed_in_period` = **82**, `count_delta` = **3** | **PASS.** From the `reports` row: `n_active` 85, `n_billed_in_period` 82, `count_delta` 3. |
+| D2 | Same hints, fee sums | `fee_sum_active` = **3825.00**, `fee_sum_billed` = **3540.00** | **PASS.** `fee_sum_active` 3825.0, `fee_sum_billed` 3540.0; card carries `gl_amount` 3540.0, `non_gl_total` 3825.0, `delta` 285.0. |
+| D3 | The card's classification | **`stale_reference`** — forced by pandas. Even if Claude proposed something else, this must win | **PASS.** `classification: stale_reference`, `card_kind: exception`. |
+| D4 | Read the narrative sentence | Mentions **"3 accounts"** and the **285.00** gap | **PARTIAL.** Observed verbatim: *"The Service Revenue roster lists 85 active accounts but only 82 were billed in this period, a gap of 3 accounts. The roster shows $3,825.00 against $3,540.00 in the GL."* — "3 accounts" ✓. The **285.00 gap is not narrated**; both sides are given instead. Not a defect: stating 285.00 would be a derived figure unless copied from `delta`, and the safe rendering is the one that cannot become arithmetic. Tighten the expectation or the prompt template, not the code. |
+| D5 | **Wording check.** Search the narrative for `customers` and `subscribers` | **Neither word appears.** The count is of roster rows, so it must say "accounts" | **PASS.** Neither `customer` nor `subscriber` occurs anywhere in the narrative. |
+| D6 | **Approximation check.** Search for `about`, `approximately`, `roughly`, `several`, `a few` near the count | None present. The count is exact | **PASS.** All five absent. |
+| D7 | **Percentage check.** Search the narrative for `%` near the count | No churn rate, no "3 of 85", no percentage derived from the counts | **PASS.** Zero `%` characters in the narrative; no "3 of 85". |
+| D8 | Upload **only** the Redhawk GL (no contracts file), fresh run | No count fields appear. The card is dollar-only or absent. **No "0 accounts" sentence anywhere** | **NOT RUN** — would need a second period; deliberately not run to avoid creating more live data than one test run. Covered by unit test `test_dollar_only_when_no_roster`. |
 
 ---
 
 ## E. Guardrail / golden-rule manual review
 
+### E.0 NEW BUG — the Excel export endpoint is broken for everyone
+
+`GET /report/{company_id}/{period}/export.xlsx` returns **403 for every
+request**, blocking B8 and B9. Found live on 5 Sep against run `cc19d60d`;
+`GET /report/{company_id}/{period}` returns 200 with the same token and the
+same company, so this is not auth expiry or an RLS problem.
+
+The handler passes its own `company_id != jwt_company_id` check and gets as far
+as fetching reports, entries and accounts, then calls:
+
+```python
+company_row = get_companies_repo().get_by_owner(jwt_company_id)   # routes.py
+```
+
+`get_by_owner` expects an **owner/user id** and is handed a **company id**. The
+observed query is `companies?owner_id=eq.7c12380b…`, using the company's own id
+as the owner id. It matches nothing, and `get_by_owner` raises
+`RLSForbiddenError` on an empty result, which surfaces as 403.
+
+Nothing to do with the data — the endpoint cannot ever have worked. Reported,
+deliberately not patched in this pass.
+
 Take the completed Redhawk report from Section B.
 
 | # | Action | Expected result | Result |
 |---|---|---|---|
-| E1 | Open the report JSON and list **every** number that appears in the `narrative` text | Write them down. Include dollars, counts and percentages | ☐ done |
-| E2 | For each one, find it in `numbers_used` | Every narrated number is present in `numbers_used`. **Any number in the prose that is missing from `numbers_used` is a finding** — record it | ☐ PASS ☐ FAIL |
-| E3 | For each `numbers_used` entry, trace it to a pandas source | It must match a value in `pandas_summary`, or a reconciliation item's `gl_amount` / `non_gl_total` / `delta`, or a hint (`implied_monthly`, `n_active`, `n_billed_in_period`, `count_delta`, `fee_sum_active`, `fee_sum_billed`), or a nested match's `gross` / `fee` / `net` / `gl_amount` / `candidate_count` | ☐ PASS ☐ FAIL |
-| E4 | Look for arithmetic in the prose | The narrative never *derives* a number. No "3,825 minus 3,540", no "which is 7.5% of", no computed ratio | ☐ PASS ☐ FAIL |
-| E5 | Check `fee_pct` | The string `fee_pct` appears **nowhere** in the report payload, and no fee percentage appears in the prose | ☐ PASS ☐ FAIL |
+| E1 | Open the report JSON and list **every** number that appears in the `narrative` text | Write them down. Include dollars, counts and percentages | **DONE.** Dollars: $260.00, $420.00, $520.00, $1,650.00, $3,540.00, $3,825.00, $6,150.00, $6,400.00, $28,400.00. Counts: 85, 82, 3, 16, 1. Date token: 2026. **No percentages at all.** |
+| E2 | For each one, find it in `numbers_used` | Every narrated number is present in `numbers_used`. **Any number in the prose that is missing from `numbers_used` is a finding** — record it | **PASS, 0 violations.** `guardrail_narrative_unlisted_number` was logged **0 times** for this run. (`numbers_used` is not persisted on the `reports` row, so this is measured from the warn-only log, exactly as the note below prescribes.) |
+| E3 | For each `numbers_used` entry, trace it to a pandas source | It must match a value in `pandas_summary`, or a reconciliation item's `gl_amount` / `non_gl_total` / `delta`, or a hint (`implied_monthly`, `n_active`, `n_billed_in_period`, `count_delta`, `fee_sum_active`, `fee_sum_billed`), or a nested match's `gross` / `fee` / `net` / `gl_amount` / `candidate_count` | **PASS.** All 9 dollar figures traced to `runs.pandas_summary` or to a reconciliation `gl_amount`/`non_gl_total`/`delta`/fee-sum hint. **Untraceable figures: 0.** |
+| E4 | Look for arithmetic in the prose | The narrative never *derives* a number. No "3,825 minus 3,540", no "which is 7.5% of", no computed ratio | **PASS.** None of `minus`, `subtract`, `which is`, `divided by`, `times` occur. Consistent with D4: the narrative gives both sides rather than a difference. |
+| E5 | Check `fee_pct` | The string `fee_pct` appears **nowhere** in the report payload, and no fee percentage appears in the prose | **PASS.** `fee_pct` absent from the entire serialized report; no `%` anywhere in the prose. |
 
 **Note on E2.** Narrative-vs-`numbers_used` consistency is currently
 **warn-only** — `ENFORCE_NARRATIVE_CONSISTENCY = False` in
@@ -272,13 +326,13 @@ measurement is the reason the flag is still off.
 
 | # | Action | Expected result | Result |
 |---|---|---|---|
-| F1 | **PR #11 cutoff fix.** In the Redhawk report, find the Service Revenue card. The roster carries `Last Billed` dates, three of them in **January/February 2026** — outside the period | Classification is **`stale_reference`**, **not** `timing_cutoff`. A roster billing-cycle date must never be read as a period cut-off signal | ☐ PASS ☐ FAIL |
-| F2 | Confirm no other card is spuriously `timing_cutoff` because of a roster date | Only genuine cross-period transaction dates produce `timing_cutoff` | ☐ PASS ☐ FAIL |
-| F3 | **Annual prepayment positive.** Construct or find an item where one side is ~12× the other on the same account (e.g. a 13,200 GL lump vs 1,100 monthly) | Classification `accrual_mismatch`, and the narrative uses the pandas `implied_monthly` value — it must **never** divide by 12 itself | ☐ PASS ☐ FAIL |
-| F4 | **Annual negative — the $285 case.** The Redhawk Service Revenue card | Must **not** be `accrual_mismatch`. 3,825 vs 3,540 is nowhere near 12×; it stays `stale_reference` | ☐ PASS ☐ FAIL |
-| F5 | **Deposit vs fee.** If a two-sided item with a 3–8% gap exists | `structural_explained` via the account-total fee hint. If the same account also has three-way `matches`, the **matcher result wins** and the fee story must not also be told (no double speech on one card) | ☐ PASS ☐ FAIL |
-| F6 | **Six classes.** Across every card in every run above, collect the distinct `classification` values | Only ever: `timing_cutoff`, `categorical_misclassification`, `missing_je`, `stale_reference`, `accrual_mismatch`, `structural_explained`. **Any seventh value is a critical failure** | ☐ PASS ☐ FAIL |
-| F7 | **Materiality AND-gate.** Look for tiny deltas | An item with `\|delta\| < $100` is not flagged. An item with `\|delta\| >= $100` but `<= 5%` is not flagged unless `\|delta\| >= $500` | ☐ PASS ☐ FAIL |
+| F1 | **PR #11 cutoff fix.** In the Redhawk report, find the Service Revenue card. The roster carries `Last Billed` dates, three of them in **January/February 2026** — outside the period | Classification is **`stale_reference`**, **not** `timing_cutoff`. A roster billing-cycle date must never be read as a period cut-off signal | **PASS.** `stale_reference`, not `timing_cutoff`. The out-of-period roster dates did not produce a cut-off reading. |
+| F2 | Confirm no other card is spuriously `timing_cutoff` because of a roster date | Only genuine cross-period transaction dates produce `timing_cutoff` | **PASS.** Across all 8 cards the only classification present is `stale_reference`; zero `timing_cutoff`. |
+| F3 | **Annual prepayment positive.** Construct or find an item where one side is ~12× the other on the same account (e.g. a 13,200 GL lump vs 1,100 monthly) | Classification `accrual_mismatch`, and the narrative uses the pandas `implied_monthly` value — it must **never** divide by 12 itself | **NOT RUN.** No ~12× item exists in the Redhawk data, and constructing one would mean inventing demo data. Covered by unit tests in `test_item4_end_to_end.py`. |
+| F4 | **Annual negative — the $285 case.** The Redhawk Service Revenue card | Must **not** be `accrual_mismatch`. 3,825 vs 3,540 is nowhere near 12×; it stays `stale_reference` | **PASS.** `stale_reference`, not `accrual_mismatch`. |
+| F5 | **Deposit vs fee.** If a two-sided item with a 3–8% gap exists | `structural_explained` via the account-total fee hint. If the same account also has three-way `matches`, the **matcher result wins** and the fee story must not also be told (no double speech on one card) | **NOT APPLICABLE to this run.** Redhawk has no processor/fee item; the only two-sided card is Service Revenue at 285.00 / 3540.00 ≈ 8.05%, classified `stale_reference` by the roster-count force-class, correctly outranking any fee reading. Needs the Item 1 data set — blocked, see C.0b. |
+| F6 | **Six classes.** Across every card in every run above, collect the distinct `classification` values | Only ever: `timing_cutoff`, `categorical_misclassification`, `missing_je`, `stale_reference`, `accrual_mismatch`, `structural_explained`. **Any seventh value is a critical failure** | **PASS.** Distinct non-null values observed: `{stale_reference}` — a subset of the six. No seventh value. Coverage cards carry `null`, which is not a classification. |
+| F7 | **Materiality AND-gate.** Look for tiny deltas | An item with `\|delta\| < $100` is not flagged. An item with `\|delta\| >= $100` but `<= 5%` is not flagged unless `\|delta\| >= $500` | **PASS.** No exception card has `\|delta\| < $100`. The single exception is 285.00 at 8.05%, correctly above both gates. |
 
 ---
 
@@ -288,11 +342,11 @@ measurement is the reason the flag is still off.
 |---|---|---|---|---|
 | 0. Prerequisites | 1 | 1 (prior session; not re-verified here) | | this VM: no live DB credentials |
 | A. Onboarding / Item 5 | 9 + A4b | A2, A4, A4b, A6, A7 (prior session) | | A1, A3, A5, A8, A9 not in this wave |
-| B. Core reconciliation | 9 | B1, B2, B3 (partial — live run `a84d3e60`, 5 Sep: upload 200, mapping confirmed, reached `awaiting_confirmation` then `generating`) | | B4–B9 — run never wrote its report (see D.0) |
-| C. Item 1 three-way | 11 + gap | | | all — sidecar layer fixed and pinned (C.0a); matcher never run live |
-| D. Item 4 counts | 8 | **D1, D2** (live HTTP run `a84d3e60`, 5 Sep) | | D3–D7 (report write failed, D.0); D8 not run |
-| E. Guardrail review | 5 | | | all — no report payload (D.0) |
-| F. Prior-fix regression | 7 | | | all — no report payload (D.0) |
+| B. Core reconciliation | 9 | **B1–B7** (live run `cc19d60d`, 5 Sep, reached `complete`) | **B8** — export 403 for all users (E.0) | B9 — needs the workbook B8 cannot produce |
+| C. Item 1 three-way | 11 + gap | | | all 11 — fixtures are not P&L-shaped and cannot be uploaded (C.0b). Sidecar layer fixed and pinned (C.0a); matcher covered by unit tests only |
+| D. Item 4 counts | 8 | **D1, D2, D3, D5, D6, D7** + **D4 partial** (live run `cc19d60d`) | | D8 not run (would need a second period) |
+| E. Guardrail review | 5 | **E1–E5 all pass** (0 untraceable figures, 0 warn-only violations) | | |
+| F. Prior-fix regression | 7 | **F1, F2, F4, F6, F7** | | F3, F5 not run — would need data that does not exist (F5 needs Item 1, blocked by C.0b) |
 
 ## Known gaps to report, not work around
 
@@ -306,6 +360,8 @@ measurement is the reason the flag is still off.
    frontend ever needs to read it directly.
 5. **Narrative consistency is warn-only** (E2). Record the violation count
    rather than treating a log line as a failure.
-6. **Duplicate monthly report blocks any period re-run.** `reports_monthly_unique` on `(company_id, report_type, period)`; the interpreter inserts without deleting first, unlike the parser which explicitly deletes `monthly_entries` for the period. A second run of a period that already has a report raises `DuplicateEntryError` mid-`generating`, and the outer handler cannot recover it (`Cannot transition run from 'RunStatus.GENERATING' to 'RunStatus.PARSING_FAILED'`), so the run is stranded at 98% forever rather than reaching a terminal state. Hit live on 5 Sep by run `a84d3e60`. Two bugs really: the missing delete-first, and `GENERATING → PARSING_FAILED` missing from the state machine. Not patched — reported for a decision.
-7. **Opus narrative upgrade fails validation every run.** `opus_upgrade` gets prose classification labels back from Opus (`'missing journal entry'`, `'accrual mismatch'`) where `NarrativeJSON` requires the six enum tokens (`missing_je`, `accrual_mismatch`, …), so `model_validate` raises and `opus_status` is `failed`. Seen on both `086ce7f0` and `a84d3e60`. `opus_narrative_prompt.txt` does not pin the token list the way `narrative_prompt.txt` does. Fails closed — the base narrative still stands — so this is quality loss, not corruption. Not patched.
-8. **Cloud-agent VM (30 Aug evening) cannot continue live E2E.** No `.env`, no `ANTHROPIC_API_KEY` / `SUPABASE_*` in the process environment, no uvicorn on `:8000`, no demo password. Prior session's JWT and `run_id` are not on this machine. Mapping confirm route is known (see B3) but was not called.
+6. **`export.xlsx` is broken for every user (found 5 Sep).** The handler passes a company id to `get_by_owner`, which expects an owner/user id; the lookup matches nothing and raises `RLSForbiddenError` → 403. One wrong argument in `backend/api/routes.py`. Blocks B8/B9. Full detail in E.0. Not patched.
+7. **Item 1's fixtures cannot be uploaded through the product.** `kova_cash_bank` and `kova_cash_fsm` have no `account` column, so they cannot normalize into the Golden Schema; the run dies at `parsing_failed`. The C.0 rename fixes routing but not shape. A real demo set is needed. Full detail in C.0b.
+8. **Duplicate monthly report blocks any period re-run.** `reports_monthly_unique` on `(company_id, report_type, period)`; the interpreter inserts without deleting first, unlike the parser which explicitly deletes `monthly_entries` for the period. A second run of a period that already has a report raises `DuplicateEntryError` mid-`generating`, and the outer handler cannot recover it (`Cannot transition run from 'RunStatus.GENERATING' to 'RunStatus.PARSING_FAILED'`), so the run is stranded at 98% forever rather than reaching a terminal state. Hit live on 5 Sep by run `a84d3e60`. Two bugs really: the missing delete-first, and `GENERATING → PARSING_FAILED` missing from the state machine. Not patched — reported for a decision.
+9. **Opus narrative upgrade — validation fixed, guardrail now rejects it.** `opus_upgrade` gets prose classification labels back from Opus (`'missing journal entry'`, `'accrual mismatch'`) where `NarrativeJSON` requires the six enum tokens (`missing_je`, `accrual_mismatch`, …), so `model_validate` raises and `opus_status` is `failed`. Seen on both `086ce7f0` and `a84d3e60`. `opus_narrative_prompt.txt` does not pin the token list the way `narrative_prompt.txt` does. Fails closed — the base narrative still stands — so this is quality loss, not corruption. Not patched.
+10. **Cloud-agent VM (30 Aug evening) cannot continue live E2E.** No `.env`, no `ANTHROPIC_API_KEY` / `SUPABASE_*` in the process environment, no uvicorn on `:8000`, no demo password. Prior session's JWT and `run_id` are not on this machine. Mapping confirm route is known (see B3) but was not called.
