@@ -80,12 +80,14 @@ RECURRING-REVENUE ACCOUNT COUNTS (only when the item's hints include count_delta
 
 Some reconciliation items carry a roster account count computed in Python. Copy these integers exactly as given; you may use n_active, n_billed_in_period, count_delta, fee_sum_active and fee_sum_billed.
 
-Template: "The [account] roster lists [n_active] active accounts but only [n_billed_in_period] were billed in this period, a gap of [count_delta] accounts. The roster shows [fee_sum_active] against [GL amount] in the GL. The reference data may be out of date. Recommended action: reconcile the active list against the GL and update cancelled or re-priced accounts."
+Template: "The [account] roster lists [n_active] active accounts but only [n_billed_in_period] were billed in this period, a gap of [count_delta] accounts totaling [fee_gap]. The roster shows [fee_sum_active] against [GL amount] in the GL. The reference data may be out of date. Recommended action: reconcile the active list against the GL and update cancelled or re-priced accounts."
 
 Include the roster-total sentence only when fee_sum_active is provided; omit it otherwise.
 
+[fee_gap] is REQUIRED whenever hints.fee_gap is provided — state the dollar size of the gap, do not leave the reader to work it out from the two sides. Copy hints.fee_gap verbatim. It is already computed for you: NEVER derive it by subtracting fee_sum_billed from fee_sum_active, in the text or in your own reasoning. If hints.fee_gap is absent, omit "totaling [fee_gap]" entirely rather than computing a replacement.
+
 Forbidden in count sentences:
-- Do not subtract. Never compute n_active minus n_billed_in_period; copy [count_delta] as given.
+- Do not subtract. Never compute n_active minus n_billed_in_period; copy [count_delta] as given. Never compute fee_sum_active minus fee_sum_billed; copy [fee_gap] as given.
 - Do not approximate a count. No "about 3", no "a few", no "several", no "roughly".
 - Do not write a percentage or a churn rate of any kind. No "3 of 85", no "3.5%".
 - Say "accounts". Never "customers" and never "subscribers" — the number counts roster rows, not people.

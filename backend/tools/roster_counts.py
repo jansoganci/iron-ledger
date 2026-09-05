@@ -40,6 +40,12 @@ class RosterCounts:
     count_delta: int
     fee_sum_active: float | None
     fee_sum_billed: float | None
+    # The dollar size of the gap, computed here so the narrative can state it
+    # without subtracting. Claude was giving both sides ("$3,825.00 against
+    # $3,540.00") and leaving the reader to do the arithmetic, because the
+    # only golden-rule-safe alternative was saying nothing. None whenever the
+    # fee sums are None — a gap with no fee column is not a zero gap.
+    fee_gap: float | None
 
 
 def _normalized_status(value: object) -> str:
@@ -97,10 +103,16 @@ def compute(sidecar: pd.DataFrame | None, period: date) -> RosterCounts | None:
 
     fee_sum_active: float | None = None
     fee_sum_billed: float | None = None
+    fee_gap: float | None = None
     if "monthly_fee" in sidecar.columns:
         fees = pd.to_numeric(sidecar["monthly_fee"], errors="coerce").fillna(0.0)
         fee_sum_active = round(float(fees[is_active].sum()), 2)
         fee_sum_billed = round(float(fees[is_billed].sum()), 2)
+        # Rounded from the rounded sums, not from the raw floats, so the
+        # narrated gap always equals the two narrated sides exactly. Deriving
+        # it from unrounded sums could print a gap a cent off from the
+        # subtraction a reader performs on the printed figures.
+        fee_gap = round(fee_sum_active - fee_sum_billed, 2)
 
     # R.3: rows are ACCOUNTS, not customers. A rate increase represented as two
     # rows counts twice; that is deferred, not solved. Log the duplicate count
@@ -134,4 +146,5 @@ def compute(sidecar: pd.DataFrame | None, period: date) -> RosterCounts | None:
         count_delta=count_delta,
         fee_sum_active=fee_sum_active,
         fee_sum_billed=fee_sum_billed,
+        fee_gap=fee_gap,
     )

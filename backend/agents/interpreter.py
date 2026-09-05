@@ -482,6 +482,7 @@ class InterpreterAgent:
                     "count_delta",
                     "fee_sum_active",
                     "fee_sum_billed",
+                    "fee_gap",
                 ):
                     v = hints.get(roster_field)
                     if v is not None:

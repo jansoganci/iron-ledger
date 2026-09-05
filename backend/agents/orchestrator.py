@@ -654,6 +654,7 @@ def _attach_roster_counts(recon_items, per_file_data, period, run_id) -> None:
     target.hints.count_delta = counts.count_delta
     target.hints.fee_sum_active = counts.fee_sum_active
     target.hints.fee_sum_billed = counts.fee_sum_billed
+    target.hints.fee_gap = counts.fee_gap
 
     logger.info(
         "roster_counts_attached",

@@ -573,6 +573,7 @@ async def export_report_xlsx(
     company_id: str,
     period: str,
     jwt_company_id: str = Depends(get_company_id),
+    company: dict = Depends(get_cached_company),
 ):
     """Download the close package as a 3-sheet Excel workbook."""
     from backend.tools.excel_export import build_close_package
@@ -595,8 +596,12 @@ async def export_report_xlsx(
     entries = get_entries_repo().list_for_period(company_id, period_date)
     accounts_map = get_accounts_repo().get_accounts_by_id(company_id)
 
-    company_row = get_companies_repo().get_by_owner(jwt_company_id)
-    company_name = company_row.get("name", "Company")
+    # get_by_owner takes an OWNER id. This passed jwt_company_id — a company
+    # id — so the lookup matched nothing and raised RLSForbiddenError, which
+    # surfaced as a 403 on every export for every user. `get_cached_company`
+    # resolves the company from the authenticated user and shares the cache
+    # with get_company_id, so this is also one fewer round trip.
+    company_name = company.get("name", "Company")
 
     entry_dicts = [
         {

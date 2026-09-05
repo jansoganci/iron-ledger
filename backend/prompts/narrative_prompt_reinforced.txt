@@ -61,9 +61,11 @@ Forbidden: subtracting gross minus net; writing any fee percentage ("4.5%", "abo
 
 RECURRING-REVENUE ACCOUNT COUNTS (only when the item's hints include count_delta greater than zero)
 
-Copy n_active, n_billed_in_period, count_delta and the fee sums verbatim from the hints. Do not drop this finding on a retry.
+Copy n_active, n_billed_in_period, count_delta, the fee sums and fee_gap verbatim from the hints. Do not drop this finding on a retry.
 
-Forbidden: subtracting n_active minus n_billed_in_period; approximating a count ("about 3", "several"); any percentage or churn rate; the words "customers" or "subscribers" in place of "accounts"; and any count sentence when count_delta is absent or zero.
+State the dollar size of the gap whenever hints.fee_gap is provided — "a gap of [count_delta] accounts totaling [fee_gap]". Giving both sides and leaving the reader to subtract is not sufficient. fee_gap is already computed: copy it, never derive it. Omit the phrase entirely if fee_gap is absent.
+
+Forbidden: subtracting n_active minus n_billed_in_period; subtracting fee_sum_active minus fee_sum_billed; approximating a count ("about 3", "several"); any percentage or churn rate; the words "customers" or "subscribers" in place of "accounts"; and any count sentence when count_delta is absent or zero.
 
 Hard rules for reconciliation findings:
 - Use ONLY the exact numeric values provided in reconciliations[]. Do not invent numbers.

@@ -284,6 +284,7 @@ def _recon_values(item: ReconciliationItem) -> list[float]:
         "count_delta",
         "fee_sum_active",
         "fee_sum_billed",
+        "fee_gap",
     ):
         v = getattr(h, field)
         if v is not None:
@@ -291,7 +292,7 @@ def _recon_values(item: ReconciliationItem) -> list[float]:
     return values
 
 
-@pytest.mark.parametrize("number", [85.0, 82.0, 3.0, 3825.0, 3540.0])
+@pytest.mark.parametrize("number", [85.0, 82.0, 3.0, 3825.0, 3540.0, 285.0])
 def test_every_narratable_count_is_verified(counted_item, number) -> None:
     passed, msg = verify_guardrail(
         {"numbers_used": [number], "narrative": f"Value {number:,.2f}."},
@@ -313,11 +314,17 @@ def test_invented_count_still_fails(counted_item) -> None:
 
 
 def test_no_ratio_or_percentage_enters_the_pool(counted_item) -> None:
-    """R.8: 3/85 = 0.0353 and 3.53% must never be reference values."""
+    """R.8: 3/85 = 0.0353 and 3.53% must never be reference values.
+
+    285.0 (fee_gap) joined the pool deliberately — it is a money point value
+    computed by pandas, not a ratio. The rule being pinned is unchanged: only
+    point values, never anything divided by anything.
+    """
     values = _recon_values(counted_item)
     assert 3 / 85 not in values
     assert round(3 / 85 * 100, 2) not in values
-    assert all(v in (85.0, 82.0, 3.0, 3825.0, 3540.0) for v in values)
+    assert 285.0 / 3825.0 not in values
+    assert all(v in (85.0, 82.0, 3.0, 3825.0, 3540.0, 285.0) for v in values)
 
 
 # ---------------------------------------------------------------------------
@@ -395,3 +402,99 @@ def test_prompts_forbid_the_dangerous_count_language(prompt) -> None:
     assert "count_delta" in lowered
     for forbidden_rule in ("customers", "subscribers", "percentage", "approximate"):
         assert forbidden_rule in lowered, forbidden_rule
+
+
+# ---------------------------------------------------------------------------
+# fee_gap — the dollar size of the gap, stated rather than left to the reader
+# ---------------------------------------------------------------------------
+
+
+def test_fee_gap_is_computed_by_pandas() -> None:
+    """3825.00 - 3540.00 = 285.00, done in Python where it belongs.
+
+    The live Redhawk narrative used to give both sides and stop, because the
+    only golden-rule-safe alternative was silence. The subtraction moved here.
+    """
+    counts = roster_counts.compute(_sidecar(), PERIOD)
+    assert counts.fee_sum_active == 3825.00
+    assert counts.fee_sum_billed == 3540.00
+    assert counts.fee_gap == 285.00
+    assert counts.fee_gap == round(counts.fee_sum_active - counts.fee_sum_billed, 2)
+
+
+def test_fee_gap_is_none_when_there_is_no_fee_column() -> None:
+    """A gap with no fee data is unknown, not zero."""
+    sc = _sidecar().drop(columns=["monthly_fee"])
+    counts = roster_counts.compute(sc, PERIOD)
+    assert counts is not None
+    assert counts.fee_sum_active is None
+    assert counts.fee_gap is None
+
+
+def test_fee_gap_attaches_to_the_item_and_verifies() -> None:
+    """It must reach the card and survive the guardrail as a money point value."""
+    item = _item()
+    _attach_roster_counts(
+        [item], [_entry("contracts", _sidecar())], PERIOD, "run-fee-gap"
+    )
+    assert item.hints.fee_gap == 285.00
+
+    passed, msg = verify_guardrail(
+        {"numbers_used": [285.00], "narrative": "a gap of 3 accounts totaling 285.00."},
+        {"accounts": {ACCOUNT: {"current": 3540.0}}},
+        reconciliation_values=_recon_values(item),
+        strict=True,
+    )
+    assert passed is True, msg
+
+
+def test_a_gap_that_was_never_computed_still_fails_the_guardrail() -> None:
+    """Only the pandas value passes — a plausible-looking gap does not."""
+    item = _item()
+    _attach_roster_counts(
+        [item], [_entry("contracts", _sidecar())], PERIOD, "run-fee-gap"
+    )
+    passed, _ = verify_guardrail(
+        {"numbers_used": [286.00], "narrative": "a gap totaling 286.00."},
+        {"accounts": {ACCOUNT: {"current": 3540.0}}},
+        reconciliation_values=_recon_values(item),
+        strict=True,
+    )
+    assert passed is False
+
+
+def test_no_ratio_derived_from_fee_gap_enters_the_pool() -> None:
+    """R.8 again: 285/3825 = 0.0745 and 7.45% are not reference values."""
+    item = _item()
+    _attach_roster_counts(
+        [item], [_entry("contracts", _sidecar())], PERIOD, "run-fee-gap"
+    )
+    values = _recon_values(item)
+    for ratio in (285.0 / 3825.0, 285.0 / 3825.0 * 100, 285.0 / 3540.0):
+        assert round(ratio, 4) not in [round(v, 4) for v in values]
+
+
+@pytest.mark.parametrize(
+    "prompt_file",
+    ["narrative_prompt.txt", "narrative_prompt_reinforced.txt"],
+)
+def test_both_prompts_require_the_gap_and_forbid_deriving_it(prompt_file) -> None:
+    """The template must carry the placeholder, not merely permit it.
+
+    Structural assertion: the prompt is what makes Claude state the gap, so a
+    prompt that drops fee_gap silently reverts the fix with every test still
+    green elsewhere.
+    """
+    text = (Path("backend/prompts") / prompt_file).read_text()
+    assert "fee_gap" in text, f"{prompt_file} does not mention fee_gap"
+    low = text.casefold()
+    # It must be presented as copied, never as something to work out.
+    assert "never derive" in low or "never compute" in low or "copy it" in low
+    assert "subtracting fee_sum_active" in low or "never compute fee_sum_active" in low
+
+
+def test_main_prompt_template_states_the_gap_inline() -> None:
+    """The count template itself must ask for the dollar figure."""
+    text = Path("backend/prompts/narrative_prompt.txt").read_text()
+    assert "totaling [fee_gap]" in text
+    assert "[count_delta] accounts totaling [fee_gap]" in text

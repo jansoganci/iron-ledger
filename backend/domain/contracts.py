@@ -270,6 +270,9 @@ class ReconciliationHints(BaseModel):
     count_delta: int | None = None
     fee_sum_active: float | None = None
     fee_sum_billed: float | None = None
+    # Pandas-computed dollar size of the gap, so the narrative can state it
+    # without Claude subtracting the two sums itself.
+    fee_gap: float | None = None
 
 
 class ReconciliationItem(BaseModel):

@@ -44,6 +44,7 @@ def test_sentinel_shape_85_82_3() -> None:
         count_delta=3,
         fee_sum_active=3825.00,
         fee_sum_billed=3540.00,
+        fee_gap=285.00,
     )
 
 

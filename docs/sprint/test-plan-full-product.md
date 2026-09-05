@@ -116,8 +116,8 @@ Period: **2026-03-01**.
 | B5 | **The $285 card.** Find the Service Revenue card | Classification is **`stale_reference`**. The delta is **285.00** (GL 3,540.00 vs roster 3,825.00) | **PASS.** `classification: stale_reference`, `gl_amount` 3540.0, `non_gl_total` 3825.0, `delta` 285.0. |
 | B6 | **Coverage vs exception.** Look at cards for GL lines with no supporting file (e.g. Rent & Utilities, Licensing & Permits) | Those render as **coverage** cards — visually distinct from exception cards, and **not** classified `missing_je` | **PASS.** 7 coverage / 1 exception. Rent & Utilities and Licensing & Permits both `card_kind: coverage`, `classification: null`. No coverage card is `missing_je`. |
 | B7 | **Guardrail badge** | Green for the whole report. If it is red/amber, capture the `error_message` and the run's `guardrail_failed` reason and **stop** | **PASS.** Guardrail passed on attempt 1 — the report row is only written after it passes, and the run reached `complete` with `error_message: null`. |
-| B8 | `GET /report/{company_id}/2026-03-01/export.xlsx` | Downloads a real `.xlsx` that opens. **Three sheets**: consolidated P&L, Reconciliations, Source Breakdown | **FAIL — 403 on every request. See E.0.** The endpoint is broken for all users; not a data problem. |
-| B9 | In the exported workbook, check the Source Breakdown `row_count` column | Values are **rolled source lines**. The column is **not** labelled "accounts" and does **not** show 85 | **BLOCKED by B8** — no workbook can be downloaded. |
+| B8 | `GET /report/{company_id}/2026-03-01/export.xlsx` | Downloads a real `.xlsx` that opens. **Three sheets**: consolidated P&L, Reconciliations, Source Breakdown | **PASS (live, after the E.0 fix).** 200, 9,342 bytes, opens in openpyxl. Sheets: `Consolidated P&L` (26 rows), `Reconciliations` (22), `Source Breakdown` (27). |
+| B9 | In the exported workbook, check the Source Breakdown `row_count` column | Values are **rolled source lines**. The column is **not** labelled "accounts" and does **not** show 85 | **PASS.** Header row reads `Account | Category | Source File | Amount ($) | Row Count`. Every `Row Count` value is `1`; **85 never appears**. |
 
 ---
 
@@ -272,7 +272,7 @@ report and entries, were deleted from the live project on 5 Sep.
 | D1 | Inspect the Service Revenue item's `hints` in the report JSON | `n_active` = **85**, `n_billed_in_period` = **82**, `count_delta` = **3** | **PASS.** From the `reports` row: `n_active` 85, `n_billed_in_period` 82, `count_delta` 3. |
 | D2 | Same hints, fee sums | `fee_sum_active` = **3825.00**, `fee_sum_billed` = **3540.00** | **PASS.** `fee_sum_active` 3825.0, `fee_sum_billed` 3540.0; card carries `gl_amount` 3540.0, `non_gl_total` 3825.0, `delta` 285.0. |
 | D3 | The card's classification | **`stale_reference`** — forced by pandas. Even if Claude proposed something else, this must win | **PASS.** `classification: stale_reference`, `card_kind: exception`. |
-| D4 | Read the narrative sentence | Mentions **"3 accounts"** and the **285.00** gap | **PARTIAL.** Observed verbatim: *"The Service Revenue roster lists 85 active accounts but only 82 were billed in this period, a gap of 3 accounts. The roster shows $3,825.00 against $3,540.00 in the GL."* — "3 accounts" ✓. The **285.00 gap is not narrated**; both sides are given instead. Not a defect: stating 285.00 would be a derived figure unless copied from `delta`, and the safe rendering is the one that cannot become arithmetic. Tighten the expectation or the prompt template, not the code. |
+| D4 | Read the narrative sentence | Mentions **"3 accounts"** and the **285.00** gap | **PARTIAL.** Observed verbatim: *"The Service Revenue roster lists 85 active accounts but only 82 were billed in this period, a gap of 3 accounts. The roster shows $3,825.00 against $3,540.00 in the GL."* — "3 accounts" ✓. The **285.00 gap is not narrated**; both sides are given instead. **Since fixed** — the omission was judged material (285.00 is ~7.5% of the roster total), so `fee_gap` is now computed by pandas in `roster_counts.py`, carried on `ReconciliationHints`, added to the guardrail money pool, and required by both narrative templates: "a gap of [count_delta] accounts totaling [fee_gap]". Claude copies it and is explicitly forbidden from subtracting. **Not yet observed in a live narrative** — confirming it needs a fresh run, and 2026-03-01 already holds a report that must not be deleted. Re-run this row on the next clean period. |
 | D5 | **Wording check.** Search the narrative for `customers` and `subscribers` | **Neither word appears.** The count is of roster rows, so it must say "accounts" | **PASS.** Neither `customer` nor `subscriber` occurs anywhere in the narrative. |
 | D6 | **Approximation check.** Search for `about`, `approximately`, `roughly`, `several`, `a few` near the count | None present. The count is exact | **PASS.** All five absent. |
 | D7 | **Percentage check.** Search the narrative for `%` near the count | No churn rate, no "3 of 85", no percentage derived from the counts | **PASS.** Zero `%` characters in the narrative; no "3 of 85". |
@@ -282,7 +282,7 @@ report and entries, were deleted from the live project on 5 Sep.
 
 ## E. Guardrail / golden-rule manual review
 
-### E.0 NEW BUG — the Excel export endpoint is broken for everyone
+### E.0 FIXED — the Excel export endpoint (was broken for everyone)
 
 `GET /report/{company_id}/{period}/export.xlsx` returns **403 for every
 request**, blocking B8 and B9. Found live on 5 Sep against run `cc19d60d`;
@@ -301,8 +301,17 @@ observed query is `companies?owner_id=eq.7c12380b…`, using the company's own i
 as the owner id. It matches nothing, and `get_by_owner` raises
 `RLSForbiddenError` on an empty result, which surfaces as 403.
 
-Nothing to do with the data — the endpoint cannot ever have worked. Reported,
-deliberately not patched in this pass.
+Nothing to do with the data — the endpoint could never have worked.
+
+**Fixed.** The handler now takes `company: dict = Depends(get_cached_company)`,
+the pattern `/companies/me` and `PATCH /companies/me` already use, which
+resolves the company from the authenticated user and shares the cache with
+`get_company_id` — one fewer round trip as well. Verified live against run
+`cc19d60d`: **200, 9,342 bytes, three sheets** — Consolidated P&L,
+Reconciliations, Source Breakdown — titled "Redhawk Alarm & Security LLC",
+which is itself proof the company lookup now resolves. Pinned by
+`tests/api/test_export_xlsx.py`, which drives the route through `TestClient`;
+re-introducing the wrong argument fails it.
 
 Take the completed Redhawk report from Section B.
 
@@ -342,7 +351,7 @@ measurement is the reason the flag is still off.
 |---|---|---|---|---|
 | 0. Prerequisites | 1 | 1 (prior session; not re-verified here) | | this VM: no live DB credentials |
 | A. Onboarding / Item 5 | 9 + A4b | A2, A4, A4b, A6, A7 (prior session) | | A1, A3, A5, A8, A9 not in this wave |
-| B. Core reconciliation | 9 | **B1–B7** (live run `cc19d60d`, 5 Sep, reached `complete`) | **B8** — export 403 for all users (E.0) | B9 — needs the workbook B8 cannot produce |
+| B. Core reconciliation | 9 | **B1–B9 — all pass** (live run `cc19d60d`; B8/B9 after the E.0 export fix) | | |
 | C. Item 1 three-way | 11 + gap | | | all 11 — fixtures are not P&L-shaped and cannot be uploaded (C.0b). Sidecar layer fixed and pinned (C.0a); matcher covered by unit tests only |
 | D. Item 4 counts | 8 | **D1, D2, D3, D5, D6, D7** + **D4 partial** (live run `cc19d60d`) | | D8 not run (would need a second period) |
 | E. Guardrail review | 5 | **E1–E5 all pass** (0 untraceable figures, 0 warn-only violations) | | |
@@ -360,7 +369,7 @@ measurement is the reason the flag is still off.
    frontend ever needs to read it directly.
 5. **Narrative consistency is warn-only** (E2). Record the violation count
    rather than treating a log line as a failure.
-6. **`export.xlsx` is broken for every user (found 5 Sep).** The handler passes a company id to `get_by_owner`, which expects an owner/user id; the lookup matches nothing and raises `RLSForbiddenError` → 403. One wrong argument in `backend/api/routes.py`. Blocks B8/B9. Full detail in E.0. Not patched.
+6. ~~**`export.xlsx` is broken for every user (found 5 Sep).**~~ **RESOLVED.** The handler passed a company id to `get_by_owner`, which expects an owner id → `RLSForbiddenError` → 403. Now uses `Depends(get_cached_company)`. B8/B9 both pass live. Detail in E.0.
 7. **Item 1's fixtures cannot be uploaded through the product.** `kova_cash_bank` and `kova_cash_fsm` have no `account` column, so they cannot normalize into the Golden Schema; the run dies at `parsing_failed`. The C.0 rename fixes routing but not shape. A real demo set is needed. Full detail in C.0b.
 8. **Duplicate monthly report blocks any period re-run.** `reports_monthly_unique` on `(company_id, report_type, period)`; the interpreter inserts without deleting first, unlike the parser which explicitly deletes `monthly_entries` for the period. A second run of a period that already has a report raises `DuplicateEntryError` mid-`generating`, and the outer handler cannot recover it (`Cannot transition run from 'RunStatus.GENERATING' to 'RunStatus.PARSING_FAILED'`), so the run is stranded at 98% forever rather than reaching a terminal state. Hit live on 5 Sep by run `a84d3e60`. Two bugs really: the missing delete-first, and `GENERATING → PARSING_FAILED` missing from the state machine. Not patched — reported for a decision.
 9. **Opus narrative upgrade — validation fixed, guardrail now rejects it.** `opus_upgrade` gets prose classification labels back from Opus (`'missing journal entry'`, `'accrual mismatch'`) where `NarrativeJSON` requires the six enum tokens (`missing_je`, `accrual_mismatch`, …), so `model_validate` raises and `opus_status` is `failed`. Seen on both `086ce7f0` and `a84d3e60`. `opus_narrative_prompt.txt` does not pin the token list the way `narrative_prompt.txt` does. Fails closed — the base narrative still stands — so this is quality loss, not corruption. Not patched.
