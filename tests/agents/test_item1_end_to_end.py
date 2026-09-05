@@ -23,7 +23,12 @@ import pytest
 
 from backend.agents.orchestrator import _attach_batch_matches
 from backend.agents.parser import _DEFAULT_UF_ACCOUNT_NAME, ParserAgent
-from backend.domain.contracts import ReconciliationItem, ReconciliationSource
+from backend.domain.contracts import (
+    DiscoveryPlan,
+    ReconciliationItem,
+    ReconciliationSource,
+)
+from backend.tools import file_reader
 
 FIXTURE_DIR = Path(__file__).parent.parent / "tools" / "fixtures"
 PERIOD = date(2026, 3, 1)
@@ -34,8 +39,25 @@ def _parser() -> ParserAgent:
     return ParserAgent.__new__(ParserAgent)
 
 
+# The production read path. `read_file` promotes no headers — columns come
+# back as integer positions and Discovery's plan names them later. Reading the
+# fixtures with pd.read_csv instead (header=0) is what hid the bug where
+# _build_sidecar matched aliases against integers and always returned None.
+_PLAN = DiscoveryPlan(
+    header_row_index=0,
+    skip_row_indices=[],
+    column_mapping={},
+    hierarchy_hints=[],
+    discovery_confidence=0.9,
+)
+
+
 def _raw(name: str) -> pd.DataFrame:
-    return pd.read_csv(FIXTURE_DIR / name)
+    return file_reader.read_file(FIXTURE_DIR / name)
+
+
+def _sidecar(name: str, file_type: str | None) -> "pd.DataFrame | None":
+    return _parser()._build_sidecar(_raw(name), file_type, _PLAN)
 
 
 def _uf_item() -> ReconciliationItem:
@@ -63,10 +85,29 @@ def _entry(label: str, file_type: str, sidecar) -> tuple:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    "name,file_type",
+    [
+        ("kova_cash_fsm_mar_2026.csv", "processor_settlement"),
+        ("kova_cash_bank_mar_2026.csv", "bank_statement"),
+        ("kova_cash_gl_mar_2026.csv", "general_ledger"),
+    ],
+)
+def test_sidecar_built_from_the_real_read_path(name, file_type) -> None:
+    """Regression: every matcher sidecar must survive positional columns.
+
+    `file_reader.read_file` labels columns 0..n; header promotion happens later
+    in apply_plan. _build_sidecar matches aliases by name, so before the fix it
+    returned None here for all three file types and the matcher never ran on a
+    real upload. Fails against the pre-fix two-argument _build_sidecar.
+    """
+    raw = _raw(name)
+    assert all(isinstance(c, int) for c in raw.columns)
+    assert _sidecar(name, file_type) is not None
+
+
 def test_fsm_sidecar_keeps_matcher_columns_and_drops_customer() -> None:
-    sidecar = _parser()._build_sidecar(
-        _raw("kova_cash_fsm_mar_2026.csv"), "processor_settlement"
-    )
+    sidecar = _sidecar("kova_cash_fsm_mar_2026.csv", "processor_settlement")
     assert sidecar is not None
     assert set(sidecar.columns) == {
         "payout_id",
@@ -79,9 +120,7 @@ def test_fsm_sidecar_keeps_matcher_columns_and_drops_customer() -> None:
 
 
 def test_bank_sidecar_maps_canonical_headers() -> None:
-    sidecar = _parser()._build_sidecar(
-        _raw("kova_cash_bank_mar_2026.csv"), "bank_statement"
-    )
+    sidecar = _sidecar("kova_cash_bank_mar_2026.csv", "bank_statement")
     assert sidecar is not None
     assert {"bank_ref", "gross", "net", "settlement_date"} <= set(sidecar.columns)
     assert len(sidecar) == 8
@@ -89,9 +128,7 @@ def test_bank_sidecar_maps_canonical_headers() -> None:
 
 def test_gl_sidecar_does_not_sidecar_rent() -> None:
     """C.5.1: only rows with a ref OR on the UF account."""
-    sidecar = _parser()._build_sidecar(
-        _raw("kova_cash_gl_mar_2026.csv"), "general_ledger"
-    )
+    sidecar = _sidecar("kova_cash_gl_mar_2026.csv", "general_ledger")
     assert sidecar is not None
     accounts = set(sidecar["gl_account"])
     assert "Rent" not in accounts
@@ -105,9 +142,7 @@ def test_gl_sidecar_does_not_sidecar_rent() -> None:
 )
 def test_no_sidecar_for_pre_existing_file_types(file_type) -> None:
     """The golden path must be untouched for every file the matcher ignores."""
-    assert (
-        _parser()._build_sidecar(_raw("kova_cash_gl_mar_2026.csv"), file_type) is None
-    )
+    assert _sidecar("kova_cash_gl_mar_2026.csv", file_type) is None
 
 
 # ---------------------------------------------------------------------------
@@ -122,19 +157,17 @@ def matched_item():
         _entry(
             "fsm.csv",
             "processor_settlement",
-            p._build_sidecar(
-                _raw("kova_cash_fsm_mar_2026.csv"), "processor_settlement"
-            ),
+            _sidecar("kova_cash_fsm_mar_2026.csv", "processor_settlement"),
         ),
         _entry(
             "gl.csv",
             "general_ledger",
-            p._build_sidecar(_raw("kova_cash_gl_mar_2026.csv"), "general_ledger"),
+            _sidecar("kova_cash_gl_mar_2026.csv", "general_ledger"),
         ),
         _entry(
             "bank.csv",
             "bank_statement",
-            p._build_sidecar(_raw("kova_cash_bank_mar_2026.csv"), "bank_statement"),
+            _sidecar("kova_cash_bank_mar_2026.csv", "bank_statement"),
         ),
     ]
     item = _uf_item()
@@ -246,14 +279,12 @@ def test_vandelay_payouts_without_a_bank_file_do_not_claim_three_way() -> None:
         _entry(
             "vandelay_shopify_payouts_mar_2026.csv",
             "processor_settlement",
-            p._build_sidecar(
-                _raw("kova_cash_fsm_mar_2026.csv"), "processor_settlement"
-            ),
+            _sidecar("kova_cash_fsm_mar_2026.csv", "processor_settlement"),
         ),
         _entry(
             "gl.csv",
             "general_ledger",
-            p._build_sidecar(_raw("kova_cash_gl_mar_2026.csv"), "general_ledger"),
+            _sidecar("kova_cash_gl_mar_2026.csv", "general_ledger"),
         ),
     ]
     item = _uf_item()
@@ -284,7 +315,7 @@ def test_sentinel_style_run_is_completely_unaffected() -> None:
         _entry(
             "sentinel_gl_mar_2026.csv",
             "general_ledger",
-            p._build_sidecar(_raw("kova_cash_gl_mar_2026.csv"), "general_ledger"),
+            _sidecar("kova_cash_gl_mar_2026.csv", "general_ledger"),
         ),
         _entry("sentinel_payroll.csv", "payroll", None),
         _entry("sentinel_contracts.csv", "contracts", None),
@@ -310,14 +341,12 @@ def test_missing_uf_item_does_not_invent_a_card() -> None:
         _entry(
             "fsm.csv",
             "processor_settlement",
-            p._build_sidecar(
-                _raw("kova_cash_fsm_mar_2026.csv"), "processor_settlement"
-            ),
+            _sidecar("kova_cash_fsm_mar_2026.csv", "processor_settlement"),
         ),
         _entry(
             "bank.csv",
             "bank_statement",
-            p._build_sidecar(_raw("kova_cash_bank_mar_2026.csv"), "bank_statement"),
+            _sidecar("kova_cash_bank_mar_2026.csv", "bank_statement"),
         ),
     ]
     other = _uf_item()

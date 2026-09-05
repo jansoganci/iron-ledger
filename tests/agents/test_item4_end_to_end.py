@@ -18,7 +18,12 @@ import pytest
 from backend.agents.interpreter import _apply_reconciliation_classifications
 from backend.agents.orchestrator import _attach_roster_counts
 from backend.agents.parser import ParserAgent
-from backend.domain.contracts import ReconciliationItem, ReconciliationSource
+from backend.domain.contracts import (
+    DiscoveryPlan,
+    ReconciliationItem,
+    ReconciliationSource,
+)
+from backend.tools import file_reader, normalizer, roster_counts
 from backend.tools.guardrail import verify_guardrail
 
 ROSTER = (
@@ -32,8 +37,25 @@ def _parser() -> ParserAgent:
     return ParserAgent.__new__(ParserAgent)
 
 
-def _sidecar() -> pd.DataFrame:
-    return _parser()._build_sidecar(pd.read_csv(ROSTER), "contracts")
+# The production read path. `read_file` returns integer positional columns;
+# Discovery's plan names them. Reading the fixture with pd.read_csv (header=0)
+# is what hid the bug where _build_sidecar matched aliases against integers
+# and so always returned None on a real upload.
+_PLAN = DiscoveryPlan(
+    header_row_index=0,
+    skip_row_indices=[],
+    column_mapping={},
+    hierarchy_hints=[],
+    discovery_confidence=0.9,
+)
+
+
+def _raw() -> pd.DataFrame:
+    return file_reader.read_file(ROSTER)
+
+
+def _sidecar(file_type: str | None = "contracts"):
+    return _parser()._build_sidecar(_raw(), file_type, _PLAN)
 
 
 def _item(account: str = ACCOUNT) -> ReconciliationItem:
@@ -61,6 +83,37 @@ def _entry(file_type: str, sidecar, accounts=(ACCOUNT,)) -> tuple:
 # ---------------------------------------------------------------------------
 
 
+def test_sidecar_built_from_the_real_read_path_not_a_header_shortcut() -> None:
+    """Regression: the sidecar must survive file_reader's positional columns.
+
+    `read_file` returns integer column labels (header promotion is apply_plan's
+    job). _build_sidecar resolves aliases by NAME, so without promoting headers
+    first it matched nothing and returned None on every real upload — killing
+    Item 4's counts and Item 1's matcher silently. Fails against the pre-fix
+    two-argument _build_sidecar, which had no plan to promote with.
+    """
+    raw = _raw()
+    # The shape the bug hid behind: no string headers to match against.
+    assert list(raw.columns) == list(range(len(raw.columns)))
+    assert all(isinstance(c, int) for c in raw.columns)
+
+    sc = _sidecar()
+    assert sc is not None, "sidecar is None on the production read path"
+    assert {"customer_id", "status", "monthly_fee", "last_billed"} <= set(sc.columns)
+
+
+def test_counts_survive_the_real_read_path() -> None:
+    """The 85/82/3 story has to come out of the frame production actually builds."""
+    counts = roster_counts.compute(_sidecar(), PERIOD)
+    assert counts is not None
+    assert (counts.n_active, counts.n_billed_in_period, counts.count_delta) == (
+        85,
+        82,
+        3,
+    )
+    assert (counts.fee_sum_active, counts.fee_sum_billed) == (3825.00, 3540.00)
+
+
 def test_contracts_sidecar_keeps_only_count_inputs() -> None:
     sc = _sidecar()
     assert set(sc.columns) == {
@@ -75,8 +128,8 @@ def test_contracts_sidecar_keeps_only_count_inputs() -> None:
 
 def test_contracts_sidecar_survives_groupby() -> None:
     """The whole point: 88 roster rows collapse to one preview row, counts don't."""
-    raw = pd.read_csv(ROSTER)
-    sc = _parser()._build_sidecar(raw, "contracts")
+    raw = normalizer.promote_headers(_raw(), _PLAN)
+    sc = _sidecar()
     collapsed = (
         pd.DataFrame({"account": [ACCOUNT] * len(raw), "amount": raw["monthly_fee"]})
         .groupby("account")["amount"]
@@ -90,7 +143,7 @@ def test_contracts_sidecar_survives_groupby() -> None:
     "file_type", ["general_ledger", "payroll", "supplier_invoices", None]
 )
 def test_pnl_and_other_files_get_no_roster_sidecar(file_type) -> None:
-    sc = _parser()._build_sidecar(pd.read_csv(ROSTER), file_type)
+    sc = _sidecar(file_type)
     assert sc is None or "status" not in sc.columns
 
 

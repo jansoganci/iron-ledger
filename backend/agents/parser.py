@@ -544,6 +544,7 @@ class ParserAgent:
         self,
         df_raw: "pd.DataFrame",
         file_type: str | None,
+        plan: DiscoveryPlan | None = None,
     ) -> "pd.DataFrame | None":
         """Copy matcher columns off the raw frame BEFORE apply_plan drops them.
 
@@ -556,9 +557,18 @@ class ParserAgent:
         against an explicit alias list — no LLM in the path, consistent with
         the matcher being pandas-only. Files with unrecognised headers simply
         produce no sidecar and fall back to today's behaviour.
+
+        `df_raw` comes from `file_reader.read_file`, whose columns are integer
+        positions — header promotion happens later, inside apply_plan. Matching
+        aliases against those integers can never hit, so when Discovery's plan
+        is available we promote headers here first. That still runs ahead of
+        apply_plan's column drop, which is the constraint that matters.
         """
         if file_type not in _SIDECAR_COLUMNS:
             return None
+
+        if plan is not None:
+            df_raw = normalizer.promote_headers(df_raw, plan)
 
         lookup = {_normalize_header(c): c for c in df_raw.columns}
         out = {}
@@ -570,7 +580,11 @@ class ParserAgent:
         if not out:
             return None
 
-        sidecar = pd.DataFrame(out)
+        # reset_index: a promoted frame starts after the header row, so its
+        # index no longer starts at 0. The masks below build fallback Series on
+        # a fresh RangeIndex, and mismatched indexes make pandas reindex the
+        # boolean key instead of aligning positionally.
+        sidecar = pd.DataFrame(out).reset_index(drop=True)
         sidecar["_orig_row_index"] = range(len(sidecar))
 
         if file_type == "general_ledger":
@@ -641,7 +655,9 @@ class ParserAgent:
 
         # Item 1: copy matcher columns off df_raw BEFORE apply_plan drops every
         # non-golden column. Returns None for all pre-existing file types.
-        sidecar = self._build_sidecar(df_raw, file_type)
+        # The plan is passed so headers are promoted first — df_raw still has
+        # integer positional columns at this point.
+        sidecar = self._build_sidecar(df_raw, file_type, plan)
 
         df_normalized, _ = normalizer.apply_plan(df_raw, plan, period)
         df_validated = validator.validate(df_normalized)

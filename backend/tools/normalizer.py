@@ -55,6 +55,36 @@ def _build_snippet(raw_value) -> str:
     return _scrub_value(str(raw_value))[:_ACCOUNT_SNIPPET_MAX]
 
 
+def promote_headers(df_raw: pd.DataFrame, plan: DiscoveryPlan) -> pd.DataFrame:
+    """Drop Discovery's skip rows and promote its header row onto the columns.
+
+    Steps 1-2 of `apply_plan`, split out because the sidecar path needs real
+    column names BEFORE apply_plan drops every non-golden column. `read_file`
+    returns integer positional columns by design, so anything matching headers
+    by name has to promote them first or it silently matches nothing.
+
+    Returns a frame carrying the `_orig_row_index` bookkeeping column. Does not
+    rename or drop any data column — that stays apply_plan's job.
+    """
+    skip = set(plan.skip_row_indices)
+    df = df_raw.copy()
+    df["_orig_row_index"] = df.index
+    df = df[~df["_orig_row_index"].isin(skip)].copy()
+
+    header_idx = plan.header_row_index
+    if header_idx in df["_orig_row_index"].values:
+        header_row = df.loc[df["_orig_row_index"] == header_idx].iloc[0]
+        header_values = [
+            str(v) if v is not None and not pd.isna(v) else f"col_{i}"
+            for i, v in enumerate(header_row.drop("_orig_row_index").tolist())
+        ]
+        df = df[df["_orig_row_index"] > header_idx].copy()
+        df.columns = header_values + ["_orig_row_index"]
+    # If header row was itself in skip_row_indices or missing from df, we
+    # assume Discovery already excluded it and df.columns are already correct.
+    return df
+
+
 def apply_plan(
     df_raw: pd.DataFrame,
     plan: DiscoveryPlan,
@@ -86,24 +116,8 @@ def apply_plan(
     trace_id = get_trace_id()
     drop_entries: list[DropReason] = []
 
-    # --- 1. Drop skip rows (metadata, banners, subtotals identified by Discovery)
-    skip = set(plan.skip_row_indices)
-    df = df_raw.copy()
-    df["_orig_row_index"] = df.index
-    df = df[~df["_orig_row_index"].isin(skip)].copy()
-
-    # --- 2. Promote header row
-    header_idx = plan.header_row_index
-    if header_idx in df["_orig_row_index"].values:
-        header_row = df.loc[df["_orig_row_index"] == header_idx].iloc[0]
-        header_values = [
-            str(v) if v is not None and not pd.isna(v) else f"col_{i}"
-            for i, v in enumerate(header_row.drop("_orig_row_index").tolist())
-        ]
-        df = df[df["_orig_row_index"] > header_idx].copy()
-        df.columns = header_values + ["_orig_row_index"]
-    # If header row was itself in skip_row_indices or missing from df, we
-    # assume Discovery already excluded it and df.columns are already correct.
+    # --- 1-2. Drop skip rows, promote the header row
+    df = promote_headers(df_raw, plan)
 
     # --- 3. Rename columns per column_mapping; drop None-mapped columns
     rename_map: dict[str, str] = {}

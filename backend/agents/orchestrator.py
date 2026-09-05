@@ -592,6 +592,25 @@ def _attach_roster_counts(recon_items, per_file_data, period, run_id) -> None:
                     "files": len(rosters),
                 },
             )
+        else:
+            # Counts silently going missing cost a full diagnostic session
+            # once already: a contracts file present but carrying no sidecar
+            # looks identical to no contracts file at all. Names are never
+            # logged — counts only.
+            contracts_files = sum(
+                1
+                for entry in per_file_data
+                if len(entry) >= 6 and entry[5] == "contracts"
+            )
+            logger.info(
+                "roster_counts_skipped",
+                extra={
+                    "run_id": run_id,
+                    "reason": "no contracts file with a sidecar",
+                    "contracts_files": contracts_files,
+                    "files": len(per_file_data),
+                },
+            )
         return
 
     label, preview_rows, _, _, _, _, sidecar = rosters[0][:7]
