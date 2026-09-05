@@ -306,8 +306,8 @@ APP_ENV=development
 
 ## Demo Data
 
-Seven demo companies live in `docs/demo_data/`: `clearview`, `corebuilt`,
-`harvest`, `helix`, `redhawk`, `sentinel`, `vandelay`.
+Eight demo companies live in `docs/demo_data/`: `clearview`, `corebuilt`,
+`harvest`, `helix`, `redhawk`, `riverbend`, `sentinel`, `vandelay`.
 
 **`redhawk/` is the seed company** — a small owner-operated alarm dealer that
 matches the ICP (field service, 5 employees, ~$38,090/month revenue →
@@ -321,6 +321,15 @@ Expected demo output:
 - Service Revenue: `stale_reference`, 285.00 gap (GL 3,540.00 vs roster 3,825.00)
 - Roster counts: `n_active` 85, `n_billed_in_period` 82, `count_delta` 3
 - Coverage cards for GL lines with no supporting file (Rent, Licensing)
+
+**`riverbend/` is the Item 1 cash demo** — an HVAC shop with GL + Stripe
+payouts + bank statement for period `2026-03-01`. Unlike `kova_cash_*.csv`,
+these files carry an `Account` column and survive a real upload. Expected
+nested matches (six cards, not seven): fee explained on `po_1Qx8Km2eZvRB`,
+cutoff on `po_1Qy2Nt4eZvRB` (settles 2026-04-02), missing JE on
+`po_1Qz9Pw7eZvRB` and `ACH-44192`, AR miscode on `po_1Ra3Ls1eZvRB`, no card
+for clean `po_1Rb7Vc9eZvRB`, one ambiguous `stale_reference` for the two
+blank $186.40 rows on 2026-03-25.
 
 The earlier DRONE single-file workbooks **no longer exist** in the tree. One
 legacy integration fixture still points to `docs/demo_data/Drone Inc - Mar

@@ -67,7 +67,8 @@ browser session.
 | Set | Path | Use |
 |---|---|---|
 | Redhawk (alarm dealer, 4 files) | `docs/demo_data/redhawk/` | Sections B, D, F |
-| Kova cash fixture (3 CSVs) | `tests/tools/fixtures/kova_cash_*.csv` | Section C — **see the gap in C.0** |
+| Riverbend (HVAC, 3 files) | `docs/demo_data/riverbend/` | Section C — live upload |
+| Kova cash fixture (3 CSVs) | `tests/tools/fixtures/kova_cash_*.csv` | Matcher unit tests only — do **not** upload |
 | RMR roster fixture | `tests/tools/fixtures/kova_rmr_roster_mar_2026.csv` | Reference only; use Redhawk for UI |
 
 ---
@@ -147,102 +148,103 @@ separate question and remains open. Blocked on the same duplicate-report bug
 described in D.0 (any second run of a period that already has a report fails),
 plus the C.0 gap below.
 
-### C.0b BLOCKED LIVE — the fixtures cannot be uploaded at all (5 Sep 2026)
+### C.0b Historical — kova CSVs cannot be uploaded (5 Sep 2026)
 
-The C.0 rename workaround below **is necessary but not sufficient**. Applying
-it and uploading the three fixtures through the real `POST /upload` was tried
-on 5 Sep and the run died at `parsing_failed` in 13s:
+Uploading `tests/tools/fixtures/kova_cash_*.csv` through `POST /upload` died
+at `parsing_failed` ("We couldn't read the 'unknown column' column.") because
+the bank and processor CSVs have no `account` column. Those files stay as
+matcher unit fixtures. **Do not upload them.**
 
-    run 25ce0fd9, period 2026-04-01, 3 files
-    file : kova_cash_bank_mar_2026.csv
-    error: "We couldn't read the 'unknown column' column."
+Live Section C uses `docs/demo_data/riverbend/` instead.
 
-The rename itself works — all three route correctly now:
+### C.0 Demo set for live upload
 
-    kova_cash_processor_payouts_mar_2026.csv -> processor_settlement  ✓
-    kova_cash_gl_mar_2026.csv                -> general_ledger        ✓
-    kova_cash_bank_mar_2026.csv              -> bank_statement        ✓
+Upload these three files together, period **2026-03-01**, company UF account
+named exactly **`Undeposited Funds`**:
 
-The real blocker is shape. Every uploaded file must normalize into the Golden
-Schema, which requires an `account` column, and two of the three fixtures have
-none:
-
-    kova_cash_bank_mar_2026.csv  cols=[bank_ref, settlement_date, gross, net]     account: NO
-    kova_cash_fsm_mar_2026.csv   cols=[payout_id, collected_date, gross, customer] account: NO
-    kova_cash_gl_mar_2026.csv    cols=[date, account, amount, memo]                account: YES
-
-A bank statement and a processor payout file simply are not P&L-shaped. These
-are unit-test fixtures for `_build_sidecar` and `batch_matcher`, never intended
-to survive `normalizer.apply_plan` + pandera. They cannot be made to pass by
-renaming.
-
-**C1–C11 are therefore BLOCKED and were not run.** Adding an `account` column
-to the fixtures would be inventing demo data and would change what is being
-tested, so it was not done. What C.0 already recommends is the actual fix: a
-real demo set — a dealer with a GL, processor payouts and a bank statement —
-whose non-GL files carry whatever the ingestion path requires. Until that
-exists, Item 1 is verified only at the unit level.
-
-Item 1's sidecar extraction is separately proven (C.0a) and its matcher logic
-is covered by `tests/agents/test_item1_end_to_end.py`. What remains unproven is
-the matcher over a real HTTP upload.
-
-### C.0 KNOWN GAP — read before running
-
-**There is no bank/processor demo file set for manual UI testing.** Redhawk has
-no bank or processor file, and the only three-way data that exists is the test
-fixture. Two consequences:
-
-1. You must upload `tests/tools/fixtures/kova_cash_*.csv` directly, and
-2. **`kova_cash_fsm_mar_2026.csv` does not route correctly.** Verified:
-
-   ```
-   kova_cash_fsm_mar_2026.csv   -> supplier_invoices   ← WRONG, needs processor_settlement
-   kova_cash_gl_mar_2026.csv    -> general_ledger      ✓
-   kova_cash_bank_mar_2026.csv  -> bank_statement      ✓
-   ```
-
-   The filename contains no processor needle (`stripe`, `shopify_payout`,
-   `paypal`, `square`, `processor`, `settlement`, `payout`). The matcher gate
-   requires **both** a processor and a bank sidecar, so as-named it will never
-   fire.
-
-**Workaround for this test:** copy the FSM file to a name that routes, e.g.
-
-```bash
-cp tests/tools/fixtures/kova_cash_fsm_mar_2026.csv /tmp/kova_cash_processor_payouts_mar_2026.csv
+```
+docs/demo_data/riverbend/riverbend_gl_mar_2026.xlsx
+docs/demo_data/riverbend/riverbend_stripe_payouts_mar_2026.xlsx
+docs/demo_data/riverbend/riverbend_bank_statement_mar_2026.xlsx
 ```
 
-Verify before uploading:
-```bash
-python -c "from backend.agents.orchestrator import _detect_file_type; \
-print(_detect_file_type('kova_cash_processor_payouts_mar_2026.csv'))"   # processor_settlement
+Routing (filename needles):
+
+```
+riverbend_gl_mar_2026.xlsx                 -> general_ledger         ✓
+riverbend_stripe_payouts_mar_2026.xlsx     -> processor_settlement   ✓
+riverbend_bank_statement_mar_2026.xlsx     -> bank_statement         ✓
 ```
 
-- [ ] Gap acknowledged; renamed copy routes as `processor_settlement` — **Result: ____**
+Shape notes: every file has an `Account` column so Discovery can satisfy the
+Golden Schema. Processor and bank rows use **Undeposited Funds**. GL `Memo`
+holds the payout id (`po_1Qx8Km2eZvRB`, …). Details in
+`docs/demo_data/riverbend/README.md`.
 
-**Report this gap.** A proper demo set (a dealer with GL + processor payouts +
-bank statement) should be created before this feature is shown to anyone.
+- [x] Files route as above — **Result: PASS (live, 5 Sep).** All three routed as listed; `sidecar_extracted` fired for `general_ledger` (4 rows after the C.5.1 ref/UF filter), `processor_settlement` (7) and `bank_statement` (8).
+
+### C.0c Live run of record + a NEW BUG found doing it
+
+**Item 1 is verified live over HTTP for the first time.** Company `8b38a84f`
+(Riverbend HVAC LLC, owner `demo@riverbenddemo.com`, created for this test so
+Redhawk was never touched), period 2026-03-01, run `c0f269d6`, report
+`6df86861`. Backend log:
+
+    batch_matcher_attached account="Undeposited Funds" matches=6
+                           unmatched_bank=1 unmatched_processor=0
+
+Every pinned outcome in C1-C11 landed correctly, including the control case
+that must produce nothing. The matcher is no longer unit-test-only.
+
+**But the first attempt (`7636747a`) died**, and the cause is a new bug:
+
+    interpreter unexpected error
+    1 validation error for NarrativeJSON
+    reconciliation_classifications.Undeposited Funds
+      Input should be 'timing_cutoff', 'categorical_misclassification',
+      'missing_je', 'stale_reference', 'accrual_mismatch' or
+      'structural_explained'
+      [input_value='exception_three_way_matches']
+
+`exception_three_way_matches` appears nowhere in the codebase — Claude coined
+it, apparently fusing `card_kind: "exception"` with the three-way matches
+nested under the card. Three things make it worse than a bad guess:
+
+1. **The value is discarded anyway.** On an item carrying `matches`,
+   `_apply_reconciliation_classifications` overwrites Claude's class with the
+   pandas residue (`_residue_from_matches`). The run dies validating a field
+   that is thrown away moments later — the same shape as the Opus bug in
+   gap 9.
+2. **The semantic retry cannot help.** The `ValidationError` is raised inside
+   `self._llm.call` at `interpreter.py:516`; the retry loop only re-runs when
+   `verify_guardrail` returns False, so a schema violation escapes
+   `_run_with_guardrail` immediately and the reinforced prompt never runs.
+3. **The run is misreported.** It lands in `guardrail_failed` carrying
+   `messages.INTERNAL_ERROR` ("Something went wrong on our end"). The numbers
+   were never in question; the taxonomy token was.
+
+**Intermittent — one run in two on this dataset.** Attempt 1 failed, attempt 2
+produced a valid token and completed. Only cards carrying nested `matches`
+look exposed, which is why Redhawk never hit it. Reported, not patched.
 
 ### C.1 Steps
 
-Upload the **three** cash files together (renamed FSM copy, GL, bank), period
-**2026-03-01**, with the company's UF account named exactly
+Upload the **three** Riverbend files, period **2026-03-01**, UF account
 **`Undeposited Funds`**.
 
 | # | Action | Expected result | Result |
 |---|---|---|---|
-| C1 | Upload the three files, let the run complete | Run reaches `complete` | ☐ PASS ☐ FAIL |
-| C2 | Open the Undeposited Funds card and inspect its nested matches (report JSON → `reconciliations[].matches`) | **Exactly 6 matches.** Not 7 | ☐ PASS ☐ FAIL |
-| C3 | `PZ-100` | `structural_explained` — gross 1000.00, net 955.00, fee 45.00 | ☐ PASS ☐ FAIL |
-| C4 | `PZ-200` | `timing_cutoff` — settlement date **2026-04-02**, after period end. Fee 80.00 present but the story is the cut-off, not a fee | ☐ PASS ☐ FAIL |
-| C5 | `PZ-300` | `missing_je` — **not** `structural_explained`, even though its fee is 4% and inside the 3–8% band. No GL row exists for it | ☐ PASS ☐ FAIL |
-| C6 | `DEP-99` | `missing_je`, `match_kind` = `none`, fee 0.00 | ☐ PASS ☐ FAIL |
-| C7 | `PZ-500` | `categorical_misclassification` — GL booked it to **Accounts Receivable**, not Undeposited Funds | ☐ PASS ☐ FAIL |
-| C8 | `PZ-900` | **No card at all.** It must be absent from `matches`. A clean three-way tie-out produces nothing | ☐ PASS ☐ FAIL |
-| C9 | The two blank-reference `$100.00` rows on 2026-03-25 | **One** card, `stale_reference`, `ambiguous` true, `candidate_count` = **2** (not 4) | ☐ PASS ☐ FAIL |
-| C10 | The card's own account-level classification | **`missing_je`** — the most action-requiring class among its matches. It must **not** read "no action required" while a missing JE is nested under it | ☐ PASS ☐ FAIL |
-| C11 | Read the narrative for these matches | Never says "subtract"; contains **no fee percentage** ("4.5%", "about 4%"); never "about 2" for the candidate count; names no processor rate (no "Stripe charges 2.9%") | ☐ PASS ☐ FAIL |
+| C1 | Upload the three files, let the run complete | Run reaches `complete` | **PASS on the second attempt — see C.0c.** Run `c0f269d6` reached `complete`, `report_id` `6df86861`. The first attempt (`7636747a`) died at the interpreter on an invalid classification token; the pipeline itself is sound but the failure is intermittent. |
+| C2 | Open the Undeposited Funds card and inspect its nested matches (report JSON → `reconciliations[].matches`) | **Exactly 6 matches.** Not 7 | **PASS. Exactly 6.** Backend log: `batch_matcher_attached account="Undeposited Funds" matches=6 unmatched_bank=1 unmatched_processor=0`. |
+| C3 | `po_1Qx8Km2eZvRB` | `structural_explained` — gross 1847.50, net 1764.36, fee 83.14 | **PASS.** `structural_explained`, gross 1847.5, fee 83.14, net 1764.36, `match_kind: id`. |
+| C4 | `po_1Qy2Nt4eZvRB` | `timing_cutoff` — settlement date **2026-04-02**, after period end. Fee 92.67 present but the story is the cut-off, not a fee | **PASS.** `timing_cutoff`, `settlement_date: 2026-04-02`. Fee 92.67 present; narrative tells the cut-off story, not a fee story. |
+| C5 | `po_1Qz9Pw7eZvRB` | `missing_je` — **not** `structural_explained`, even though its fee is 4.1% and inside the 3–8% band. No GL row exists for it | **PASS.** `missing_je`, `gl_ref: null`, `unmatched: true`. The in-band 26.33 fee did not pull it to `structural_explained`. |
+| C6 | `ACH-44192` | `missing_je`, `match_kind` = `none`, fee 0.00 | **PASS.** `missing_je`, `match_kind: none`, fee 0.0, `match_id: none:bank:ach-44192`. |
+| C7 | `po_1Ra3Ls1eZvRB` | `categorical_misclassification` — GL booked it to **Accounts Receivable**, not Undeposited Funds | **PASS.** `categorical_misclassification`, `gl_account: "Accounts Receivable"`, same 1275.63 on all three sides. |
+| C8 | `po_1Rb7Vc9eZvRB` | **No card at all.** It must be absent from `matches`. A clean three-way tie-out produces nothing | **PASS.** Absent from `matches` entirely. The clean tie-out produced nothing — this is why the count is 6 and not 7. |
+| C9 | The two blank-reference `$186.40` rows on 2026-03-25 | **One** card, `stale_reference`, `ambiguous` true, `candidate_count` = **2** (not 4) | **PASS.** Exactly one card: `stale_reference`, `ambiguous: true`, `candidate_count: 2`, `match_kind: amount_date`, `match_id: ad:186.40:2026-03-25`. |
+| C10 | The card's own account-level classification | **`missing_je`** — the most action-requiring class among its matches. It must **not** read "no action required" while a missing JE is nested under it | **PASS.** Account-level `classification: missing_je`, the E.6 residue over the nested classes — set by pandas, not by Claude. |
+| C11 | Read the narrative for these matches | Never says "subtract"; contains **no fee percentage** ("4.5%", "about 4%"); never "about 2" for the candidate count; names no processor rate (no "Stripe charges 2.9%") | **PASS.** No `subtract`, no `%` anywhere, no "about 2" (it writes "2 possible matching entries"), no processor rate, `fee_pct` absent from the payload. One template nit, not a C11 failure: ACH-44192 is a bank-side unmatched row, so the template asks for "The bank file shows…" but the narrative used the card-batch wording. |
 
 ---
 
@@ -352,7 +354,7 @@ measurement is the reason the flag is still off.
 | 0. Prerequisites | 1 | 1 (prior session; not re-verified here) | | this VM: no live DB credentials |
 | A. Onboarding / Item 5 | 9 + A4b | A2, A4, A4b, A6, A7 (prior session) | | A1, A3, A5, A8, A9 not in this wave |
 | B. Core reconciliation | 9 | **B1–B9 — all pass** (live run `cc19d60d`; B8/B9 after the E.0 export fix) | | |
-| C. Item 1 three-way | 11 + gap | | | all 11 — fixtures are not P&L-shaped and cannot be uploaded (C.0b). Sidecar layer fixed and pinned (C.0a); matcher covered by unit tests only |
+| C. Item 1 three-way | 11 + gap | **C1–C11 — all pass** (live run `c0f269d6`, Riverbend). C1 needed a second attempt, see C.0c | | |
 | D. Item 4 counts | 8 | **D1, D2, D3, D5, D6, D7** + **D4 partial** (live run `cc19d60d`) | | D8 not run (would need a second period) |
 | E. Guardrail review | 5 | **E1–E5 all pass** (0 untraceable figures, 0 warn-only violations) | | |
 | F. Prior-fix regression | 7 | **F1, F2, F4, F6, F7** | | F3, F5 not run — would need data that does not exist (F5 needs Item 1, blocked by C.0b) |
@@ -370,7 +372,8 @@ measurement is the reason the flag is still off.
 5. **Narrative consistency is warn-only** (E2). Record the violation count
    rather than treating a log line as a failure.
 6. ~~**`export.xlsx` is broken for every user (found 5 Sep).**~~ **RESOLVED.** The handler passed a company id to `get_by_owner`, which expects an owner id → `RLSForbiddenError` → 403. Now uses `Depends(get_cached_company)`. B8/B9 both pass live. Detail in E.0.
-7. **Item 1's fixtures cannot be uploaded through the product.** `kova_cash_bank` and `kova_cash_fsm` have no `account` column, so they cannot normalize into the Golden Schema; the run dies at `parsing_failed`. The C.0 rename fixes routing but not shape. A real demo set is needed. Full detail in C.0b.
+7. ~~**Item 1's fixtures cannot be uploaded through the product.**~~ **RESOLVED** by `docs/demo_data/riverbend/`. Item 1 verified live end to end on 5 Sep, run `c0f269d6` — 6 matches, all C1-C11 outcomes correct. Detail in C.0c.
+7b. **An invalid classification token from Claude kills the run, intermittently (found 5 Sep).** Claude returned `exception_three_way_matches` for a card carrying nested matches; `NarrativeJSON` rejected it and the run died as `guardrail_failed` with a generic internal-error message. The value would have been overwritten by the pandas residue anyway, and the semantic retry cannot catch a schema error because it is raised inside `llm.call`. Roughly one run in two. Not patched. Detail in C.0c.
 8. **Duplicate monthly report blocks any period re-run.** `reports_monthly_unique` on `(company_id, report_type, period)`; the interpreter inserts without deleting first, unlike the parser which explicitly deletes `monthly_entries` for the period. A second run of a period that already has a report raises `DuplicateEntryError` mid-`generating`, and the outer handler cannot recover it (`Cannot transition run from 'RunStatus.GENERATING' to 'RunStatus.PARSING_FAILED'`), so the run is stranded at 98% forever rather than reaching a terminal state. Hit live on 5 Sep by run `a84d3e60`. Two bugs really: the missing delete-first, and `GENERATING → PARSING_FAILED` missing from the state machine. Not patched — reported for a decision.
 9. **Opus narrative upgrade — validation fixed, guardrail now rejects it.** `opus_upgrade` gets prose classification labels back from Opus (`'missing journal entry'`, `'accrual mismatch'`) where `NarrativeJSON` requires the six enum tokens (`missing_je`, `accrual_mismatch`, …), so `model_validate` raises and `opus_status` is `failed`. Seen on both `086ce7f0` and `a84d3e60`. `opus_narrative_prompt.txt` does not pin the token list the way `narrative_prompt.txt` does. Fails closed — the base narrative still stands — so this is quality loss, not corruption. Not patched.
 10. **Cloud-agent VM (30 Aug evening) cannot continue live E2E.** No `.env`, no `ANTHROPIC_API_KEY` / `SUPABASE_*` in the process environment, no uvicorn on `:8000`, no demo password. Prior session's JWT and `run_id` are not on this machine. Mapping confirm route is known (see B3) but was not called.

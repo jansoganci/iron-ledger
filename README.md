@@ -123,6 +123,7 @@ The `docs/demo_data/` folder ships with curated multi-file scenarios designed to
 | Scenario | Folder / Files | What it demonstrates |
 |---|---|---|
 | **Redhawk Alarm & Security LLC — seeded demo** | `docs/demo_data/redhawk/` (GL, contracts, payroll, and vendor invoices) | Primary four-file reconciliation scenario for `demo@redhawkdemo.com`, including the deterministic $285 service-revenue roster gap. |
+| **Riverbend HVAC LLC — bank / processor three-way** | `docs/demo_data/riverbend/` (GL, Stripe payouts, and bank statement) | Uploadable Item 1 demo: fee gap, late payout, missing JE, bank-only deposit, AR miscode, clean tie-out, and an ambiguous pair. |
 | **Additional sector scenarios** | `docs/demo_data/{clearview,corebuilt,harvest,helix,vandelay}/` | Multi-source fixtures for healthcare, construction, food service, professional services, and e-commerce workflows. |
 | **Sentinel Secure — multi-period GL** | `docs/demo_data/sentinel/` (February and March GL files) | The only checked-in two-period company fixture. The former payroll, supplier, contracts, and installation files are no longer in the repository. |
 
