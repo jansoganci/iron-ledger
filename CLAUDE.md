@@ -70,6 +70,7 @@ monthproof/
 │   │   ├── discovery.py              # Structure/header discovery
 │   │   ├── account_mapper.py         # Source values → canonical GL accounts
 │   │   ├── parser.py                 # Read, sanitize, normalize, and preview
+│   │   ├── account_mapping_step.py   # Haiku account mapping — extracted from ParserAgent
 │   │   ├── consolidator.py           # Multi-source consolidation/reconciliation
 │   │   ├── comparison.py             # Python-only variance calculation
 │   │   ├── interpreter.py            # Claude narrative + guardrail
@@ -84,6 +85,7 @@ monthproof/
 │   │   ├── normalizer.py             # Discovery-plan normalization
 │   │   ├── hint_computer.py          # Deterministic reconciliation hints
 │   │   ├── batch_matcher.py          # Deterministic transaction matching
+│   │   ├── sidecar.py                # Item 1 sidecar extraction — extracted from ParserAgent
 │   │   ├── excel_export.py           # Verified close-package export
 │   │   └── guardrail.py              # Numeric guardrail — DO NOT CHANGE
 │   │
@@ -92,7 +94,13 @@ monthproof/
 │   │   ├── middleware.py             # trace_id per request
 │   │   ├── auth.py                   # JWT → user_id → company_id
 │   │   ├── rate_limit.py             # slowapi Limiter + composite key_func (user_id | IP)
-│   │   └── routes.py                 # Existing endpoints only
+│   │   └── routers/                  # One APIRouter per resource, each wired in main.py
+│   │       ├── health.py             # GET /health
+│   │       ├── uploads.py            # POST /upload, all /runs/{run_id}/* endpoints
+│   │       ├── reports.py            # /report/*, /anomalies/*, /reports, /data
+│   │       ├── mail.py               # POST /mail/send (stub)
+│   │       ├── companies.py          # /companies/* (create, PATCH, has-history)
+│   │       └── quarterly.py          # Quarterly report generate/status/get/delete
 │   │
 │   ├── prompts/                      # ALL Claude prompts live here — never inline
 │   │   ├── narrative_prompt.txt      # Monthly report writer

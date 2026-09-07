@@ -7,19 +7,14 @@ from pathlib import Path
 import pandas as pd
 
 from backend import messages
+from backend.agents.account_mapping_step import map_accounts
 from backend.agents.discovery import DiscoveryAgent
-from backend.domain.contracts import (
-    DiscoveryPlan,
-    MappingOutput,
-    MappingResponse,
-    ParserOutput,
-)
+from backend.domain.contracts import DiscoveryPlan, ParserOutput
 from backend.domain.errors import (
     DiscoveryFailed,
     DiscoveryLowConfidence,
     FileHasNoValidColumns,
     MappingAmbiguous,
-    TransientIOError,
 )
 from backend.domain.ports import (
     AccountsRepo,
@@ -30,58 +25,9 @@ from backend.domain.ports import (
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger
 from backend.tools import file_reader, normalizer, pii_sanitizer, validator
+from backend.tools.sidecar import build_sidecar
 
 logger = get_logger(__name__)
-
-# Item 1 — the company's single Undeposited Funds / merchant-clearing GL name.
-# v1 simplification: the MVP boundary is locked to ONE clearing account, so this
-# is a constant rather than config. If the product ever supports multiple
-# clearing accounts this must become configurable (a company setting), which
-# would need a migration — deliberately out of scope here.
-_DEFAULT_UF_ACCOUNT_NAME = "Undeposited Funds"
-
-
-def _normalize_header(col: object) -> str:
-    return str(col).strip().lower().replace(" ", "_").replace("-", "_")
-
-
-# Canonical sidecar column -> accepted raw headers, per C.5.1's frame table.
-# First alias found wins, so canonical names always take precedence.
-_SIDECAR_COLUMNS: dict[str, dict[str, tuple[str, ...]]] = {
-    "processor_settlement": {
-        "payout_id": ("payout_id", "batch_id", "payout", "batch", "reference"),
-        "gross": ("gross", "gross_amount", "amount_collected"),
-        "net": ("net", "net_amount"),
-        "collected_date": ("collected_date", "collected", "date"),
-    },
-    "bank_statement": {
-        "bank_ref": ("bank_ref", "reference", "payout_id", "ref"),
-        "gross": ("gross", "gross_amount"),
-        "fee": ("fee", "fees"),
-        "net": ("net", "net_amount"),
-        "amount": ("amount", "deposit", "credit"),
-        "settlement_date": ("settlement_date", "settled", "posted_date", "date"),
-    },
-    # Item 4 — contracts / RMR roster. Preserves the count inputs before
-    # apply_plan drops them. customer_name is deliberately NOT here: it is not
-    # a count input and must not ride along.
-    "contracts": {
-        "customer_id": ("customer_id", "customer", "account_id", "site_id"),
-        "status": ("status", "account_status", "contract_status"),
-        "monthly_fee": ("monthly_fee", "monthly_amount", "rate", "mrr", "rmr"),
-        "last_billed": ("last_billed", "last_billed_date", "last_invoice_date"),
-    },
-    "general_ledger": {
-        "gl_ref": ("gl_ref", "memo", "reference", "check_no", "check_number"),
-        "gl_account": ("gl_account", "account"),
-        "amount": ("amount",),
-        "gl_date": ("gl_date", "date"),
-    },
-}
-
-MAPPING_MODEL = "claude-haiku-4-5-20251001"
-
-_HIGH_CONFIDENCE_THRESHOLD = 0.80
 
 
 class ParserAgent:
@@ -317,8 +263,8 @@ class ParserAgent:
 
         # Enriched account mapping (parent_category / account_code / department).
         try:
-            mapped_columns, low_confidence_columns = self._map_accounts(
-                run_id, company_id, df_validated
+            mapped_columns, low_confidence_columns = map_accounts(
+                run_id, company_id, df_validated, self._accounts, self._llm, self._runs
             )
         except MappingAmbiguous:
             self._fail(run_id, RunStatus.MAPPING, messages.MAPPING_FAILED)
@@ -428,194 +374,8 @@ class ParserAgent:
         return "amount"
 
     # ------------------------------------------------------------------ #
-    # Account mapping (enriched input shape)                             #
-    # ------------------------------------------------------------------ #
-
-    def _map_accounts(
-        self,
-        run_id: str,
-        company_id: str,
-        df: pd.DataFrame,
-    ) -> tuple[dict[str, dict], list[MappingOutput]]:
-        """Build per-account context with hierarchy fields, then call Haiku."""
-        grouped = df.groupby("account", dropna=False)
-
-        def _first_nonnull(series: pd.Series) -> str | None:
-            s = series.dropna()
-            return str(s.iloc[0]) if not s.empty else None
-
-        account_info: dict[str, dict] = {}
-        for account_name, group in grouped:
-            name_str = str(account_name)
-            account_info[name_str] = {
-                "name": name_str,
-                "total": float(group["amount"].sum()),
-                "parent_category": _first_nonnull(
-                    group["parent_category"]
-                    if "parent_category" in group.columns
-                    else pd.Series([], dtype=object)
-                ),
-                "account_code": _first_nonnull(
-                    group["account_code"]
-                    if "account_code" in group.columns
-                    else pd.Series([], dtype=object)
-                ),
-                "department": _first_nonnull(
-                    group["department"]
-                    if "department" in group.columns
-                    else pd.Series([], dtype=object)
-                ),
-            }
-
-        known: dict[str, str] = self._accounts.list_for_company(company_id)
-
-        # Accounts needing Haiku mapping — list-of-dicts per new prompt schema.
-        unknown_accounts = [
-            info for name, info in account_info.items() if name not in known
-        ]
-
-        high_conf: list[MappingOutput] = []
-        low_conf: list[MappingOutput] = []
-
-        if unknown_accounts:
-            context = {
-                "accounts": unknown_accounts,
-                "known_mappings": known,
-            }
-            try:
-                response: MappingResponse = self._llm.call(
-                    prompt="mapping_prompt.txt",
-                    model=MAPPING_MODEL,
-                    context=context,
-                    schema=MappingResponse,
-                )
-            except TransientIOError:
-                raise MappingAmbiguous("LLM call failed during account mapping")
-
-            for m in response.mappings:
-                if m.confidence >= _HIGH_CONFIDENCE_THRESHOLD:
-                    high_conf.append(m)
-                else:
-                    low_conf.append(m)
-
-            # Single bulk call — 3 round-trips total regardless of batch size.
-            # Previous per-row upsert loop saturated Supabase's HTTP/2
-            # connection on 20+ accounts and caused RemoteProtocolError on
-            # shared-stream tenants.
-            if high_conf:
-                self._accounts.bulk_upsert_mappings(company_id, high_conf)
-
-            if low_conf:
-                self._runs.set_low_confidence_columns(run_id, low_conf)
-
-        mapped_columns: dict[str, dict] = {}
-
-        for account_name, category in known.items():
-            if account_name in account_info:
-                mapped_columns[account_name] = {"category": category, "confidence": 1.0}
-
-        for m in high_conf:
-            mapped_columns[m.column] = {
-                "category": m.category,
-                "confidence": m.confidence,
-            }
-
-        for m in low_conf:
-            mapped_columns[m.column] = {
-                "category": "OTHER",
-                "confidence": m.confidence,
-            }
-
-        for account_name in account_info:
-            if account_name not in mapped_columns:
-                mapped_columns[account_name] = {"category": "OTHER", "confidence": 0.0}
-
-        return mapped_columns, low_conf
-
-    # ------------------------------------------------------------------ #
     # Multi-file helper (no state transitions)                          #
     # ------------------------------------------------------------------ #
-
-    # ------------------------------------------------------------------ #
-    # Item 1 — bank/processor sidecar                                    #
-    # ------------------------------------------------------------------ #
-
-    def _build_sidecar(
-        self,
-        df_raw: "pd.DataFrame",
-        file_type: str | None,
-        plan: DiscoveryPlan | None = None,
-    ) -> "pd.DataFrame | None":
-        """Copy matcher columns off the raw frame BEFORE apply_plan drops them.
-
-        Returns None for every file type the matcher does not consume, so the
-        golden path is untouched for P&L, payroll and supplier files.
-
-        Header mapping note (v1): the spec says "Discovery maps onto these"
-        canonical names but never specifies how. Rather than guess at a
-        Discovery prompt change, this resolves headers deterministically
-        against an explicit alias list — no LLM in the path, consistent with
-        the matcher being pandas-only. Files with unrecognised headers simply
-        produce no sidecar and fall back to today's behaviour.
-
-        `df_raw` comes from `file_reader.read_file`, whose columns are integer
-        positions — header promotion happens later, inside apply_plan. Matching
-        aliases against those integers can never hit, so when Discovery's plan
-        is available we promote headers here first. That still runs ahead of
-        apply_plan's column drop, which is the constraint that matters.
-        """
-        if file_type not in _SIDECAR_COLUMNS:
-            return None
-
-        if plan is not None:
-            df_raw = normalizer.promote_headers(df_raw, plan)
-
-        lookup = {_normalize_header(c): c for c in df_raw.columns}
-        out = {}
-        for canonical, aliases in _SIDECAR_COLUMNS[file_type].items():
-            for alias in aliases:
-                if alias in lookup:
-                    out[canonical] = df_raw[lookup[alias]]
-                    break
-        if not out:
-            return None
-
-        # reset_index: a promoted frame starts after the header row, so its
-        # index no longer starts at 0. The masks below build fallback Series on
-        # a fresh RangeIndex, and mismatched indexes make pandas reindex the
-        # boolean key instead of aligning positionally.
-        sidecar = pd.DataFrame(out).reset_index(drop=True)
-        sidecar["_orig_row_index"] = range(len(sidecar))
-
-        if file_type == "general_ledger":
-            # C.5.1: sidecar only rows carrying a ref OR sitting on the UF
-            # account. "Do not sidecar Rent."
-            ref = (
-                sidecar["gl_ref"]
-                if "gl_ref" in sidecar
-                else pd.Series([None] * len(sidecar))
-            )
-            account = (
-                sidecar["gl_account"]
-                if "gl_account" in sidecar
-                else pd.Series([None] * len(sidecar))
-            )
-            keep = ref.notna() | (
-                account.astype("string").str.strip() == _DEFAULT_UF_ACCOUNT_NAME
-            )
-            sidecar = sidecar[keep.fillna(False)]
-            if sidecar.empty:
-                return None
-
-        logger.info(
-            "sidecar_extracted",
-            extra={
-                "file_type": file_type,
-                "columns": sorted(out.keys()),
-                "rows": int(len(sidecar)),
-            },
-        )
-        return sidecar
 
     def parse_file_silently(
         self,
@@ -657,13 +417,13 @@ class ParserAgent:
         # non-golden column. Returns None for all pre-existing file types.
         # The plan is passed so headers are promoted first — df_raw still has
         # integer positional columns at this point.
-        sidecar = self._build_sidecar(df_raw, file_type, plan)
+        sidecar = build_sidecar(df_raw, file_type, plan)
 
         df_normalized, _ = normalizer.apply_plan(df_raw, plan, period)
         df_validated = validator.validate(df_normalized)
 
         # Apply AccountMapper decisions before category mapping and groupby (B2 fix).
-        # Must run here so GL account names are in place before _map_accounts aggregates.
+        # Must run here so GL account names are in place before map_accounts aggregates.
         if account_name_map:
             df_validated["account"] = df_validated["account"].map(
                 lambda x: account_name_map.get(str(x).strip(), x)
@@ -671,7 +431,9 @@ class ParserAgent:
 
         source_column = self._extract_source_column(plan)
 
-        mapped_columns, _ = self._map_accounts(run_id, company_id, df_validated)
+        mapped_columns, _ = map_accounts(
+            run_id, company_id, df_validated, self._accounts, self._llm, self._runs
+        )
 
         account_totals: dict[str, float] = (
             df_validated.groupby("account")["amount"].sum().to_dict()

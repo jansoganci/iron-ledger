@@ -14,10 +14,10 @@ from pathlib import Path
 import pytest
 
 from backend.agents.orchestrator import _detect_file_type
-from backend.agents.parser import ParserAgent, _DEFAULT_UF_ACCOUNT_NAME
 from backend.domain.contracts import DiscoveryPlan
 from backend.tools import file_reader, normalizer, validator
 from backend.tools.batch_matcher import match
+from backend.tools.sidecar import _DEFAULT_UF_ACCOUNT_NAME, build_sidecar
 
 DEMO_DIR = Path("docs/demo_data/riverbend")
 PERIOD = date(2026, 3, 1)
@@ -76,10 +76,6 @@ BANK_PLAN = DiscoveryPlan(
 )
 
 
-def _parser() -> ParserAgent:
-    return ParserAgent.__new__(ParserAgent)
-
-
 @pytest.mark.parametrize(
     "path, expected",
     [
@@ -124,20 +120,17 @@ def test_processor_and_bank_map_to_undeposited_funds() -> None:
 
 
 def test_matcher_emits_six_cards_and_drops_the_clean_tie_out() -> None:
-    parser = _parser()
-    fsm = parser._build_sidecar(
+    fsm = build_sidecar(
         file_reader.read_file(PROCESSOR),
         "processor_settlement",
         PROCESSOR_PLAN,
     )
-    gl = parser._build_sidecar(
+    gl = build_sidecar(
         file_reader.read_file(GL),
         "general_ledger",
         GL_PLAN,
     )
-    bank = parser._build_sidecar(
-        file_reader.read_file(BANK), "bank_statement", BANK_PLAN
-    )
+    bank = build_sidecar(file_reader.read_file(BANK), "bank_statement", BANK_PLAN)
     assert fsm is not None and gl is not None and bank is not None
 
     result = match(fsm, gl, bank, PERIOD, _DEFAULT_UF_ACCOUNT_NAME)

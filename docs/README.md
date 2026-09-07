@@ -53,6 +53,7 @@ Analysis reports and findings.
 
 - `hackathon_findings_report.md` - Hackathon retrospective and findings
 - `close-process-by-sector.md` - Month-end close by industry; start with field services; how to complete the current close flow without pivoting the product
+- `pending-decisions-audit.md` - Cross-doc audit (7 Sep 2026): decided-but-unbuilt work, intentionally parked items, and stale/contradictory docs found while reading the whole `docs/` tree. Read this before archiving or merging any other doc listed here.
 
 ### archive/
 Outdated or superseded documentation.

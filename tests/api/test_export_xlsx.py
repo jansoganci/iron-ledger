@@ -126,9 +126,13 @@ def _patched_repos():
 def test_export_returns_a_real_workbook_not_403() -> None:
     """The bug in one assertion: this returned 403 for every user."""
     reports, entries, accounts = _patched_repos()
-    with patch("backend.api.routes.get_reports_repo", return_value=reports), patch(
-        "backend.api.routes.get_entries_repo", return_value=entries
-    ), patch("backend.api.routes.get_accounts_repo", return_value=accounts):
+    with patch(
+        "backend.api.routers.reports.get_reports_repo", return_value=reports
+    ), patch(
+        "backend.api.routers.reports.get_entries_repo", return_value=entries
+    ), patch(
+        "backend.api.routers.reports.get_accounts_repo", return_value=accounts
+    ):
         resp = client.get(f"/report/{COMPANY_ID}/2026-03-01/export.xlsx")
 
     assert resp.status_code == 200, f"expected 200, got {resp.status_code}"
@@ -142,30 +146,35 @@ def test_export_returns_a_real_workbook_not_403() -> None:
 def test_export_never_looks_a_company_up_by_its_own_id_as_an_owner() -> None:
     """Pins the specific mistake.
 
-    `get_by_owner` takes an owner id. If the handler ever calls it with the
-    company id again, the endpoint 403s for everyone — so assert it is not
-    called that way at all.
+    `get_by_owner` takes an owner id. The handler used to call it with the
+    company id instead, which 403s for everyone. The fix routes through
+    `Depends(get_cached_company)` instead of `get_companies_repo().get_by_owner`,
+    so `get_companies_repo` is never even imported by the export route anymore —
+    there is nothing left to call it the wrong way with.
     """
     reports, entries, accounts = _patched_repos()
-    companies = MagicMock()
-    with patch("backend.api.routes.get_reports_repo", return_value=reports), patch(
-        "backend.api.routes.get_entries_repo", return_value=entries
-    ), patch("backend.api.routes.get_accounts_repo", return_value=accounts), patch(
-        "backend.api.routes.get_companies_repo", return_value=companies
+    with patch(
+        "backend.api.routers.reports.get_reports_repo", return_value=reports
+    ), patch(
+        "backend.api.routers.reports.get_entries_repo", return_value=entries
+    ), patch(
+        "backend.api.routers.reports.get_accounts_repo", return_value=accounts
     ):
         resp = client.get(f"/report/{COMPANY_ID}/2026-03-01/export.xlsx")
 
     assert resp.status_code == 200
-    for call in companies.get_by_owner.call_args_list:
-        assert COMPANY_ID not in call.args, "company id passed to get_by_owner"
 
 
 def test_export_still_forbids_another_companys_report() -> None:
     """The fix must not loosen the tenancy check."""
     reports, entries, accounts = _patched_repos()
-    with patch("backend.api.routes.get_reports_repo", return_value=reports), patch(
-        "backend.api.routes.get_entries_repo", return_value=entries
-    ), patch("backend.api.routes.get_accounts_repo", return_value=accounts):
+    with patch(
+        "backend.api.routers.reports.get_reports_repo", return_value=reports
+    ), patch(
+        "backend.api.routers.reports.get_entries_repo", return_value=entries
+    ), patch(
+        "backend.api.routers.reports.get_accounts_repo", return_value=accounts
+    ):
         resp = client.get("/report/some-other-company/2026-03-01/export.xlsx")
 
     assert resp.status_code == 403
@@ -174,9 +183,13 @@ def test_export_still_forbids_another_companys_report() -> None:
 def test_export_404s_when_the_period_has_no_report() -> None:
     reports, entries, accounts = _patched_repos()
     reports.get.return_value = None
-    with patch("backend.api.routes.get_reports_repo", return_value=reports), patch(
-        "backend.api.routes.get_entries_repo", return_value=entries
-    ), patch("backend.api.routes.get_accounts_repo", return_value=accounts):
+    with patch(
+        "backend.api.routers.reports.get_reports_repo", return_value=reports
+    ), patch(
+        "backend.api.routers.reports.get_entries_repo", return_value=entries
+    ), patch(
+        "backend.api.routers.reports.get_accounts_repo", return_value=accounts
+    ):
         resp = client.get(f"/report/{COMPANY_ID}/2026-03-01/export.xlsx")
 
     assert resp.status_code == 404
