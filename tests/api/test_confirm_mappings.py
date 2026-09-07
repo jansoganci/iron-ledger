@@ -45,7 +45,7 @@ def _preview_with_pool(pool: list[str]) -> dict:
 # ---------------------------------------------------------------------------
 
 
-@patch("backend.api.routes.get_runs_repo")
+@patch("backend.api.routers.uploads.get_runs_repo")
 def test_confirm_mappings_wrong_state_returns_409(mock_repo):
     runs_repo = MagicMock()
     runs_repo.get_by_id.return_value = _mock_run(RunStatus.AWAITING_CONFIRMATION.value)
@@ -63,7 +63,7 @@ def test_confirm_mappings_wrong_state_returns_409(mock_repo):
 # ---------------------------------------------------------------------------
 
 
-@patch("backend.api.routes.get_runs_repo")
+@patch("backend.api.routers.uploads.get_runs_repo")
 def test_confirm_mappings_bad_gl_account_returns_400(mock_repo):
     runs_repo = MagicMock()
     runs_repo.get_by_id.return_value = _mock_run(
@@ -84,7 +84,7 @@ def test_confirm_mappings_bad_gl_account_returns_400(mock_repo):
 # ---------------------------------------------------------------------------
 
 
-@patch("backend.api.routes.get_runs_repo")
+@patch("backend.api.routers.uploads.get_runs_repo")
 def test_confirm_mappings_empty_decisions_returns_400(mock_repo):
     runs_repo = MagicMock()
     runs_repo.get_by_id.return_value = _mock_run(
@@ -105,8 +105,8 @@ def test_confirm_mappings_empty_decisions_returns_400(mock_repo):
 # ---------------------------------------------------------------------------
 
 
-@patch("backend.api.routes.apply_mapping_and_consolidate")
-@patch("backend.api.routes.get_runs_repo")
+@patch("backend.api.routers.uploads.apply_mapping_and_consolidate")
+@patch("backend.api.routers.uploads.get_runs_repo")
 def test_confirm_mappings_success_returns_200(mock_repo, mock_apply):
     runs_repo = MagicMock()
     runs_repo.get_by_id.return_value = _mock_run(

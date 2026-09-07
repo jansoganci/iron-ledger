@@ -2,7 +2,7 @@
 
 Exercises the production functions, not the matcher in isolation:
 
-    ParserAgent._build_sidecar   (real CSV headers -> canonical sidecar)
+    sidecar.build_sidecar        (real CSV headers -> canonical sidecar)
         -> _attach_batch_matches (the orchestrator call site)
             -> batch_matcher.match + _classify
                 -> ReconciliationItem.matches
@@ -22,27 +22,22 @@ import pandas as pd
 import pytest
 
 from backend.agents.orchestrator import _attach_batch_matches
-from backend.agents.parser import _DEFAULT_UF_ACCOUNT_NAME, ParserAgent
 from backend.domain.contracts import (
     DiscoveryPlan,
     ReconciliationItem,
     ReconciliationSource,
 )
 from backend.tools import file_reader
+from backend.tools.sidecar import _DEFAULT_UF_ACCOUNT_NAME, build_sidecar
 
 FIXTURE_DIR = Path(__file__).parent.parent / "tools" / "fixtures"
 PERIOD = date(2026, 3, 1)
 
 
-def _parser() -> ParserAgent:
-    """_build_sidecar uses no instance state; skip the dependency wiring."""
-    return ParserAgent.__new__(ParserAgent)
-
-
 # The production read path. `read_file` promotes no headers — columns come
 # back as integer positions and Discovery's plan names them later. Reading the
 # fixtures with pd.read_csv instead (header=0) is what hid the bug where
-# _build_sidecar matched aliases against integers and always returned None.
+# build_sidecar matched aliases against integers and always returned None.
 _PLAN = DiscoveryPlan(
     header_row_index=0,
     skip_row_indices=[],
@@ -57,7 +52,7 @@ def _raw(name: str) -> pd.DataFrame:
 
 
 def _sidecar(name: str, file_type: str | None) -> "pd.DataFrame | None":
-    return _parser()._build_sidecar(_raw(name), file_type, _PLAN)
+    return build_sidecar(_raw(name), file_type, _PLAN)
 
 
 def _uf_item() -> ReconciliationItem:
@@ -97,9 +92,9 @@ def test_sidecar_built_from_the_real_read_path(name, file_type) -> None:
     """Regression: every matcher sidecar must survive positional columns.
 
     `file_reader.read_file` labels columns 0..n; header promotion happens later
-    in apply_plan. _build_sidecar matches aliases by name, so before the fix it
+    in apply_plan. build_sidecar matches aliases by name, so before the fix it
     returned None here for all three file types and the matcher never ran on a
-    real upload. Fails against the pre-fix two-argument _build_sidecar.
+    real upload. Fails against the pre-fix two-argument build_sidecar.
     """
     raw = _raw(name)
     assert all(isinstance(c, int) for c in raw.columns)
@@ -152,7 +147,6 @@ def test_no_sidecar_for_pre_existing_file_types(file_type) -> None:
 
 @pytest.fixture(scope="module")
 def matched_item():
-    p = _parser()
     per_file_data = [
         _entry(
             "fsm.csv",
@@ -274,7 +268,6 @@ def test_e2e_only_six_classes(matched_item) -> None:
 
 def test_vandelay_payouts_without_a_bank_file_do_not_claim_three_way() -> None:
     """The spec's repeated warning: Vandelay alone is two-sided, not three-way."""
-    p = _parser()
     per_file_data = [
         _entry(
             "vandelay_shopify_payouts_mar_2026.csv",
@@ -310,7 +303,6 @@ def test_vandelay_negative_leaves_kova1_fee_hint_free_to_fire() -> None:
 
 
 def test_sentinel_style_run_is_completely_unaffected() -> None:
-    p = _parser()
     per_file_data = [
         _entry(
             "sentinel_gl_mar_2026.csv",
@@ -336,7 +328,6 @@ def test_no_sidecars_at_all_is_a_no_op() -> None:
 
 def test_missing_uf_item_does_not_invent_a_card() -> None:
     """If the GL has no UF line there is nothing to nest under — log, not guess."""
-    p = _parser()
     per_file_data = [
         _entry(
             "fsm.csv",

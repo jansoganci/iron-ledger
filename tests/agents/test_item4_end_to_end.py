@@ -1,10 +1,10 @@
 """Item 4 — end to end plus the gates, force-class, guardrail and negatives.
 
-    ParserAgent._build_sidecar   (roster CSV -> contracts sidecar)
-        -> _attach_roster_counts (R.4 / R.5 / R.7 gates)
-            -> roster_counts.compute
-                -> ReconciliationHints
-                    -> interpreter force-class + guardrail
+sidecar.build_sidecar        (roster CSV -> contracts sidecar)
+    -> _attach_roster_counts (R.4 / R.5 / R.7 gates)
+        -> roster_counts.compute
+            -> ReconciliationHints
+                -> interpreter force-class + guardrail
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ import pytest
 
 from backend.agents.interpreter import _apply_reconciliation_classifications
 from backend.agents.orchestrator import _attach_roster_counts
-from backend.agents.parser import ParserAgent
 from backend.domain.contracts import (
     DiscoveryPlan,
     ReconciliationItem,
@@ -25,6 +24,7 @@ from backend.domain.contracts import (
 )
 from backend.tools import file_reader, normalizer, roster_counts
 from backend.tools.guardrail import verify_guardrail
+from backend.tools.sidecar import build_sidecar
 
 ROSTER = (
     Path(__file__).parent.parent / "tools" / "fixtures" / "kova_rmr_roster_mar_2026.csv"
@@ -33,13 +33,9 @@ PERIOD = date(2026, 3, 1)
 ACCOUNT = "Service Revenue"
 
 
-def _parser() -> ParserAgent:
-    return ParserAgent.__new__(ParserAgent)
-
-
 # The production read path. `read_file` returns integer positional columns;
 # Discovery's plan names them. Reading the fixture with pd.read_csv (header=0)
-# is what hid the bug where _build_sidecar matched aliases against integers
+# is what hid the bug where build_sidecar matched aliases against integers
 # and so always returned None on a real upload.
 _PLAN = DiscoveryPlan(
     header_row_index=0,
@@ -55,7 +51,7 @@ def _raw() -> pd.DataFrame:
 
 
 def _sidecar(file_type: str | None = "contracts"):
-    return _parser()._build_sidecar(_raw(), file_type, _PLAN)
+    return build_sidecar(_raw(), file_type, _PLAN)
 
 
 def _item(account: str = ACCOUNT) -> ReconciliationItem:
@@ -87,10 +83,10 @@ def test_sidecar_built_from_the_real_read_path_not_a_header_shortcut() -> None:
     """Regression: the sidecar must survive file_reader's positional columns.
 
     `read_file` returns integer column labels (header promotion is apply_plan's
-    job). _build_sidecar resolves aliases by NAME, so without promoting headers
+    job). build_sidecar resolves aliases by NAME, so without promoting headers
     first it matched nothing and returned None on every real upload — killing
     Item 4's counts and Item 1's matcher silently. Fails against the pre-fix
-    two-argument _build_sidecar, which had no plan to promote with.
+    two-argument build_sidecar, which had no plan to promote with.
     """
     raw = _raw()
     # The shape the bug hid behind: no string headers to match against.

@@ -227,26 +227,6 @@ class _FakeEntriesRepo:
         return len(_state["entries"])
 
 
-class _FakeAnomaliesRepo:
-    def write_batch(self, anomalies):
-        pass
-
-    def list_for_period(self, company_id, period):
-        return []
-
-
-class _FakeReportsRepo:
-    def write(self, report: Report) -> Report:
-        _state["reports"][report.id] = report
-        return report
-
-    def get(self, company_id: str, period: date):
-        for report in _state["reports"].values():
-            if str(report.company_id) == company_id and report.period == period:
-                return report
-        return None
-
-
 # ---------------------------------------------------------------------------
 # LLM canned responses
 # ---------------------------------------------------------------------------
@@ -357,18 +337,28 @@ def _make_patches(llm_mock: MagicMock) -> list:
             return_value=_FakeAccountsRepo(),
         ),
         patch("backend.agents.orchestrator.get_llm_client", return_value=llm_mock),
-        # Routes deps (used by HTTP handlers)
-        patch("backend.api.routes.get_runs_repo", return_value=_FakeRunsRepo()),
-        patch("backend.api.routes.get_file_storage", return_value=_FakeFileStorage()),
-        patch("backend.api.routes.get_accounts_repo", return_value=_FakeAccountsRepo()),
-        patch("backend.api.routes.get_entries_repo", return_value=_FakeEntriesRepo()),
+        # Routes deps (used by HTTP handlers). get_anomalies_repo/get_reports_repo
+        # are not called by anything in the uploads router — the confirm endpoint
+        # only touches runs/accounts/entries directly and hands the background
+        # task nothing but IDs, which resolves its own repos inside orchestrator.py.
         patch(
-            "backend.api.routes.get_anomalies_repo", return_value=_FakeAnomaliesRepo()
+            "backend.api.routers.uploads.get_runs_repo", return_value=_FakeRunsRepo()
         ),
-        patch("backend.api.routes.get_reports_repo", return_value=_FakeReportsRepo()),
+        patch(
+            "backend.api.routers.uploads.get_file_storage",
+            return_value=_FakeFileStorage(),
+        ),
+        patch(
+            "backend.api.routers.uploads.get_accounts_repo",
+            return_value=_FakeAccountsRepo(),
+        ),
+        patch(
+            "backend.api.routers.uploads.get_entries_repo",
+            return_value=_FakeEntriesRepo(),
+        ),
         # Stub out the heavy comparison+report pipeline
         patch(
-            "backend.api.routes.run_comparison_and_report",
+            "backend.api.routers.uploads.run_comparison_and_report",
             side_effect=_fake_comparison,
         ),
     ]

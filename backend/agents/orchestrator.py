@@ -680,8 +680,8 @@ def _attach_batch_matches(recon_items, per_file_data, period, run_id) -> None:
     three ways — Vandelay payouts with no bank file must fall back to Kova 1's
     account-total fee hint rather than have this claim a three-way match.
     """
-    from backend.agents.parser import _DEFAULT_UF_ACCOUNT_NAME
     from backend.tools.batch_matcher import match
+    from backend.tools.sidecar import _DEFAULT_UF_ACCOUNT_NAME
 
     sidecars: dict[str, object] = {}
     for entry in per_file_data:
