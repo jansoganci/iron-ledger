@@ -2,6 +2,8 @@
 ### AI-Powered Month-End Close Agent
 *Built with Claude Opus 4.7 — Anthropic Hackathon April 2026*
 
+> Now documented at [jansoganci.com/work/month-proof](https://jansoganci.com/work/month-proof) — part of my public build log.
+
 ---
 
 ## What it does
