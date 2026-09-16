@@ -248,9 +248,23 @@ def test_empty_numbers_used_with_narrative_number_is_detected() -> None:
     assert "999,999" in violations[0]["excerpt"]
 
 
-def test_narrative_violation_is_warn_only_by_default() -> None:
-    """Decision 3: measure the violation rate before enforcing."""
-    assert guardrail_module.ENFORCE_NARRATIVE_CONSISTENCY is False
+def test_narrative_violation_fails_by_default() -> None:
+    """Slice A: the $999,999 empty-numbers_used bypass is now a hard failure."""
+    assert guardrail_module.ENFORCE_NARRATIVE_CONSISTENCY is True
+    passed, msg = verify_guardrail(
+        {"numbers_used": [], "narrative": "We found $999,999 missing."},
+        {"revenue": 1_000_000.0},
+        strict=True,
+    )
+    assert passed is False
+    assert "999999" in msg.replace(",", "") or "999999.0" in msg.replace(",", "")
+
+
+def test_narrative_violation_can_be_switched_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The named flag still governs Stage 1; it is not an inline conditional."""
+    monkeypatch.setattr(guardrail_module, "ENFORCE_NARRATIVE_CONSISTENCY", False)
     passed, _ = verify_guardrail(
         {"numbers_used": [], "narrative": "We found $999,999 missing."},
         {"revenue": 1_000_000.0},
@@ -259,18 +273,17 @@ def test_narrative_violation_is_warn_only_by_default() -> None:
     assert passed is True
 
 
-def test_narrative_violation_fails_when_enforcement_is_enabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Flipping the named flag turns Stage 1 into a hard failure."""
-    monkeypatch.setattr(guardrail_module, "ENFORCE_NARRATIVE_CONSISTENCY", True)
+def test_listed_narrative_number_that_matches_pandas_still_passes() -> None:
     passed, msg = verify_guardrail(
-        {"numbers_used": [], "narrative": "We found $999,999 missing."},
-        {"revenue": 1_000_000.0},
+        {
+            "numbers_used": [999_999.0],
+            "narrative": "We found $999,999 missing.",
+        },
+        {"revenue": 999_999.0},
         strict=True,
     )
-    assert passed is False
-    assert "999999" in msg.replace(",", "") or "999999.0" in msg.replace(",", "")
+    assert passed is True
+    assert msg == "Success"
 
 
 def test_narrative_number_present_in_numbers_used_is_not_a_violation() -> None:

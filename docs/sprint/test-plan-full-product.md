@@ -325,11 +325,11 @@ Take the completed Redhawk report from Section B.
 | E4 | Look for arithmetic in the prose | The narrative never *derives* a number. No "3,825 minus 3,540", no "which is 7.5% of", no computed ratio | **PASS.** None of `minus`, `subtract`, `which is`, `divided by`, `times` occur. Consistent with D4: the narrative gives both sides rather than a difference. |
 | E5 | Check `fee_pct` | The string `fee_pct` appears **nowhere** in the report payload, and no fee percentage appears in the prose | **PASS.** `fee_pct` absent from the entire serialized report; no `%` anywhere in the prose. |
 
-**Note on E2.** Narrative-vs-`numbers_used` consistency is currently
-**warn-only** — `ENFORCE_NARRATIVE_CONSISTENCY = False` in
-`backend/tools/guardrail.py`. A violation is **logged, not blocked**. Check the
-backend log for `guardrail_narrative_unlisted_number` and report the count; that
-measurement is the reason the flag is still off.
+**Note on E2.** Narrative-vs-`numbers_used` consistency is **enforced** —
+`ENFORCE_NARRATIVE_CONSISTENCY = True` in `backend/tools/guardrail.py`. A
+prose `$` or `%` figure absent from `numbers_used` fails the monthly report.
+The measurement window (this row: 0 violations on run `cc19d60d`) is what
+justified the flip. See `docs/sprint/pre-analysis-guardrail-second-gate.md`.
 
 ---
 

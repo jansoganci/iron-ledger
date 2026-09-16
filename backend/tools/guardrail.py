@@ -12,14 +12,14 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 # Stage 1 checks that every number written in the narrative also appears in
-# numbers_used. It is MEASUREMENT-ONLY for one release: violations are logged
-# at WARNING and the report still saves.
+# numbers_used. Measured on live Redhawk (test-plan E2: 0 unlisted figures),
+# then flipped to enforcing so an empty numbers_used array cannot hide a
+# dollar or percent written in the prose.
 #
-# Flip to True to make an unlisted narrative number fail the report. This is a
-# deliberate, named switch — do not re-express it as an inline conditional and
-# do not flip it without an explicit decision. See
-# docs/sprint/guardrail-fix-pre-analysis.md, decision 3.
-ENFORCE_NARRATIVE_CONSISTENCY = False
+# This flag only affects the strict=True path (monthly interpreter, and
+# quarterly/Opus once those callers pass strict=True). Do not re-express it
+# as an inline conditional. See docs/sprint/pre-analysis-guardrail-second-gate.md.
+ENFORCE_NARRATIVE_CONSISTENCY = True
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ def verify_guardrail(
           percent : 0.05 percentage points
         Zero references are NOT excluded, so a legitimate $0.00 can match a
         real 0.0 and nothing else. Additionally runs the Stage 1 narrative
-        consistency check (warn-only unless ENFORCE_NARRATIVE_CONSISTENCY).
+        consistency check (blocked when ENFORCE_NARRATIVE_CONSISTENCY is True).
     """
     if not strict:
         flat_values = flatten_summary(pandas_summary)
@@ -287,7 +287,7 @@ def verify_guardrail(
     if reconciliation_values:
         money_refs.extend(float(v) for v in reconciliation_values if v is not None)
 
-    # Stage 1 — narrative vs numbers_used. Warn-only for this release.
+    # Stage 1 — narrative vs numbers_used. Blocking when the named flag is on.
     violations = check_narrative_consistency(claude_json, run_id=run_id)
     if violations and ENFORCE_NARRATIVE_CONSISTENCY:
         first = violations[0]

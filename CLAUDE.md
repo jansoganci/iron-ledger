@@ -149,7 +149,7 @@ The active workflow is coordinated by `agents/orchestrator.py`. It performs stru
 ## Critical Files
 
 **`backend/tools/guardrail.py`** — Do not break this.
-`verify_guardrail()` accepts the narrative contract, pandas summary, optional reconciliation reference values, and a `strict` mode. The monthly interpreter uses strict unit-separated money/percentage pools; quarterly and Opus-upgrade paths currently use the legacy pool. Narrative-vs-`numbers_used` consistency is measured and logged, with enforcement controlled by the named rollout flag in this module.
+`verify_guardrail()` accepts the narrative contract, pandas summary, optional reconciliation reference values, and a `strict` mode. The monthly interpreter uses strict unit-separated money/percentage pools. Quarterly and Opus-upgrade paths still use the legacy pool until Slice B of `docs/sprint/pre-analysis-guardrail-second-gate.md` lands. Narrative-vs-`numbers_used` consistency (Stage 1) is **enforced** on the strict path via `ENFORCE_NARRATIVE_CONSISTENCY`.
 
 **`backend/tools/file_reader.py`** — Handles NetSuite edge case.
 NetSuite exports `.xls` files that are actually XML Spreadsheet 2003. openpyxl cannot open them. Detect by reading first 2 bytes: if `b"<?"` → parse as XML, not binary xls.
