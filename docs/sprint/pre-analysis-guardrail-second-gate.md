@@ -1,15 +1,14 @@
 # Pre-analysis — Guardrail second gate (two debts, one family)
 
-Status: analysis only. No code in this change.
+Status: approved and implemented (Slice A then Slice B, two commits).
 Date: 2026-09-16.
 Parent: `docs/sprint/guardrail-fix-pre-analysis.md` open questions 2–3;
 `docs/06-reports/pending-decisions-audit.md` §1.3–1.4;
 `docs/sprint/test-plan-full-product.md` E2.
-Checkout: `main`.
+Checkout: `cursor/guardrail-second-gate-05bf` (from `main`).
 
 Process: (1) this pre-analysis → approval, (2) implementation as **two
-slices**, (3) verification vs this file. Do not start coding until §10 is
-locked.
+slices**, (3) verification vs this file. §10 was locked before coding.
 
 ---
 
@@ -335,14 +334,38 @@ Python + prompts + tests only.
 Reply with yes/no per row. Implementation of a slice starts only when that
 slice is locked.
 
-- [ ] This is **two slices**, not one job.
-- [ ] Slice A: flip `ENFORCE_NARRATIVE_CONSISTENCY` to True (monthly only).
-- [ ] Slice B: pandas + prompts first, then `strict=True` on quarterly and Opus.
-- [ ] Do A before B.
-- [ ] Do not change money/percent tolerances.
-- [ ] Do not ask Claude to calculate `{N} of {M}`, `year-1`, MoM %, or net.
-- [ ] No live SQL / deploy in these slices.
+- [x] This is **two slices**, not one job.
+- [x] Slice A: flip `ENFORCE_NARRATIVE_CONSISTENCY` to True (monthly only).
+- [x] Slice B: pandas + prompts first, then `strict=True` on quarterly and Opus.
+- [x] Do A before B.
+- [x] Do not change money/percent tolerances.
+- [x] Do not ask Claude to calculate `{N} of {M}`, `year-1`, MoM %, or net.
+- [x] No live SQL / deploy in these slices.
 
 If A is “no,” say whether we keep measuring or wait for more live E2 counts.
 If B is “no,” say whether quarterly/Opus stay on legacy until a later close
 slice.
+
+---
+
+## SONUÇ
+
+Both slices approved and coded. Tolerances (`$0.01`, `0.05pp`) unchanged.
+No 7th class. No live SQL / deploy.
+
+**Slice A.** `ENFORCE_NARRATIVE_CONSISTENCY = True`. Empty `numbers_used` plus
+`$999,999` in prose now fails on `strict=True`. Named flag still governs
+Stage 1.
+
+**Slice B.** Quarterly `aggregated_summary` now carries `months_present`,
+`months_in_quarter`, `reporting_year`, `prior_year`, `reporting_quarter`, and
+named `mom_{curr}_vs_{prev}_revenue_pct` scalars (the old MoM list never
+entered the unit-aware pool). Prompts are copy-only. Opus pandas supplies
+`net_income` / `gross_profit_total` / `net_margin_pct`. Interpreter and Opus
+share `collect_reconciliation_reference_values` (`fee_pct` still absent).
+All three production `verify_guardrail` callers pass `strict=True`.
+`_tolerance_for` stays in the module unused.
+
+Remaining outside this family: close-flow, duplicate-period re-run policy,
+GL+dept `_roll_up`, email stub, parked Kova 2/3/6. Merge to `main` is
+user-gated.

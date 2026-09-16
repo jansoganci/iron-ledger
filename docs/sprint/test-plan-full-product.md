@@ -369,8 +369,11 @@ justified the flip. See `docs/sprint/pre-analysis-guardrail-second-gate.md`.
    bypasses RLS so the backend is unaffected, but any direct
    anon/authenticated read of that table returns zero rows. Flag if the
    frontend ever needs to read it directly.
-5. **Narrative consistency is warn-only** (E2). Record the violation count
-   rather than treating a log line as a failure.
+5. ~~**Narrative consistency is warn-only** (E2). Record the violation count
+   rather than treating a log line as a failure.~~ **RESOLVED (2026-09-16).**
+   `ENFORCE_NARRATIVE_CONSISTENCY = True`. Quarterly and Opus now pass
+   `strict=True` after copy-only pandas/prompt work. See
+   `docs/sprint/pre-analysis-guardrail-second-gate.md`.
 6. ~~**`export.xlsx` is broken for every user (found 5 Sep).**~~ **RESOLVED.** The handler passed a company id to `get_by_owner`, which expects an owner id → `RLSForbiddenError` → 403. Now uses `Depends(get_cached_company)`. B8/B9 both pass live. Detail in E.0.
 7. ~~**Item 1's fixtures cannot be uploaded through the product.**~~ **RESOLVED** by `docs/demo_data/riverbend/`. Item 1 verified live end to end on 5 Sep, run `c0f269d6` — 6 matches, all C1-C11 outcomes correct. Detail in C.0c.
 7b. **An invalid classification token from Claude kills the run, intermittently (found 5 Sep).** Claude returned `exception_three_way_matches` for a card carrying nested matches; `NarrativeJSON` rejected it and the run died as `guardrail_failed` with a generic internal-error message. The value would have been overwritten by the pandas residue anyway, and the semantic retry cannot catch a schema error because it is raised inside `llm.call`. Roughly one run in two. Not patched. Detail in C.0c.

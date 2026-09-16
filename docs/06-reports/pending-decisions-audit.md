@@ -33,9 +33,13 @@ Somut olarak eksik olan (§5'te tanımlı):
 **Kaynak:** `backend/tools/guardrail.py:22` `ENFORCE_NARRATIVE_CONSISTENCY = False`
 **Doğrulandı:** `docs/sprint/test-plan-full-product.md` §E "Note on E2" ve `docs/audit_results.md` (c) tablosu satır 1 — ikisi de aynı bayrağı, aynı nedenle ("bir ölçüm turu bitmeden enforce etme") açık olarak işaretliyor. Şu anki canlı ölçüm: Redhawk raporunda **0 ihlal** (`test-plan-full-product.md` §E2). Bir ölçüm turu geçti, bayrak hâlâ kapalı — flip etme kararı kimseye ait değil, dokümante edilmiş ama tetiklenmemiş.
 
+**Güncelleme (2026-09-16):** Slice A (`docs/sprint/pre-analysis-guardrail-second-gate.md`) bayrağı `True` yaptı. `$999,999` + boş `numbers_used` artık `strict=True` altında fail. `main`'e merge kullanıcı kapılı.
+
 ### 1.4 Quarterly ve Opus-upgrade path'leri hâlâ eski (non-strict) guardrail toleransında
 **Kaynak:** `docs/audit_results.md` (c) tablosu satır 2-3
 **Doğrulandı:** `grep -n "strict=True" backend/agents/*.py` → yalnızca `interpreter.py:526`. `quarterly.py` ve `opus_upgrade.py` `strict` parametresi geçmiyor → `verify_guardrail`'in eski `max(1%, $1,000)` toleransını kullanıyorlar, `CLAUDE.md`'nin "aylık interpreter strict, quarterly/opus-upgrade legacy tolerance kullanıyor (belgelenmiş)" notuyla tutarlı — yani bu **CLAUDE.md'de zaten kabul edilmiş bir borç**, ama audit'in belirttiği asıl sorun şu: quarterly ve opus prompt'ları hâlâ Claude'dan türetilmiş değer istiyor (`{N} of {M}`, `year-1`, "net position if derivable") — bu ikisi düzeltilmeden strict'e geçiş mümkün değil. Migrasyon planı yok.
+
+**Güncelleme (2026-09-16):** Slice B pandas alanlarını ve kopyala-only prompt'ları ekledi, sonra her iki çağırıcıya `strict=True` verdi. Opus recon havuzu aylık interpreter ile aynı kolektörü kullanıyor; `net_income` Python'dan geliyor. `_tolerance_for` modülde duruyor, production kullanmıyor. `main`'e merge kullanıcı kapılı.
 
 ### 1.5 "exception_three_way_matches" — invalid classification token bug
 **Kaynak:** `docs/sprint/test-plan-full-product.md` gap #7b, bu oturumda kullanıcı tarafından da doğrulandı.

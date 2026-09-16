@@ -13,7 +13,7 @@ Built with Claude Opus 4.7 — Anthropic Hackathon April 2026.
 - Claude NEVER does arithmetic. All calculations (variance, totals, anomaly thresholds) are Python/pandas.
 - Claude ONLY interprets the pandas output in plain English.
 - No report is saved to Supabase until the numeric guardrail passes.
-- The monthly interpreter uses strict, unit-aware guardrail checks: money uses cent/float-noise tolerance and percentages use 0.05 percentage points. Legacy quarterly and Opus-upgrade callers still use the documented legacy tolerance in `backend/tools/guardrail.py`.
+- Monthly, quarterly, and Opus-upgrade callers all use strict, unit-aware guardrail checks: money uses cent/float-noise tolerance and percentages use 0.05 percentage points. `_tolerance_for` remains in `backend/tools/guardrail.py` for a revert, unused by production.
 
 ---
 
@@ -149,7 +149,7 @@ The active workflow is coordinated by `agents/orchestrator.py`. It performs stru
 ## Critical Files
 
 **`backend/tools/guardrail.py`** — Do not break this.
-`verify_guardrail()` accepts the narrative contract, pandas summary, optional reconciliation reference values, and a `strict` mode. The monthly interpreter uses strict unit-separated money/percentage pools. Quarterly and Opus-upgrade paths still use the legacy pool until Slice B of `docs/sprint/pre-analysis-guardrail-second-gate.md` lands. Narrative-vs-`numbers_used` consistency (Stage 1) is **enforced** on the strict path via `ENFORCE_NARRATIVE_CONSISTENCY`.
+`verify_guardrail()` accepts the narrative contract, pandas summary, optional reconciliation reference values, and a `strict` mode. Monthly, quarterly, and Opus-upgrade callers use strict unit-separated money/percentage pools. Narrative-vs-`numbers_used` consistency (Stage 1) is enforced on the strict path via `ENFORCE_NARRATIVE_CONSISTENCY`.
 
 **`backend/tools/file_reader.py`** — Handles NetSuite edge case.
 NetSuite exports `.xls` files that are actually XML Spreadsheet 2003. openpyxl cannot open them. Detect by reading first 2 bytes: if `b"<?"` → parse as XML, not binary xls.

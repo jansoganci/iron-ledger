@@ -5,12 +5,47 @@ from datetime import date
 from backend.api.deps import get_llm_client, get_reports_repo, get_runs_repo
 from backend.domain.contracts import NarrativeJSON
 from backend.logger import get_logger, get_trace_id
-from backend.tools.guardrail import verify_guardrail
+from backend.tools.guardrail import (
+    collect_reconciliation_reference_values,
+    verify_guardrail,
+)
 
 logger = get_logger(__name__)
 
 _OPUS_MODEL = "claude-opus-4-7"
 _PROMPT_FILE = "opus_narrative_prompt.txt"
+
+_REVENUE_CATS = frozenset({"REVENUE", "OTHER_INCOME"})
+_COGS_CATS = frozenset({"COGS"})
+_OPEX_CATS = frozenset({"OPEX", "G&A", "R&D"})
+
+
+def _pnl_totals_from_summary(pandas_summary: dict) -> dict[str, float]:
+    """Python-only P&L rollup so Opus copies net_income instead of deriving it."""
+    revenue = 0.0
+    cogs = 0.0
+    opex = 0.0
+    accounts = pandas_summary.get("accounts") or {}
+    if isinstance(accounts, dict):
+        for account_data in accounts.values():
+            if not isinstance(account_data, dict):
+                continue
+            category = account_data.get("category", "OTHER")
+            current = float(account_data.get("current") or 0.0)
+            if category in _REVENUE_CATS:
+                revenue += current
+            elif category in _COGS_CATS:
+                cogs += current
+            elif category in _OPEX_CATS:
+                opex += current
+    gross_profit = revenue - cogs
+    net_income = gross_profit - opex
+    net_margin_pct = (net_income / revenue * 100) if revenue else 0.0
+    return {
+        "net_income": round(net_income, 2),
+        "gross_profit_total": round(gross_profit, 2),
+        "net_margin_pct": round(net_margin_pct, 2),
+    }
 
 
 def run_opus_upgrade(run_id: str, company_id: str, period: date) -> None:
@@ -79,9 +114,13 @@ def run_opus_upgrade(run_id: str, company_id: str, period: date) -> None:
             if r.get("pandas_summary")
         ]
 
+        pnl = _pnl_totals_from_summary(current_pandas)
+        current_summary = dict(current_pandas)
+        current_summary.update(pnl)
+
         context = {
             "period": str(period),
-            "current_summary": current_pandas,
+            "current_summary": current_summary,
             "prior_summaries": prior_summaries,
             "reconciliations": reconciliations,
         }
@@ -103,19 +142,14 @@ def run_opus_upgrade(run_id: str, company_id: str, period: date) -> None:
             schema=NarrativeJSON,
         )
 
-        # Guardrail: verify numbers against current pandas_summary only.
-        recon_values: list[float] = []
-        for item in reconciliations:
-            if isinstance(item, dict):
-                for key in ("delta", "gl_amount", "non_gl_total"):
-                    v = item.get(key)
-                    if isinstance(v, (int, float)):
-                        recon_values.append(float(v))
+        recon_values = collect_reconciliation_reference_values(reconciliations)
 
         passed, reason = verify_guardrail(
             claude_json=result.model_dump(),
-            pandas_summary=current_pandas,
+            pandas_summary=current_summary,
             reconciliation_values=recon_values if recon_values else None,
+            strict=True,
+            run_id=run_id,
         )
 
         if not passed:
