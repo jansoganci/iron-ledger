@@ -1,6 +1,7 @@
 # Pre-analysis — Close checklist (raporu kapanış listesine çevir)
 
-Status: Slice 1 implemented. Slice 2 not started.
+Status: Slice 1 implemented. Slice 2 **left open** (2026-09-16) — not
+started, not cancelled. Reopen only with a new lock.
 Date: 2026-09-16.
 Parent: `docs/02-planning/close-flow-contract.md`;
 `docs/06-reports/close-process-by-sector.md` §5;
@@ -273,6 +274,8 @@ slice is locked.
 - [x] Slice 1: regroup existing cards + bank sentence + Verified copy.
       No new file types. No `closed`. No SQL.
 - [ ] Slice 2: named five controls + file-total→GL map, **after** 1.
+      **Left open 2026-09-16.** Do not start. Do not paint Install/Fuel.
+      An invented 5th control with no file must not count as passed.
 - [x] Demo fixture for slice 1 is **Redhawk**, not restoring Sentinel binaries.
 - [x] Do not reopen materiality, coverage/`missing_je`, or a 7th class.
 - [x] Do not ask Claude to calculate N of M.
@@ -293,3 +296,24 @@ Vendors / Contracts / Other, then coverage, then narrative, then a
 session-only bank checkbox. “Numbers verified” is not “period closed.”
 Excel recon sheet carries the same bank sentence. No `closed` state, no
 SQL, no install/fuel types.
+
+## SONUÇ — Slice 2 left open (2026-09-16)
+
+We are **not** starting named five controls, install/fuel `SourceFileType`
+needles, or a file-total→GL mapping mode. Slice 1 already gives an honest
+page for the types we have (Payroll / Vendors / Contracts / Other).
+
+Why it stays open, not “done” and not “never”:
+
+- Redhawk has three supporting files + GL. Install and fuel fixtures are
+  not in the tree. Painting those labels would lie.
+- A control with no uploaded file must not count as passed.
+- File-total→GL is a mapping mode. Wrong GL target is a fake pass or a
+  fake fail. That lock is a separate approval.
+
+`closed` / sign-off / period lock remains slice 3, later, with SQL.
+Do not sneak it in while slice 2 is open.
+
+To reopen slice 2: lock names against real demo files, then file-total
+mode, then UI labels — in that order. Until then this family stops at
+slice 1.
