@@ -14,7 +14,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from backend import messages
 from backend.agents.opus_upgrade import run_opus_upgrade
@@ -32,9 +32,10 @@ from backend.api.deps import (
     get_entries_repo,
     get_file_storage,
     get_runs_repo,
+    get_source_mappings_repo,
 )
 from backend.api.rate_limit import limiter
-from backend.domain.contracts import DiscoveryPlan
+from backend.domain.contracts import DiscoveryPlan, MappingDraft
 from backend.domain.entities import MonthlyEntry
 from backend.domain.errors import (
     DuplicateEntryError,
@@ -44,6 +45,7 @@ from backend.domain.errors import (
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger
 from backend.tools.file_reader import SUPPORTED_EXTENSIONS
+from backend.tools.source_mapping import persistable_upserts
 
 # Categories accepted by POST /runs/{run_id}/mapping/confirm.
 # "SKIP" is a frontend-only sentinel — never written to the database.
@@ -671,6 +673,9 @@ async def confirm_mappings(
     except RLSForbiddenError as exc:
         raise HTTPException(status_code=403, detail=messages.FORBIDDEN) from exc
 
+    if run.get("company_id") != company_id:
+        raise HTTPException(status_code=403, detail=messages.FORBIDDEN)
+
     # State guard
     if run.get("status") != RunStatus.AWAITING_MAPPING_CONFIRMATION.value:
         raise HTTPException(
@@ -697,6 +702,16 @@ async def confirm_mappings(
         raise HTTPException(
             status_code=422, detail="Could not determine run period"
         ) from exc
+
+    try:
+        draft_model = MappingDraft.model_validate(draft)
+    except ValidationError:
+        draft_model = MappingDraft(items=[], gl_account_pool=pool)
+    mappings_repo = get_source_mappings_repo()
+    for file_type, source_pattern, gl_account in persistable_upserts(
+        draft_model.items, body.decisions
+    ):
+        mappings_repo.upsert(company_id, file_type, source_pattern, gl_account)
 
     # Synchronously transition to APPLYING_MAPPING before firing the background task.
     # This prevents re-entry: any subsequent confirm-mappings call will see a non-

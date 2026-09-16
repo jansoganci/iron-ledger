@@ -79,3 +79,6 @@ DISCOVERY_REJECTED = (
 
 COMPANY_CREATE_FAILED = "We couldn't create your workspace. Please try again."
 COMPANY_UPDATE_FAILED = "We couldn't save your company details. Please try again."
+
+MAPPING_NOT_FOUND = "That saved name was not found."
+MAPPING_GL_REQUIRED = "Choose a GL account before saving."

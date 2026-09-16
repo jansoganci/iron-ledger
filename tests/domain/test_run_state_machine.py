@@ -8,6 +8,13 @@ from backend.domain.errors import InvalidRunTransition
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 
 
+def test_parsing_to_applying_mapping_valid() -> None:
+    result = RunStateMachine.transition(
+        RunStatus.PARSING, RunStatus.APPLYING_MAPPING
+    )
+    assert result == RunStatus.APPLYING_MAPPING
+
+
 def test_parsing_to_awaiting_mapping_confirmation_valid() -> None:
     result = RunStateMachine.transition(
         RunStatus.PARSING, RunStatus.AWAITING_MAPPING_CONFIRMATION

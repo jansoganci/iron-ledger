@@ -16,12 +16,21 @@ from backend.api.deps import (
     get_llm_client,
     get_reports_repo,
     get_runs_repo,
+    get_source_mappings_repo,
 )
 from backend.agents.account_mapper import AccountMapper
 from backend.domain.contracts import DEFAULT_GL_CATEGORIES, DiscoveryPlan, MappingDraft
 from backend.domain.errors import DiscoveryLowConfidence
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
+from backend.tools.source_mapping import (
+    annotate_draft_items,
+    auto_map_payroll,
+    index_stored,
+    is_payroll,
+    needs_user_review,
+    remembered_decisions,
+)
 
 logger = get_logger(__name__)
 
@@ -769,12 +778,15 @@ def run_multi_file_parser_with_mapping(
     company_id: str,
     period: date,
 ) -> None:
-    """Phase A: parse all files, run AccountMapper for non-GL files,
-    store mapping draft, pause at AWAITING_MAPPING_CONFIRMATION.
+    """Phase A: parse all files, map non-GL source values, pause only if needed.
 
-    Phase B is triggered by POST /runs/{run_id}/confirm-mappings.
-    If all files are GL (no mapping needed) the function runs consolidation
-    directly and transitions to AWAITING_CONFIRMATION instead.
+    Payroll lines are identity-mapped and never shown for review. Vendor and
+    expense names are compared to saved mappings; Haiku still runs, and a
+    disagreement pauses for the user. If nothing needs a decision, Phase B
+    (`apply_mapping_and_consolidate`) runs immediately.
+
+    When review is required, Phase B is triggered by POST /runs/{id}/confirm-mappings.
+    All-GL uploads still skip mapping and consolidate directly.
     """
     import pandas as pd
 
@@ -872,18 +884,17 @@ def run_multi_file_parser_with_mapping(
         if not gl_pool:
             gl_pool = list(DEFAULT_GL_CATEGORIES)
 
-        # Run AccountMapper for each non-GL file.
-        all_draft_items = []
-        file_keys = {
-            label: key
-            for label, key, *_ in [
-                (f[0], sorted_keys[i]) for i, f in enumerate(per_file_data)
-            ]
-        }
-        # Rebuild file_keys correctly
+        # Run AccountMapper for persistable / reviewable non-GL files.
+        # Payroll is identity-mapped and never sent to Haiku or the review UI.
         file_keys = {}
         for entry, key in zip(per_file_data, sorted_keys):
             file_keys[entry[0]] = key
+
+        stored_index = index_stored(
+            get_source_mappings_repo().list_for_company(company_id)
+        )
+        auto_decisions: dict[str, str] = {}
+        all_draft_items = []
 
         for label, preview_rows, _, _, is_gl, file_type, *_ in per_file_data:
             if is_gl:
@@ -891,17 +902,31 @@ def run_multi_file_parser_with_mapping(
             unique_values = sorted(
                 {row["account"] for row in preview_rows if row.get("account")}
             )
+            if is_payroll(file_type):
+                auto_decisions.update(auto_map_payroll(unique_values))
+                logger.info(
+                    "payroll_identity_mapped",
+                    extra={
+                        "run_id": run_id,
+                        "file": label,
+                        "lines": len(unique_values),
+                        "trace_id": get_trace_id(),
+                    },
+                )
+                continue
             _, draft = mapper.build_draft(
                 unique_values=unique_values,
                 file_type=file_type,
                 source_file=label,
                 gl_pool=gl_pool,
             )
-            all_draft_items.extend(draft.items)
+            annotated = annotate_draft_items(draft.items, stored_index)
+            all_draft_items.extend(annotated)
+            auto_decisions.update(remembered_decisions(annotated))
 
         aggregate_draft = MappingDraft(items=all_draft_items, gl_account_pool=gl_pool)
 
-        if not all_draft_items:
+        if not all_draft_items and not auto_decisions:
             # All files are GL — skip mapping, consolidate directly.
             _run_consolidation(
                 run_id,
@@ -913,14 +938,35 @@ def run_multi_file_parser_with_mapping(
             )
             return
 
-        # Persist draft + file key map, then pause for user review.
         parse_preview = {
             "mapping_draft": aggregate_draft.model_dump(mode="json"),
             "file_keys": file_keys,
             "is_multi_file": True,
+            "auto_decisions": auto_decisions,
         }
         runs_repo.set_parse_preview(run_id, parse_preview)
         runs_repo.set_file_count(run_id, len(sorted_keys))
+
+        if not needs_user_review(all_draft_items):
+            applying_status = RunStateMachine.transition(
+                RunStatus.PARSING, RunStatus.APPLYING_MAPPING
+            )
+            runs_repo.update_status(
+                run_id,
+                applying_status,
+                extra={
+                    "step": 2,
+                    "step_label": "Applying saved mappings...",
+                    "progress_pct": 55,
+                },
+            )
+            apply_mapping_and_consolidate(
+                run_id=run_id,
+                company_id=company_id,
+                period=period,
+                user_decisions=auto_decisions,
+            )
+            return
 
         await_map_status = RunStateMachine.transition(
             RunStatus.PARSING, RunStatus.AWAITING_MAPPING_CONFIRMATION
@@ -930,7 +976,7 @@ def run_multi_file_parser_with_mapping(
             await_map_status,
             extra={
                 "step": 2,
-                "step_label": "Review AI account mappings...",
+                "step_label": "Review vendor and expense names...",
                 "progress_pct": 50,
             },
         )
@@ -996,6 +1042,8 @@ def apply_mapping_and_consolidate(
 
         parse_preview = run.get("parse_preview") or {}
         file_keys: dict[str, str] = parse_preview.get("file_keys", {})
+        auto_decisions: dict[str, str] = parse_preview.get("auto_decisions") or {}
+        merged_decisions = {**auto_decisions, **(user_decisions or {})}
 
         if not file_keys:
             logger.error(
@@ -1009,7 +1057,7 @@ def apply_mapping_and_consolidate(
         for label, storage_key in file_keys.items():
             is_gl = _is_gl_label(label)
             file_type = "general_ledger" if is_gl else _detect_file_type(label)
-            account_name_map = None if is_gl else (user_decisions or None)
+            account_name_map = None if is_gl else (merged_decisions or None)
             try:
                 preview_rows, source_column, raw_df, sidecar = _unpack_parse(
                     parser.parse_file_silently(
