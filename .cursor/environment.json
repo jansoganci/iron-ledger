@@ -1,0 +1,15 @@
+{
+  "name": "Month Proof",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "npm run dev",
+      "description": "FastAPI backend (uvicorn on :8000) and Vite frontend (:5173) started together via concurrently."
+    }
+  ],
+  "ports": [
+    { "name": "backend api", "port": 8000 },
+    { "name": "frontend", "port": 5173 }
+  ]
+}

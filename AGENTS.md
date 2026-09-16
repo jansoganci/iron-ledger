@@ -146,8 +146,11 @@ Run from the repository root unless noted otherwise.
 ```bash
 # Install
 pip install -r requirements.txt -r requirements-dev.txt
-npm install
-npm --prefix frontend install
+npm ci
+npm --prefix frontend ci
+
+# Cloud Agent bootstrap (idempotent; used by `.cursor/environment.json`)
+bash .cursor/install.sh
 
 # Develop
 npm run dev
@@ -171,6 +174,19 @@ supabase db push
 Do not run external-service integration tests, apply remote migrations, seed a
 database, send email, or call paid LLM APIs unless the task requires it and the
 needed environment is explicitly available.
+
+## Cursor Cloud
+
+Cloud Agent setup is repository-managed in `.cursor/`:
+
+- `install.sh` creates `.venv`, installs Python deps, then runs `npm ci` at the
+  repo root and in `frontend/`. It must stay idempotent and must not start
+  servers.
+- `environment.json` runs `bash .cursor/install.sh` after checkout. Dev servers
+  belong in `terminals` (`npm run dev` on ports 8000 and 5173), not in
+  `install`.
+- Do not point `install` at a path that is missing on the checked-out branch.
+  Agents boot from the selected git revision, not from a dashboard-only file.
 
 ## Testing expectations
 
