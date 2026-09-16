@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import json
 import uuid
-from datetime import date
+
+from pydantic import ValidationError
 
 from backend import messages
 from backend.domain.contracts import NarrativeJSON, PandasSummary
 from backend.domain.entities import Anomaly, Report
-from backend.domain.errors import DuplicateEntryError, GuardrailError
+from backend.domain.errors import (
+    DuplicateEntryError,
+    GuardrailError,
+    NarrativeSchemaError,
+)
 from backend.domain.ports import FileStorage, LLMClient, ReportsRepo, RunsRepo
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
@@ -280,6 +286,26 @@ class InterpreterAgent:
                     extra={"run_id": run_id, "inner_error": str(inner)},
                 )
             return False
+        except NarrativeSchemaError as exc:
+            logger.warning(
+                "narrative_schema_failed",
+                extra={"run_id": run_id, "error": str(exc), "trace_id": get_trace_id()},
+            )
+            try:
+                fail_status = RunStateMachine.transition(
+                    RunStatus.GENERATING, RunStatus.GUARDRAIL_FAILED
+                )
+                self._runs.update_status(
+                    run_id,
+                    fail_status,
+                    extra={"error_message": messages.NARRATIVE_SCHEMA_FAILED},
+                )
+            except Exception as inner:
+                logger.error(
+                    "failed to set guardrail_failed status",
+                    extra={"run_id": run_id, "inner_error": str(inner)},
+                )
+            return False
         except Exception as exc:
             logger.error(
                 "interpreter unexpected error",
@@ -410,6 +436,8 @@ class InterpreterAgent:
 
         Semantic retry is a content-quality concern, not an I/O concern.
         I/O retries (network/5xx) stay in anthropic_llm.py.
+        Schema violations (ValidationError / JSONDecodeError) retry the same
+        way Discovery does; they are not number mismatches.
         """
         summary_dict = pandas_summary.model_dump(mode="json")
         anomaly_list = [
@@ -500,6 +528,7 @@ class InterpreterAgent:
                 recon_values.append(float(src.get("amount", 0)))
 
         last_message = ""
+        last_was_schema = False
         for attempt in range(max_retries):
             # Keep users informed during longer LLM/guardrail work.
             if attempt > 0:
@@ -513,12 +542,28 @@ class InterpreterAgent:
                 if attempt == 0
                 else "narrative_prompt_reinforced.txt"
             )
-            result: NarrativeJSON = self._llm.call(
-                prompt=prompt_file,
-                model=NARRATIVE_MODEL,
-                context=context,
-                schema=NarrativeJSON,
-            )
+            try:
+                result: NarrativeJSON = self._llm.call(
+                    prompt=prompt_file,
+                    model=NARRATIVE_MODEL,
+                    context=context,
+                    schema=NarrativeJSON,
+                )
+            except (ValidationError, json.JSONDecodeError) as exc:
+                last_was_schema = True
+                last_message = f"schema violation: {exc}"
+                logger.warning(
+                    "narrative schema violation",
+                    extra={
+                        "event": "narrative_schema_retry",
+                        "run_id": run_id,
+                        "attempt": attempt + 1,
+                        "error": str(exc),
+                        "trace_id": get_trace_id(),
+                    },
+                )
+                continue
+            last_was_schema = False
             success, message = verify_guardrail(
                 result.model_dump(),
                 summary_dict,
@@ -541,6 +586,11 @@ class InterpreterAgent:
                 return result
             last_message = message
 
+        if last_was_schema:
+            raise NarrativeSchemaError(
+                f"Narrative schema invalid after {max_retries} attempts. "
+                f"Last error: {last_message}"
+            )
         raise GuardrailError(
             f"Report could not be verified after {max_retries} attempts. "
             f"Last mismatch: {last_message}"

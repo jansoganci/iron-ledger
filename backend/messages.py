@@ -27,6 +27,10 @@ GUARDRAIL_FAILED = (
     "We couldn't verify the report numbers after two attempts. "
     "Download the raw data below and try again."
 )
+NARRATIVE_SCHEMA_FAILED = (
+    "We couldn't write the report from the model's output after two attempts. "
+    "Your data is safe — please try again."
+)
 REPORT_WRITE_FAILED = (
     "We verified your numbers but couldn't save the report. "
     "Please try running this period again."
