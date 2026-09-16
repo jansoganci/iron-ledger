@@ -20,9 +20,8 @@ def test_cloud_agent_install_script_exists_and_uses_lockfiles() -> None:
 
 
 def test_cloud_agent_environment_json_points_at_install_script() -> None:
-    config = json.loads(
-        (REPO_ROOT / ".cursor" / "environment.json").read_text(encoding="utf-8")
-    )
+    env_path = REPO_ROOT / ".cursor" / "environment.json"
+    config = json.loads(env_path.read_text(encoding="utf-8"))
     assert config["install"] == "bash .cursor/install.sh"
     ports = {item["port"] for item in config["ports"]}
     assert ports == {8000, 5173}
