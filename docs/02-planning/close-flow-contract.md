@@ -1,7 +1,9 @@
 # Close akışı ürün sözleşmesi
 
-*Kod yok. Araştırma ([close-process-by-sector.md](../06-reports/close-process-by-sector.md)) ile ilk kod dilimi arasındaki köprü.*  
-*24 Ağustos 2026.*
+*Araştırma ([close-process-by-sector.md](../06-reports/close-process-by-sector.md)) ile kod dilimleri arasındaki köprü.*  
+*Kilit: 24 Ağustos 2026.*
+
+**Durum 16 Eylül 2026.** Kilit tablo değişmedi. Dil 1 (raporu mevcut tiplerle checklist gibi okutmak) ayrı bir ailede kodlandı; bu `main` ağacında henüz yok. Dil 2 (isimli beş kontrol + dosya-toplamı→GL) **şimdilik açık** — `docs/04-status/REMAINING_WORK.md`. `closed` sonraki dilim.
 
 Ürünü pivot etmiyoruz. Direkt “checklist ekranı / closed status / yeni ajan” yazmıyoruz. Önce bu sözleşmeyi kilitle, sonra Sentinel’i kâğıt üzerinde yürüt, en son en küçük dilimi kodla.
 

@@ -1,5 +1,7 @@
 # Karar verilmiş ama üretilmemiş işler — çapraz doküman taraması
 
+**16 Eylül 2026: arşiv.** Bu envanter temizliği başlattı. Canlı kalan iş: `docs/04-status/REMAINING_WORK.md`. Bu dosya güncellenmez.
+
 *7 Eylül 2026. `main` + `claude/iron-ledger-review-cs3x9p` HEAD'i (`e41c2f2`) üzerinden.*
 *Amaç: `docs/` altındaki ~30 dosyayı tek tek okuyup üç soruyu ayırmak — (1) karar verilmiş ama hâlâ kod olmayan iş, (2) bilinçli olarak beklemeye alınmış iş, (3) doküman zaten kodu anlatmıyor / yalan söylüyor. Konsolidasyon öncesi envanter niyetiyle yazıldı — hangi dosyanın arşive gideceğine, hangisinin güncelleneceğine, hangisinin backlog'a gireceğine buradan karar verilebilir.*
 

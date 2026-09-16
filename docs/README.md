@@ -1,86 +1,36 @@
-# Month Proof Documentation
+# Month Proof — doküman haritası
 
-Welcome to the Month Proof documentation. This folder contains all project documentation organized by category.
+*16 Eylül 2026. Eski Nisan listeleri arşivde.*
 
-## 📁 Documentation Structure
+## Önce burası
 
-### 01-architecture/
-Technical architecture and system design documents.
+1. **Kalan iş** — [`04-status/REMAINING_WORK.md`](04-status/REMAINING_WORK.md)
+2. **Nasıl çalışır (kod)** — `01-architecture/` ve kök `AGENTS.md` / `CLAUDE.md`
+3. **Kilit sözleşme** — [`02-planning/close-flow-contract.md`](02-planning/close-flow-contract.md) (Dil 2 şimdilik açık)
 
-- `agent-flow.md` - AI agent workflow and processing pipeline
-- `api.md` - API endpoints and specifications
-- `db-schema.md` - Database schema and relationships
-- `design.md` - UI/UX design guidelines and component specs
-- `tech-stack.md` - Technology stack and dependencies
+## Canlı klasörler
 
-### 02-planning/
-Project plans, blueprints, and roadmaps.
+| Klasör | Ne için |
+|---|---|
+| `01-architecture/` | Ajan akışı, API, şema, tasarım, stack. Şüphede kod. |
+| `02-planning/` | `close-flow-contract.md`, `agentic-memory-roadmap.md` (Phase 1–3 kodda; dosya tarihsel). |
+| `04-status/` | Yalnız `REMAINING_WORK.md`. |
+| `05-guides/` | `runbook.md` — çalıştırma / deploy notları. |
+| `06-reports/` | `close-process-by-sector.md` — sektör araştırması. |
+| `sprint/` | Hâlâ referans: close triage, Kova 2 item planı, guardrail kilidi. Bitmiş pre-analysis arşivde. |
+| `demo_data/` | Redhawk, Riverbend ve diğer fixture’lar. |
+| `archive/` | Bitmiş, bayat veya yalan söyleyen dokümanlar. Silinmedi. |
 
-- `scope.md` - Project scope and requirements
-- `agentic-memory-roadmap.md` - Quarterly reporting and memory roadmap
-- `close-flow-contract.md` - Product contract to complete the close flow without pivoting (no code until this is locked)
+## Arşiv özeti
 
-### 03-sprint/
-Sprint planning and daily execution plans (hackathon days 1–6).
+- Hackathon Nisan durum/TODO: `archive/hackathon-april-2026/`
+- Hackathon günlük sprint + risks: `archive/03-sprint/`
+- Eski auditler: `archive/audits/`
+- Tamamlanmış pre-analysis: `archive/sprint-complete/`
+- Strateji / Upwork taslakları: `archive/strategy/`
 
-- `README.md` - Sprint overview
-- `completed.md` - Completed tasks
-- `risks.md` - Risk assessment and mitigation
-- `day-1-foundation.md` → `day-6-demo.md` - Daily sprint plans
-- `discovery-layer-plan.md` - Discovery layer implementation
+## Bakım
 
-### sprint/
-Post-hackathon planning (spec → approval → implementation).
-
-- `field-service-close-triage.md` - Triage of field-service close research against the current consolidator/classifier (no code until approved)
-- `pre-analysis-is-material.md` - Slice 1 pre-analysis: consolidator `_is_material` AND-gate (approval gate; not PAYROLL, not class-6)
-- `pre-analysis-orphan-policy.md` - GL-only / source-only policy (planning only; not the AND-gate PR)
-
-### 04-status/
-Current project status and TODO lists.
-
-- `CURRENT_STATUS.md` - Latest project status (English)
-- `YAPILACAKLAR.md` - Current TODO list (Turkish)
-
-### 05-guides/
-User guides and operational runbooks.
-
-- `runbook.md` - Operations and deployment guide
-- `onboarding-revision.md` - Developer onboarding guide
-
-### 06-reports/
-Analysis reports and findings.
-
-- `hackathon_findings_report.md` - Hackathon retrospective and findings
-- `close-process-by-sector.md` - Month-end close by industry; start with field services; how to complete the current close flow without pivoting the product
-- `pending-decisions-audit.md` - Cross-doc audit (7 Sep 2026): decided-but-unbuilt work, intentionally parked items, and stale/contradictory docs found while reading the whole `docs/` tree. Read this before archiving or merging any other doc listed here.
-
-### archive/
-Outdated or superseded documentation.
-
-- Old status reports
-- Previous execution plans
-- Legacy planning documents
-
-### demo_data/
-Sample data files for testing and demos.
-
----
-
-## 🚀 Quick Start
-
-1. **New to the project?** Start with `05-guides/onboarding-revision.md`
-2. **Need current status?** Check `04-status/CURRENT_STATUS.md`
-3. **Looking for architecture?** Browse `01-architecture/`
-4. **Planning new work?** Review `02-planning/implementation_blueprint.md`
-
-## 📝 Maintenance
-
-- Keep `04-status/` updated with current project state
-- Archive outdated plans to `archive/`
-- Update this README when adding new major documents
-- Use consistent naming: lowercase with hyphens (kebab-case)
-
----
-
-**Last Updated:** August 24, 2026
+- Kalan iş yalnızca `REMAINING_WORK.md` içinde güncellenir.
+- Bitmiş plan `archive/` altına `git mv` ile gider; silinmez.
+- `01-architecture/` kodla çelişirse kod doğrudur; mimari dosyayı sonra düzelt.

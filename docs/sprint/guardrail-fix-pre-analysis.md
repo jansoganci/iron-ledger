@@ -1,16 +1,18 @@
 # Guardrail Fix — Pre-Analysis
 
-**Status: design only. No code written. Awaiting explicit go-ahead.**
+**Durum 16 Eylül 2026.** Bu kilit belgesi. Stage 1 enforce + quarterly/Opus `strict=True` ayrı bir ailede kodlandı; bu `main` ağacında `ENFORCE_NARRATIVE_CONSISTENCY` hâlâ `False`. Canlı liste: `docs/04-status/REMAINING_WORK.md`.
+
+**Original status:** design only.
 
 Target: `backend/tools/guardrail.py` (CRITICAL per `CLAUDE.md`), plus the
 reference-building code in `backend/agents/interpreter.py` and the prompt files.
 
-Source findings: `docs/audit_results.md` Tour 1 §B and §E.1.
+Source findings: `docs/archive/audits/audit_results.md` Tour 1 §B and §E.1.
 
 ## Where this document lives, and why
 
 Written to `docs/sprint/guardrail-fix-pre-analysis.md` rather than appended to
-`docs/audit_results.md`.
+`docs/archive/audits/audit_results.md`.
 
 Two reasons. The audit file is a closed record — it ends with an explicit "Audit
 round closed" marker, and it documents *what is true of a snapshot*; amending it

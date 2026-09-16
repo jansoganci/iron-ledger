@@ -272,7 +272,7 @@ Bunların her biri başka sektörün düşük skorunun nedeni. Birini eklemek ka
 - [Numetix — Professional services accounting](https://www.numetix.ai/resources/professional-services-accounting-guide)
 - [The SaaS CFO — Deferred revenue](https://www.thesaascfo.com/deferred-revenue-saas/)
 - [Premier CS — Construction WIP reports](https://premiercs.com/blog/the-complete-guide-to-wip-reports-in-construction-accounting)
-- Repo içi: [docs/04-status/YAPILACAKLAR.md](../04-status/YAPILACAKLAR.md), [docs/archive/three_sector_demo_plan.md](../archive/three_sector_demo_plan.md), [backend/agents/consolidator.py](../../backend/agents/consolidator.py), [backend/agents/comparison.py](../../backend/agents/comparison.py)
+- Repo içi: [REMAINING_WORK.md](../04-status/REMAINING_WORK.md), [docs/archive/three_sector_demo_plan.md](../archive/three_sector_demo_plan.md), [backend/agents/consolidator.py](../../backend/agents/consolidator.py), [backend/agents/comparison.py](../../backend/agents/comparison.py)
 
 ---
 

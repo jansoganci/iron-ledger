@@ -1,5 +1,7 @@
 # Agentic Memory & Quarterly Reporting — Implementation Roadmap
 
+**Durum 16 Eylül 2026.** Phase 1–3 kodda var: `0009_add_report_type_and_quarterly.sql`, `quarterly.py`, `mark_quarterly_stale`. Bu dosya tarihsel plandır, kalan iş listesi değildir. Kalan iş: `docs/04-status/REMAINING_WORK.md`.
+
 **Source:** Merged from two independent deep-search analyses (Codex 5.3 and Sonnet 4.6) on 2026-04-26. Conflicts were resolved by reading the actual code; see Section 3.
 **Revision (2026-04-26, late):** Section 0 added after a code-walk uncovered the dual-background-task flow that both original analyses missed. Phase 2 was rewritten because `opus_upgrade.py` already implements the trend-context idea it originally proposed. See Section 3, Conflict F.
 **Revision (2026-04-26, final):** User confirmed decisions on all open questions:

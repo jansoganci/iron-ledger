@@ -1,5 +1,5 @@
 # Month Proof — Scope Document
-*Built with Opus 4.7 Hackathon — April 2026*
+*Hackathon MVP tanımı, Nisan 2026. Demo artık DRONE değil (Redhawk / Riverbend). Kalan iş: `docs/04-status/REMAINING_WORK.md`. Bu dosya 16 Eylül 2026’da arşive taşındı.*
 *v2 — US market focus, market data, and input list updated*
 
 ---
