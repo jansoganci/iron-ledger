@@ -35,6 +35,10 @@ REPORT_ALREADY_EXISTS = (
     "A report already exists for this period. "
     "Delete it explicitly first if you want to regenerate it."
 )
+REGENERATE_REQUIRED = (
+    "This period already has a verified report. "
+    "Confirm that you want to replace it before continuing."
+)
 NOT_FOUND = "No verified report found for this company and period."
 
 MAIL_FAILED = (

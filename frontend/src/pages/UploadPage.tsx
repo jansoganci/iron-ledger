@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
-import { apiFetch, RateLimitedError } from "../lib/api";
-import { monthsAgo } from "../lib/formatters";
+import { apiFetch, ApiError, RateLimitedError } from "../lib/api";
+import { formatPeriod, monthsAgo } from "../lib/formatters";
 import { FileUpload } from "../components/FileUpload";
 import { PeriodSelector } from "../components/PeriodSelector";
 import { LoadingProgress } from "../components/LoadingProgress";
@@ -50,6 +51,7 @@ interface TerminalFailureState {
 export default function UploadPage() {
   const toast = useToast();
   const { data: company } = useCompany();
+  const [searchParams] = useSearchParams();
 
   const [view, setView] = useState<PageView>("upload");
   const [period, setPeriod] = useState(monthsAgo(0));
@@ -64,6 +66,8 @@ export default function UploadPage() {
   const [guardrailState, setGuardrailState] = useState<GuardrailState | null>(null);
   const [terminalFailure, setTerminalFailure] =
     useState<TerminalFailureState | null>(null);
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [previewRegenerate, setPreviewRegenerate] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   // Track runs that have already been confirmed so we don't re-show preview on remount
@@ -77,6 +81,11 @@ export default function UploadPage() {
     queryFn: () => apiFetch<HasHistoryResponse>("/companies/me/has-history"),
     staleTime: 30_000,
   });
+
+  useEffect(() => {
+    const fromQuery = searchParams.get("period");
+    if (fromQuery) setPeriod(fromQuery);
+  }, [searchParams]);
 
   // Rate-limit countdown ticker
   useEffect(() => {
@@ -98,14 +107,26 @@ export default function UploadPage() {
   const cooldownActive = cooldownLeft > 0;
   const canSubmit = selectedFiles.length > 0 && !!period && !isUploading && !cooldownActive;
 
-  async function handleAnalyze() {
-    if (!canSubmit) return;
+  async function periodHasVerifiedReport(): Promise<boolean> {
+    if (!company?.id || !period) return false;
+    try {
+      await apiFetch(`/report/${company.id}/${period}`);
+      return true;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return false;
+      throw err;
+    }
+  }
+
+  async function startUpload(regenerate: boolean) {
+    if (selectedFiles.length === 0 || !period || cooldownActive) return;
     setIsUploading(true);
     setUploadError(null);
 
     const fd = new FormData();
     selectedFiles.forEach((f) => fd.append("files", f));
     fd.append("period", period);
+    fd.append("regenerate", regenerate ? "true" : "false");
 
     try {
       const res = await apiFetch<{ run_id: string }>("/upload", {
@@ -129,6 +150,36 @@ export default function UploadPage() {
     } finally {
       setIsUploading(false);
     }
+  }
+
+  async function handleAnalyze() {
+    if (!canSubmit) return;
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const exists = await periodHasVerifiedReport();
+      if (exists) {
+        setIsUploading(false);
+        setShowRegenerateModal(true);
+        return;
+      }
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Upload failed. Please try again.";
+      setUploadError(msg);
+      setIsUploading(false);
+      return;
+    }
+    await startUpload(false);
+  }
+
+  function handleRegenerateCancel() {
+    setShowRegenerateModal(false);
+  }
+
+  async function handleRegenerateConfirm() {
+    setShowRegenerateModal(false);
+    await startUpload(true);
   }
 
   function handleAwaitingMappingConfirmation(runId: string, draft: MappingDraft) {
@@ -173,9 +224,10 @@ export default function UploadPage() {
     setView("processing");
   }
 
-  function handleAwaitingConfirmation(runId: string, preview: ParsePreview) {
+  function handleAwaitingConfirmation(runId: string, preview: ParsePreview, regenerate: boolean) {
     if (confirmedRuns.has(runId)) return;
     setParsePreview(preview);
+    setPreviewRegenerate(regenerate);
     setView("preview");
   }
 
@@ -207,6 +259,7 @@ export default function UploadPage() {
     setTerminalFailure(null);
     setCurrentRunId(null);
     setParsePreview(null);
+    setPreviewRegenerate(false);
     setProcessingMode("default");
     setSelectedFiles([]);
     setUploadError(null);
@@ -252,6 +305,7 @@ export default function UploadPage() {
           <ParsePreviewPanel
             runId={currentRunId}
             preview={parsePreview}
+            regenerate={previewRegenerate}
             onConfirmed={handleConfirmed}
           />
         </div>
@@ -370,6 +424,55 @@ export default function UploadPage() {
             : "Analyze"}
         </button>
       </div>
+
+      {showRegenerateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4"
+          role="presentation"
+          onClick={handleRegenerateCancel}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="regenerate-title"
+            className="w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="regenerate-title" className="text-base font-semibold text-text-primary">
+              Replace the {formatPeriod(period)} report?
+            </h2>
+            <p className="text-sm text-text-secondary">
+              This month already has a verified report. If you continue, you will
+              review the new files first. After you confirm the preview, the
+              numbers change. If verification passes, this report is replaced.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleRegenerateCancel}
+                className={cn(
+                  "w-full sm:w-auto rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary",
+                  "hover:bg-neutral-100 transition-colors",
+                  "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+                )}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRegenerateConfirm}
+                className={cn(
+                  "w-full sm:w-auto rounded-md bg-accent px-4 py-2 text-sm font-medium text-white",
+                  "hover:bg-accent/90 transition-colors",
+                  "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+                )}
+              >
+                Replace this report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

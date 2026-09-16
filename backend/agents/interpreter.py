@@ -8,6 +8,7 @@ from backend.domain.contracts import NarrativeJSON, PandasSummary
 from backend.domain.entities import Anomaly, Report
 from backend.domain.errors import DuplicateEntryError, GuardrailError
 from backend.domain.ports import FileStorage, LLMClient, ReportsRepo, RunsRepo
+from backend.domain.regenerate import run_wants_regenerate
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
 from backend.tools.guardrail import verify_guardrail
@@ -316,7 +317,14 @@ class InterpreterAgent:
         # a failure here is persistence, not correctness — it gets its own
         # terminal state rather than being reported as a guardrail failure.
         # Unhandled, this used to strand the run in GENERATING forever.
+        # An existing monthly report is deleted only when this run carries
+        # explicit regenerate consent. write() itself stays insert-only.
         try:
+            run = self._runs.get_by_id(run_id)
+            if run_wants_regenerate(run):
+                self._reports.delete_monthly(
+                    str(pandas_summary.company_id), pandas_summary.period
+                )
             report = self._reports.write(
                 Report(
                     id=str(uuid.uuid4()),

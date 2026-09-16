@@ -1,6 +1,6 @@
 # Aynı dönemi yeniden üretme — pre-analysis
 
-**Durum:** yalnız plan. Onay yok, kod yok.
+**Durum:** onaylandı ve kodlandı. Onay kutusu uygulandı.
 
 **Aile:** takılı run / aynı `(şirket, ay)` ikinci kez kapanış. Dil 2 (checklist) ve Dil 3 (`closed`) değil.
 
@@ -155,8 +155,8 @@ Canlı LLM / `supabase db push` yok.
 
 ## Onay kutusu
 
-- [ ] Kilit tablo kabul
-- [ ] Guardrail-fail kenarı kabul (satır yeni, rapor eski, bayat)
-- [ ] Anomali replace bu dilimde
-- [ ] SQL yok kabul
-- [ ] Kod yok, ta ki bu kutu işaretlenene kadar
+- [x] Kilit tablo kabul
+- [x] Guardrail-fail kenarı kabul (satır yeni, rapor eski, bayat)
+- [x] Anomali replace bu dilimde
+- [x] SQL yok kabul
+- [x] Kod, bu kutu işaretlendikten sonra

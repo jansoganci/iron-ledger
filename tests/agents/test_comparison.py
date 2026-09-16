@@ -360,7 +360,7 @@ def _make_agent(prior_flag_counts: dict[str, int]) -> ComparisonAgent:
     companies_repo.get_by_id.return_value = {"monthly_revenue_band": None}
 
     anomalies_repo.list_account_flag_counts_before.return_value = prior_flag_counts
-    anomalies_repo.write_many.return_value = None
+    anomalies_repo.replace_period.return_value = None
     runs_repo.get_by_id.return_value = {"status": "comparing"}
     runs_repo.update_status.return_value = None
     runs_repo.set_pandas_summary.return_value = None
@@ -378,7 +378,7 @@ def test_recurrence_suffix_appended_when_prior_count_is_2() -> None:
     agent = _make_agent({ACCT_ID: 2})
     agent.run("run-1", COMPANY_ID, PERIOD)
 
-    written: list = agent._anomalies.write_many.call_args[0][0]
+    written: list = agent._anomalies.replace_period.call_args[0][2]
     assert len(written) == 1
     assert (
         "Flagged in 2 of the past 6 months — recurring pattern."
@@ -390,7 +390,7 @@ def test_recurrence_suffix_appended_when_prior_count_exceeds_2() -> None:
     agent = _make_agent({ACCT_ID: 4})
     agent.run("run-1", COMPANY_ID, PERIOD)
 
-    written: list = agent._anomalies.write_many.call_args[0][0]
+    written: list = agent._anomalies.replace_period.call_args[0][2]
     assert (
         "Flagged in 4 of the past 6 months — recurring pattern."
         in written[0].description
@@ -401,7 +401,7 @@ def test_recurrence_suffix_not_appended_when_prior_count_is_1() -> None:
     agent = _make_agent({ACCT_ID: 1})
     agent.run("run-1", COMPANY_ID, PERIOD)
 
-    written: list = agent._anomalies.write_many.call_args[0][0]
+    written: list = agent._anomalies.replace_period.call_args[0][2]
     assert "recurring pattern" not in written[0].description
 
 
@@ -409,7 +409,7 @@ def test_recurrence_suffix_not_appended_when_no_prior_flags() -> None:
     agent = _make_agent({})
     agent.run("run-1", COMPANY_ID, PERIOD)
 
-    written: list = agent._anomalies.write_many.call_args[0][0]
+    written: list = agent._anomalies.replace_period.call_args[0][2]
     assert "recurring pattern" not in written[0].description
 
 

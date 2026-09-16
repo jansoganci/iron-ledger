@@ -20,6 +20,7 @@ from backend.domain.errors import (
     RLSForbiddenError,
     TransientIOError,
 )
+from backend.domain.regenerate import attach_regenerate_flag, run_wants_regenerate
 from backend.domain.run_state_machine import RunStatus
 from backend.logger import get_logger
 
@@ -264,6 +265,20 @@ class SupabaseAnomaliesRepo:
         except Exception as exc:
             raise _wrap_db(exc) from exc
 
+    def replace_period(
+        self,
+        company_id: str,
+        period: date,
+        anomalies: list[Anomaly],
+    ) -> None:
+        try:
+            self._db.table("anomalies").delete().eq("company_id", company_id).eq(
+                "period", str(period)
+            ).execute()
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        self.write_many(anomalies)
+
     def list_account_flag_counts_before(
         self,
         company_id: str,
@@ -318,6 +333,7 @@ class SupabaseReportsRepo:
                 .select("*")
                 .eq("company_id", company_id)
                 .eq("period", str(period))
+                .eq("report_type", "monthly")
                 .limit(1)
                 .execute()
             )
@@ -401,6 +417,19 @@ class SupabaseReportsRepo:
             self._db.table("reports").delete().eq("company_id", company_id).eq(
                 "report_type", "quarterly"
             ).eq("year", year).eq("quarter", quarter).execute()
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+
+    def delete_monthly(self, company_id: str, period: date) -> None:
+        """Delete the monthly report for this period. Idempotent.
+
+        Does not touch quarterly rows. company_id is always the caller-resolved
+        tenant — never taken from a client-supplied report body.
+        """
+        try:
+            self._db.table("reports").delete().eq("company_id", company_id).eq(
+                "report_type", "monthly"
+            ).eq("period", str(period)).execute()
         except Exception as exc:
             raise _wrap_db(exc) from exc
 
@@ -600,8 +629,32 @@ class SupabaseRunsRepo:
             raise _wrap_db(exc) from exc
 
     def set_parse_preview(self, run_id: str, preview: dict) -> None:
+        payload = dict(preview)
+        try:
+            current = self.get_by_id(run_id)
+            payload = attach_regenerate_flag(
+                payload, regenerate=run_wants_regenerate(current)
+            )
+        except Exception:
+            pass
         body = {
-            "parse_preview": preview,
+            "parse_preview": payload,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        try:
+            _with_retry(
+                lambda: self._db.table("runs").update(body).eq("id", run_id).execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+
+    def set_regenerate(self, run_id: str, regenerate: bool) -> None:
+        run = self.get_by_id(run_id)
+        payload = attach_regenerate_flag(
+            run.get("parse_preview"), regenerate=regenerate
+        )
+        body = {
+            "parse_preview": payload,
             "updated_at": datetime.utcnow().isoformat(),
         }
         try:

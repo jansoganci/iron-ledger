@@ -70,6 +70,7 @@ interface RunStatusResponse {
   parse_preview: ParsePreview | null;
   mapping_draft: MappingDraft | null;
   discovery_plan: DiscoveryPlanPayload | null;
+  regenerate: boolean;
 }
 
 export interface MappingDraftItem {
@@ -105,7 +106,7 @@ interface LoadingProgressProps {
   period: string;
   processingMode?: "default" | "post-discovery";
   onGuardrailFailed: (runId: string, rawDataUrl: string | null, errorMessage: string | null) => void;
-  onAwaitingConfirmation?: (runId: string, preview: ParsePreview) => void;
+  onAwaitingConfirmation?: (runId: string, preview: ParsePreview, regenerate: boolean) => void;
   onAwaitingMappingConfirmation?: (runId: string, draft: MappingDraft) => void;
   onAwaitingDiscoveryConfirmation?: (
     runId: string,
@@ -231,7 +232,7 @@ export function LoadingProgress({
       return;
     }
     if (status === "awaiting_confirmation" && parse_preview) {
-      onAwaitingConfirmation?.(runId, parse_preview);
+      onAwaitingConfirmation?.(runId, parse_preview, Boolean(data.regenerate));
       return;
     }
     if (TERMINAL_FAILED.has(status)) {
