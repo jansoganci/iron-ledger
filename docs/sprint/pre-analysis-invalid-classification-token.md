@@ -1,14 +1,11 @@
 # Pre-analysis — Invalid classification token (“uydurma sınıf”)
 
-Status: analysis only. No code in this change.
-Date: 2026-09-16.
-Parent: `docs/sprint/test-plan-full-product.md` C.0c / gap 7b;
-`docs/06-reports/pending-decisions-audit.md` §1.5.
-Checkout: `main` (this branch is documentation only).
+**SONUÇ: implementation landed on this branch, 16 September 2026.** Six-class
+Literal unchanged. Unknown tokens are dropped at `NarrativeJSON`. Interpreter
+retries schema errors like Discovery. Match-carrying accounts are omitted from
+the class dict in both monthly prompts. `guardrail.py` untouched.
 
-Process: (1) this pre-analysis → approval, (2) implementation as one piece,
-(3) verification vs this file. Do not start coding until this document is
-approved.
+*Originally planning only. Implementation follows the locked choices in §10.*
 
 ---
 
