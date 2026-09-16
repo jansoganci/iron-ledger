@@ -1,6 +1,6 @@
 # Pre-analysis — Close checklist (raporu kapanış listesine çevir)
 
-Status: analysis only. No product code in this change.
+Status: Slice 1 implemented. Slice 2 not started.
 Date: 2026-09-16.
 Parent: `docs/02-planning/close-flow-contract.md`;
 `docs/06-reports/close-process-by-sector.md` §5;
@@ -269,15 +269,27 @@ Not this family.
 Reply with yes/no per row. Implementation of a slice starts only when that
 slice is locked.
 
-- [ ] This is **two slices**, not “add closed + checklist in one job.”
-- [ ] Slice 1: regroup existing cards + bank sentence + Verified copy.
+- [x] This is **two slices**, not “add closed + checklist in one job.”
+- [x] Slice 1: regroup existing cards + bank sentence + Verified copy.
       No new file types. No `closed`. No SQL.
 - [ ] Slice 2: named five controls + file-total→GL map, **after** 1.
-- [ ] Demo fixture for slice 1 is **Redhawk**, not restoring Sentinel binaries.
-- [ ] Do not reopen materiality, coverage/`missing_je`, or a 7th class.
-- [ ] Do not ask Claude to calculate N of M.
-- [ ] No live SQL / deploy in these slices.
+- [x] Demo fixture for slice 1 is **Redhawk**, not restoring Sentinel binaries.
+- [x] Do not reopen materiality, coverage/`missing_je`, or a 7th class.
+- [x] Do not ask Claude to calculate N of M.
+- [x] No live SQL / deploy in these slices.
 
 If slice 1 is “no,” say whether we skip this family and take duplicate-period
 re-run instead (stuck runs vs. wrong screen).
 If slice 2 is “no,” slice 1 still ships a honest page for the types we have.
+
+---
+
+## SONUÇ — Slice 1
+
+Counts live in `backend/tools/tie_out_summary.py` (uploaded filenames vs
+exception cards). GET `/report` adds `tie_out_summary` and `tie_out_group`.
+The report page leads with that summary, then exceptions by Payroll /
+Vendors / Contracts / Other, then coverage, then narrative, then a
+session-only bank checkbox. “Numbers verified” is not “period closed.”
+Excel recon sheet carries the same bank sentence. No `closed` state, no
+SQL, no install/fuel types.

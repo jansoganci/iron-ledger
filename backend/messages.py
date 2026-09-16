@@ -79,3 +79,8 @@ DISCOVERY_REJECTED = (
 
 COMPANY_CREATE_FAILED = "We couldn't create your workspace. Please try again."
 COMPANY_UPDATE_FAILED = "We couldn't save your company details. Please try again."
+
+BANK_OUTSIDE_ATTESTATION = (
+    "Bank and card reconciliation is done outside Month Proof. "
+    "This report does not confirm it."
+)

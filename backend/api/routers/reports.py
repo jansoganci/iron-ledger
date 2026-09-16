@@ -14,6 +14,7 @@ from backend.api.deps import (
     get_reports_repo,
 )
 from backend.api.rate_limit import limiter
+from backend.tools.tie_out_summary import build_tie_out_summary, group_for_item
 
 router = APIRouter()
 
@@ -190,6 +191,17 @@ async def get_report(
     except Exception:
         financials = None
 
+    source_files = [Path(e.source_file).name for e in entries if e.source_file]
+    recon_items = list(report.reconciliations or [])
+    tie_out_summary = build_tie_out_summary(source_files, recon_items)
+    reconciliations = []
+    for item in recon_items:
+        if not isinstance(item, dict):
+            continue
+        row = dict(item)
+        row["tie_out_group"] = group_for_item(row)
+        reconciliations.append(row)
+
     return {
         "report_id": report.id,
         "company_id": report.company_id,
@@ -201,8 +213,9 @@ async def get_report(
         "is_stale": is_stale,
         "opus_upgraded": report.opus_upgraded,
         "anomalies": anomaly_list,
-        "reconciliations": report.reconciliations or [],
+        "reconciliations": reconciliations,
         "financials": financials,
+        "tie_out_summary": tie_out_summary,
     }
 
 
