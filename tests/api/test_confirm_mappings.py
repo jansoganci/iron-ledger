@@ -18,6 +18,23 @@ app.dependency_overrides[get_company_id] = lambda: "co-1"
 client = TestClient(app, raise_server_exceptions=False)
 
 
+@pytest.fixture(autouse=True)
+def _override_auth():
+    previous_user = app.dependency_overrides.get(get_current_user)
+    previous_company = app.dependency_overrides.get(get_company_id)
+    app.dependency_overrides[get_current_user] = lambda: "user-1"
+    app.dependency_overrides[get_company_id] = lambda: "co-1"
+    yield
+    if previous_user is not None:
+        app.dependency_overrides[get_current_user] = previous_user
+    else:
+        app.dependency_overrides.pop(get_current_user, None)
+    if previous_company is not None:
+        app.dependency_overrides[get_company_id] = previous_company
+    else:
+        app.dependency_overrides.pop(get_company_id, None)
+
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------

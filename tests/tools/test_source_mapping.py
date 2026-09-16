@@ -57,15 +57,17 @@ def test_remembered_match_skips_review() -> None:
     assert items[0].origin == "remembered"
     assert items[0].suggested_gl_account == "Equipment COGS"
     assert not needs_user_review(items)
-    assert remembered_decisions(items) == {
-        "AlarmTech Industries": "Equipment COGS"
-    }
+    assert remembered_decisions(items) == {"AlarmTech Industries": "Equipment COGS"}
 
 
 def test_haiku_none_with_saved_row_is_remembered() -> None:
     stored = {("supplier_invoices", "Electricity"): "Utilities"}
     items = annotate_draft_items(
-        [_item(source_pattern="Electricity", suggested_gl_account=None, confident=False)],
+        [
+            _item(
+                source_pattern="Electricity", suggested_gl_account=None, confident=False
+            )
+        ],
         stored,
     )
     assert items[0].origin == "remembered"

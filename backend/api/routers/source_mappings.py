@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -67,9 +65,7 @@ async def update_source_mapping(
     if not gl_account:
         raise HTTPException(status_code=400, detail=messages.MAPPING_GL_REQUIRED)
     try:
-        updated = get_source_mappings_repo().update(
-            company_id, mapping_id, gl_account
-        )
+        updated = get_source_mappings_repo().update(company_id, mapping_id, gl_account)
     except RLSForbiddenError as exc:
         raise HTTPException(status_code=403, detail=messages.FORBIDDEN) from exc
     if updated is None:

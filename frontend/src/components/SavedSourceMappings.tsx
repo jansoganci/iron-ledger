@@ -52,11 +52,10 @@ export function SavedSourceMappings() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["source-mappings"] });
-      toast.push("success", "Saved name updated");
+      toast.success("Saved name updated");
     },
     onError: (err: unknown) => {
-      toast.push(
-        "error",
+      toast.error(
         "Could not update that name",
         err instanceof Error ? err.message : undefined
       );
@@ -69,11 +68,10 @@ export function SavedSourceMappings() {
     onSuccess: () => {
       setPendingDeleteId(null);
       queryClient.invalidateQueries({ queryKey: ["source-mappings"] });
-      toast.push("success", "Saved name removed");
+      toast.success("Saved name removed");
     },
     onError: (err: unknown) => {
-      toast.push(
-        "error",
+      toast.error(
         "Could not remove that name",
         err instanceof Error ? err.message : undefined
       );

@@ -9,9 +9,7 @@ from backend.domain.run_state_machine import RunStateMachine, RunStatus
 
 
 def test_parsing_to_applying_mapping_valid() -> None:
-    result = RunStateMachine.transition(
-        RunStatus.PARSING, RunStatus.APPLYING_MAPPING
-    )
+    result = RunStateMachine.transition(RunStatus.PARSING, RunStatus.APPLYING_MAPPING)
     assert result == RunStatus.APPLYING_MAPPING
 
 
