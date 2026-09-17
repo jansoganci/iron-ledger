@@ -16,7 +16,10 @@ from backend.domain.errors import (
 from backend.domain.ports import FileStorage, LLMClient, ReportsRepo, RunsRepo
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
-from backend.tools.guardrail import verify_guardrail
+from backend.tools.guardrail import (
+    collect_reconciliation_reference_values,
+    verify_guardrail,
+)
 
 logger = get_logger(__name__)
 
@@ -462,70 +465,7 @@ class InterpreterAgent:
         # which differ from the consolidated pandas_summary total ($10,920 = GL + dept).
         # Passing these as extra reference values prevents false guardrail failures in
         # multi-file runs without weakening the check for single-file variance analysis.
-        recon_values: list[float] = []
-        for item in reconciliations or []:
-            for field in ("gl_amount", "non_gl_total", "delta"):
-                v = item.get(field)
-                if v is not None:
-                    recon_values.append(float(v))
-                    recon_values.append(float(abs(v)))
-            # implied_monthly lives on the nested hints object
-            # (ReconciliationHints), NOT on the item itself — reading
-            # item.get("implied_monthly") would be a silent no-op. Pandas
-            # derived: max(|GL|, |source|) / 12, set only when
-            # looks_like_annual_prepayment is true.
-            hints = item.get("hints") or {}
-            if isinstance(hints, dict):
-                implied_monthly = hints.get("implied_monthly")
-                if implied_monthly is not None:
-                    recon_values.append(float(implied_monthly))
-                    recon_values.append(float(abs(implied_monthly)))
-            # Item 1: every pandas number Claude is allowed to copy from a
-            # nested BatchMatch must be a verified reference, or a correct
-            # narrative fails the guardrail. fee_pct is deliberately ABSENT —
-            # it is an internal gate (E.1), it is a percentage rather than
-            # money, and putting it in this money pool is exactly the
-            # mixed-unit bug the guardrail fix removed.
-            for match in item.get("matches") or []:
-                if not isinstance(match, dict):
-                    match = getattr(match, "model_dump", dict)()
-                for money_field in ("gross", "fee", "net", "gl_amount"):
-                    v = match.get(money_field)
-                    if v is not None:
-                        recon_values.append(float(v))
-                        recon_values.append(float(abs(v)))
-                # A count, not money. Claude may copy it ("2 candidates"), so it
-                # must be a reference; at cent tolerance it is a point value and
-                # cannot widen anything.
-                candidate_count = match.get("candidate_count")
-                if candidate_count is not None:
-                    recon_values.append(float(candidate_count))
-            # Item 4: roster counts are point values (R.8) — integers and
-            # money sums, never a ratio. No churn %, no "3 of 85" percentage
-            # may ever enter this pool.
-            if isinstance(hints, dict):
-                for roster_field in (
-                    "n_active",
-                    "n_billed_in_period",
-                    "count_delta",
-                    "fee_sum_active",
-                    "fee_sum_billed",
-                    "fee_gap",
-                ):
-                    v = hints.get(roster_field)
-                    if v is not None:
-                        recon_values.append(float(v))
-                        recon_values.append(float(abs(v)))
-            for count_field in (
-                "unmatched_count",
-                "unmatched_processor_count",
-                "unmatched_bank_count",
-            ):
-                v = item.get(count_field)
-                if v is not None:
-                    recon_values.append(float(v))
-            for src in item.get("sources", []):
-                recon_values.append(float(src.get("amount", 0)))
+        recon_values = collect_reconciliation_reference_values(reconciliations)
 
         last_message = ""
         last_was_schema = False

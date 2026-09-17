@@ -206,10 +206,16 @@ class QuarterlyAgent:
             aggregated_summary["q_total_opex"] = q_total_opex
             aggregated_summary["q_gross_profit"] = q_gross_profit
             aggregated_summary["q_avg_gross_margin"] = q_gross_margin
+            aggregated_summary["months_present"] = float(len(runs_data))
+            aggregated_summary["months_in_quarter"] = 3.0
+            aggregated_summary["reporting_year"] = float(year)
+            aggregated_summary["prior_year"] = float(year - 1)
+            aggregated_summary["reporting_quarter"] = float(quarter)
 
-            # Month-over-month growth for adjacent available pairs
+            # Month-over-month growth for adjacent available pairs.
+            # Named *_pct keys so flatten_summary_by_unit puts them in the
+            # percent pool. A list would be skipped by the walker.
             sorted_periods = sorted(runs_data.keys())
-            mom_revenue_growth = []
             for i in range(1, len(sorted_periods)):
                 prev_period = sorted_periods[i - 1]
                 curr_period = sorted_periods[i]
@@ -221,9 +227,8 @@ class QuarterlyAgent:
 
                 if prev_rev != 0:
                     growth_pct = ((curr_rev - prev_rev) / abs(prev_rev)) * 100
-                    mom_revenue_growth.append(round(growth_pct, 2))
-
-            aggregated_summary["q_mom_revenue_growth"] = mom_revenue_growth
+                    key = f"mom_{curr_label}_vs_{prev_label}_revenue_pct"
+                    aggregated_summary[key] = round(growth_pct, 2)
 
             # YoY deltas (only if prior-year quarter has ≥2 months)
             yoy_deltas = None
@@ -318,6 +323,7 @@ class QuarterlyAgent:
             success, message = verify_guardrail(
                 claude_json=result.model_dump(),
                 pandas_summary=aggregated_summary,
+                strict=True,
             )
 
             if not success:

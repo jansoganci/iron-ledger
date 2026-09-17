@@ -325,11 +325,11 @@ Take the completed Redhawk report from Section B.
 | E4 | Look for arithmetic in the prose | The narrative never *derives* a number. No "3,825 minus 3,540", no "which is 7.5% of", no computed ratio | **PASS.** None of `minus`, `subtract`, `which is`, `divided by`, `times` occur. Consistent with D4: the narrative gives both sides rather than a difference. |
 | E5 | Check `fee_pct` | The string `fee_pct` appears **nowhere** in the report payload, and no fee percentage appears in the prose | **PASS.** `fee_pct` absent from the entire serialized report; no `%` anywhere in the prose. |
 
-**Note on E2.** Narrative-vs-`numbers_used` consistency is currently
-**warn-only** — `ENFORCE_NARRATIVE_CONSISTENCY = False` in
-`backend/tools/guardrail.py`. A violation is **logged, not blocked**. Check the
-backend log for `guardrail_narrative_unlisted_number` and report the count; that
-measurement is the reason the flag is still off.
+**Note on E2.** Narrative-vs-`numbers_used` consistency is **enforced** —
+`ENFORCE_NARRATIVE_CONSISTENCY = True` in `backend/tools/guardrail.py`. A
+prose `$` or `%` figure absent from `numbers_used` fails the monthly report.
+The measurement window (this row: 0 violations on run `cc19d60d`) is what
+justified the flip. See `docs/sprint/pre-analysis-guardrail-second-gate.md`.
 
 ---
 
@@ -369,8 +369,11 @@ measurement is the reason the flag is still off.
    bypasses RLS so the backend is unaffected, but any direct
    anon/authenticated read of that table returns zero rows. Flag if the
    frontend ever needs to read it directly.
-5. **Narrative consistency is warn-only** (E2). Record the violation count
-   rather than treating a log line as a failure.
+5. ~~**Narrative consistency is warn-only** (E2). Record the violation count
+   rather than treating a log line as a failure.~~ **RESOLVED (2026-09-16).**
+   `ENFORCE_NARRATIVE_CONSISTENCY = True`. Quarterly and Opus now pass
+   `strict=True` after copy-only pandas/prompt work. See
+   `docs/sprint/pre-analysis-guardrail-second-gate.md`.
 6. ~~**`export.xlsx` is broken for every user (found 5 Sep).**~~ **RESOLVED.** The handler passed a company id to `get_by_owner`, which expects an owner id → `RLSForbiddenError` → 403. Now uses `Depends(get_cached_company)`. B8/B9 both pass live. Detail in E.0.
 7. ~~**Item 1's fixtures cannot be uploaded through the product.**~~ **RESOLVED** by `docs/demo_data/riverbend/`. Item 1 verified live end to end on 5 Sep, run `c0f269d6` — 6 matches, all C1-C11 outcomes correct. Detail in C.0c.
 7b. ~~**An invalid classification token from Claude kills the run, intermittently (found 5 Sep).**~~ **RESOLVED.** Unknown `reconciliation_classifications` values are dropped at `NarrativeJSON`; pandas residue / hints fill the gap. Schema errors retry once like Discovery. Exhausted schema retries stay in `guardrail_failed` with `messages.NARRATIVE_SCHEMA_FAILED`, not `INTERNAL_ERROR`. Six classes only — `exception_three_way_matches` was never added. Detail in `docs/sprint/pre-analysis-invalid-classification-token.md`.
