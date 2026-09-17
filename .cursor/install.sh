@@ -22,6 +22,4 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt
 
 # --- Node dependencies -----------------------------------------------------
-# Root package.json provides `concurrently` for `npm run dev`.
-npm install
-npm --prefix frontend install
+
