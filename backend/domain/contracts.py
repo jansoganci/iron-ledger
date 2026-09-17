@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import logging
 from datetime import date
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 ReconciliationClassification = Literal[
     "timing_cutoff",
@@ -14,6 +15,10 @@ ReconciliationClassification = Literal[
     "accrual_mismatch",
     "structural_explained",
 ]
+ALLOWED_RECONCILIATION_CLASSIFICATIONS: frozenset[str] = frozenset(
+    get_args(ReconciliationClassification)
+)
+_logger = logging.getLogger(__name__)
 
 SourceFileType = Literal[
     "general_ledger",
@@ -73,6 +78,38 @@ class NarrativeJSON(BaseModel):
     reconciliation_classifications: dict[str, ReconciliationClassification] | None = (
         None
     )
+
+    @field_validator("reconciliation_classifications", mode="before")
+    @classmethod
+    def drop_unknown_classification_tokens(cls, value: object) -> object:
+        """Drop invented class tokens so the six-class Literal stays closed.
+
+        Claude's class is advisory. Pandas residue and hints overwrite it on
+        match, coverage, fee, deposit, annual, and roster-gap cards. An unknown
+        string must not kill the run before that merge runs.
+        """
+        if value is None or not isinstance(value, dict):
+            return value
+        cleaned: dict[str, object] = {}
+        dropped_accounts: list[str] = []
+        dropped_tokens: list[str] = []
+        for account, token in value.items():
+            if token in ALLOWED_RECONCILIATION_CLASSIFICATIONS:
+                cleaned[account] = token
+            else:
+                dropped_accounts.append(str(account))
+                dropped_tokens.append(str(token))
+        if dropped_tokens:
+            _logger.warning(
+                "invalid classification token dropped",
+                extra={
+                    "event": "invalid_classification_token",
+                    "dropped_count": len(dropped_tokens),
+                    "accounts": dropped_accounts,
+                    "tokens": dropped_tokens,
+                },
+            )
+        return cleaned
 
 
 class MappingOutput(BaseModel):

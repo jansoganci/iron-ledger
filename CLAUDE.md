@@ -196,6 +196,7 @@ On 429: `Retry-After` header + JSON body with `messages.RATE_LIMITED`. Frontend 
 | `DuplicateEntryError` | `EntriesRepo` on unique-constraint violation | Never | 409 |
 | `RLSForbiddenError` | Any repo when RLS denies the row | Never | 403 |
 | `GuardrailError` | Interpreter use case, after semantic retry | Never | surfaces as `guardrail_failed` run status, not a 5xx |
+| `NarrativeSchemaError` | Interpreter use case, after schema retry | Never | surfaces as `guardrail_failed` with `NARRATIVE_SCHEMA_FAILED`, not a number-mismatch message |
 | `InvalidRunTransition` | `RunStateMachine.transition()` | Never — programmer error | 500 |
 | `FileHasNoValidColumns` | Parser after PII sanitization | Never | 422 |
 | `MappingAmbiguous` | Parser/category mapping | User confirmation | 422 when it reaches the API handler |

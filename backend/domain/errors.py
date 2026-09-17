@@ -17,6 +17,15 @@ class GuardrailError(Exception):
     """Interpreter produced numbers not in PandasSummary after 2 attempts."""
 
 
+class NarrativeSchemaError(Exception):
+    """Narrative JSON failed schema validation after semantic retry.
+
+    Distinct from GuardrailError: the numbers were never checked. Surfaces
+    as guardrail_failed so Retry Analysis still works, with a different
+    user message.
+    """
+
+
 class InvalidRunTransition(Exception):
     """RunStateMachine.transition() called with an illegal state move."""
 

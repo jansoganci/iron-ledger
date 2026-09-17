@@ -39,7 +39,7 @@ Somut olarak eksik olan (§5'te tanımlı):
 
 ### 1.5 "exception_three_way_matches" — invalid classification token bug
 **Kaynak:** `docs/sprint/test-plan-full-product.md` gap #7b, bu oturumda kullanıcı tarafından da doğrulandı.
-**Durum:** Bu depoda (`e41c2f2` HEAD) **hâlâ açık** — commit geçmişinde bir düzeltme yok. Kullanıcı bunu **kendi makinesinde** çözdüğünü ama commit/push etmediğini belirtti; bu uzak oturumun çalışma kopyasında değişiklik yok (`git status` temiz, `git log` içinde ilgili bir commit yok). Yani: iki farklı yerde iki farklı durum var — local'de çözüm var, bu repo'da (ve GitHub'da) yok. Push edilene kadar "çözüldü" sayılmamalı.
+**Durum:** Düzeltme `docs/sprint/pre-analysis-invalid-classification-token.md` kilidiyle kodlandı. Yedinci sınıf eklenmedi. Bilinmeyen token `NarrativeJSON`'da düşülüyor; interpreter şema hatasında Discovery gibi bir kez daha deniyor. `main`'e merge edilene kadar canlı proje hâlâ eski davranışı gösterir.
 
 ---
 
