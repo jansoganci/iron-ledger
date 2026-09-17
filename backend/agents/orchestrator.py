@@ -24,6 +24,14 @@ from backend.domain.errors import DiscoveryLowConfidence
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
 from backend.tools.file_type import FILE_TYPE_PATTERNS, detect_file_type
+from backend.tools.source_mapping import (
+    annotate_draft_items,
+    auto_map_payroll,
+    index_stored,
+    is_payroll,
+    needs_user_review,
+    remembered_decisions,
+)
 
 # Tests still import these aliases from orchestrator.
 _FILE_TYPE_PATTERNS = FILE_TYPE_PATTERNS
