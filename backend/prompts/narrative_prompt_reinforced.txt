@@ -55,7 +55,7 @@ Classification taxonomy — pick the ONE that best fits based on the hints provi
 
 THREE-WAY CASH MATCHES (only when a reconciliation item has a non-empty "matches" list)
 
-Each nested match already carries a classification set by Python. Do not choose it, do not contradict it, and do not drop these findings on a retry. Copy gross, fee, net, gl_amount, settlement_date and candidate_count verbatim from the match.
+Each nested match already carries a classification set by Python. Do not choose it, do not contradict it, and do not drop these findings on a retry. Copy gross, fee, net, gl_amount, settlement_date and candidate_count verbatim from the match. Do NOT add that account to reconciliation_classifications — omit it the same way you omit coverage accounts.
 
 Forbidden: subtracting gross minus net; writing any fee percentage ("4.5%", "about 4%"); approximating a count ("about 2"); naming a processor or vendor rate; inventing a batch, date or amount not on the match.
 
@@ -72,8 +72,19 @@ Hard rules for reconciliation findings:
 - Every dollar amount in the reconciliation narrative must appear in numbers_used.
 - Do not classify if no reconciliations are provided — omit the section entirely.
 - Do not speculate beyond what the hints support. If unsure on an exception item, default to missing_je. Never default a coverage / is_gl_only item to missing_je.
-- One finding per exception item only — omit coverage / is_gl_only accounts from reconciliation_classifications. You may mention them in the narrative as not compared against a supporting file.
+- One finding per exception item only — omit coverage / is_gl_only accounts from reconciliation_classifications. Also omit accounts with a non-empty "matches" list. You may mention coverage accounts in the narrative as not compared against a supporting file.
 - If card_kind is "coverage" or the is_gl_only hint is true, do not assign a classification.
+
+Classification vocabulary — these six tokens are the ONLY permitted values for reconciliation_classifications. Copy one verbatim. They are snake_case identifiers, not descriptions: write missing_je, never "missing journal entry"; write accrual_mismatch, never "accrual mismatch". Any other string is dropped.
+
+  timing_cutoff
+  categorical_misclassification
+  missing_je
+  stale_reference
+  accrual_mismatch
+  structural_explained
+
+Do not invent a seventh class.
 
 ---
 
@@ -92,9 +103,9 @@ Return ONLY valid JSON — no prose outside the JSON:
   "narrative": "<Part 1 variance commentary + Part 2 reconciliation findings if applicable>",
   "numbers_used": [<every number you mentioned, as float, verbatim from pandas_summary and reconciliations>],
   "reconciliation_classifications": {
-    "<account name exactly as it appears in reconciliations[].account>": "<classification string from the taxonomy above>",
-    "...one entry per exception item only — omit coverage / is_gl_only accounts..."
+    "<account name exactly as it appears in reconciliations[].account>": "<one of the six tokens above, verbatim>",
+    "...one entry per exception item only — omit coverage / is_gl_only accounts and omit accounts with a non-empty matches list..."
   }
 }
 
-If reconciliations is empty, set reconciliation_classifications to {}.
+If reconciliations is empty, set reconciliation_classifications to {}. Omit coverage accounts and accounts with a non-empty matches list from reconciliation_classifications.

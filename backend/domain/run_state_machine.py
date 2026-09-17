@@ -37,6 +37,7 @@ _ALLOWED: dict[RunStatus, frozenset[RunStatus]] = {
         {
             RunStatus.DISCOVERING,
             RunStatus.AWAITING_MAPPING_CONFIRMATION,
+            RunStatus.APPLYING_MAPPING,
             RunStatus.AWAITING_CONFIRMATION,
             RunStatus.PARSING_FAILED,
         }

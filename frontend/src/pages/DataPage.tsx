@@ -16,6 +16,7 @@ import { apiFetch } from "../lib/api";
 import { formatCurrency, formatPeriod, formatVariance } from "../lib/formatters";
 import { cn } from "../lib/utils";
 import { exportToCSV } from "../lib/exportCSV";
+import { SavedSourceMappings } from "../components/SavedSourceMappings";
 
 interface DataEntry {
   period: string;
@@ -67,6 +68,7 @@ export default function DataPage() {
   );
   const [selectedMonth, setSelectedMonth] = useState(initialMonth || "all");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"entries" | "saved-names">("entries");
   const [sorting, setSorting] = useState<SortingState>([
     { id: "period", desc: true },
   ]);
@@ -235,10 +237,48 @@ export default function DataPage() {
         <div>
           <h1 className="text-lg font-semibold text-text-primary">Data</h1>
           <p className="text-sm text-text-secondary mt-1">
-            {company?.name ? `${company.name} · ` : ""}View all uploaded financial data
+            {company?.name ? `${company.name} · ` : ""}
+            {activeTab === "saved-names"
+              ? "Saved vendor and expense names used at upload"
+              : "View all uploaded financial data"}
           </p>
         </div>
 
+        <div role="tablist" aria-label="Data views" className="flex gap-2">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "entries"}
+            onClick={() => setActiveTab("entries")}
+            className={cn(
+              "px-3 py-1.5 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+              activeTab === "entries"
+                ? "bg-accent text-white"
+                : "bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-canvas"
+            )}
+          >
+            Entries
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "saved-names"}
+            onClick={() => setActiveTab("saved-names")}
+            className={cn(
+              "px-3 py-1.5 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+              activeTab === "saved-names"
+                ? "bg-accent text-white"
+                : "bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-canvas"
+            )}
+          >
+            Saved names
+          </button>
+        </div>
+
+        {activeTab === "saved-names" ? (
+          <SavedSourceMappings />
+        ) : (
+          <>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 flex gap-3">
             <select
@@ -475,6 +515,8 @@ export default function DataPage() {
               </table>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

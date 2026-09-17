@@ -6,7 +6,7 @@ from typing import Protocol, runtime_checkable
 from pydantic import BaseModel
 
 from backend.domain.contracts import MappingOutput, SendResult
-from backend.domain.entities import Anomaly, MonthlyEntry, Report
+from backend.domain.entities import Anomaly, MonthlyEntry, Report, SourceAccountMapping
 from backend.domain.run_state_machine import RunStatus
 
 
@@ -245,3 +245,25 @@ class AccountsRepo(Protocol):
 
     # Returns {account_id: {"name": str, "category": str}}
     # Used by comparison agent to join account info onto monthly_entries rows.
+
+
+@runtime_checkable
+class SourceAccountMappingsRepo(Protocol):
+    def list_for_company(self, company_id: str) -> list[SourceAccountMapping]: ...
+
+    def upsert(
+        self,
+        company_id: str,
+        file_type: str,
+        source_pattern: str,
+        gl_account: str,
+    ) -> SourceAccountMapping: ...
+
+    def update(
+        self,
+        company_id: str,
+        mapping_id: str,
+        gl_account: str,
+    ) -> SourceAccountMapping | None: ...
+
+    def delete(self, company_id: str, mapping_id: str) -> bool: ...

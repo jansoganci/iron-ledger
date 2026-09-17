@@ -4,11 +4,11 @@ Two paths are under test:
 
 * **strict=True** — the corrected guardrail. Unit-aware reference pools, money
   at cent precision, percentages at 0.05pp, zero references retained, plus the
-  Stage 1 narrative consistency check. This is what the Interpreter uses.
+  Stage 1 narrative consistency check. Interpreter, quarterly, and Opus all
+  use this path.
 * **strict=False (legacy)** — the old max(1% , $1,000) single-pool behaviour,
-  retained ONLY for callers not yet migrated (quarterly.py, opus_upgrade.py).
-  Its tests are kept so the un-migrated path stays pinned, and are named so no
-  one mistakes them for the intended behaviour of new call sites.
+  retained so a caller revert is a flag change, not a deletion. Do not add
+  new legacy call sites.
 """
 
 from __future__ import annotations
@@ -19,6 +19,8 @@ from backend.tools import guardrail as guardrail_module
 from backend.tools.guardrail import (
     _tolerance_for,
     check_narrative_consistency,
+    collect_reconciliation_reference_values,
+    flatten_summary_by_unit,
     money_tolerance,
     parse_narrative_numbers,
     pct_tolerance,
@@ -27,8 +29,8 @@ from backend.tools.guardrail import (
 
 
 # ---------------------------------------------------------------------------
-# LEGACY path — pinned for quarterly.py / opus_upgrade.py only.
-# Do not treat these as the desired behaviour; see module docstring.
+# LEGACY path — retained so a revert is a caller flag, not a deletion.
+# No production caller should use this path. See module docstring.
 # ---------------------------------------------------------------------------
 
 
@@ -216,13 +218,11 @@ def test_parser_ignores_dates_ordinals_and_counts() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Stage 1 — narrative consistency (WARN-ONLY this release)
+# Stage 1 — narrative consistency (enforced on strict=True)
 # ---------------------------------------------------------------------------
 #
-# Replaces the former test_empty_numbers_used_always_passes, which pinned the
-# bypass as intended behaviour. Empty numbers_used no longer means "always
-# passes" unconditionally: it passes only when the narrative contains no
-# numbers, and an unlisted narrative number is now detected and logged.
+# Empty numbers_used no longer means "always passes": it passes only when the
+# narrative contains no numbers. An unlisted narrative number fails.
 
 
 def test_empty_numbers_used_passes_when_narrative_has_no_numbers() -> None:
@@ -248,9 +248,23 @@ def test_empty_numbers_used_with_narrative_number_is_detected() -> None:
     assert "999,999" in violations[0]["excerpt"]
 
 
-def test_narrative_violation_is_warn_only_by_default() -> None:
-    """Decision 3: measure the violation rate before enforcing."""
-    assert guardrail_module.ENFORCE_NARRATIVE_CONSISTENCY is False
+def test_narrative_violation_fails_by_default() -> None:
+    """Slice A: the $999,999 empty-numbers_used bypass is now a hard failure."""
+    assert guardrail_module.ENFORCE_NARRATIVE_CONSISTENCY is True
+    passed, msg = verify_guardrail(
+        {"numbers_used": [], "narrative": "We found $999,999 missing."},
+        {"revenue": 1_000_000.0},
+        strict=True,
+    )
+    assert passed is False
+    assert "999999" in msg.replace(",", "") or "999999.0" in msg.replace(",", "")
+
+
+def test_narrative_violation_can_be_switched_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The named flag still governs Stage 1; it is not an inline conditional."""
+    monkeypatch.setattr(guardrail_module, "ENFORCE_NARRATIVE_CONSISTENCY", False)
     passed, _ = verify_guardrail(
         {"numbers_used": [], "narrative": "We found $999,999 missing."},
         {"revenue": 1_000_000.0},
@@ -259,18 +273,17 @@ def test_narrative_violation_is_warn_only_by_default() -> None:
     assert passed is True
 
 
-def test_narrative_violation_fails_when_enforcement_is_enabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Flipping the named flag turns Stage 1 into a hard failure."""
-    monkeypatch.setattr(guardrail_module, "ENFORCE_NARRATIVE_CONSISTENCY", True)
+def test_listed_narrative_number_that_matches_pandas_still_passes() -> None:
     passed, msg = verify_guardrail(
-        {"numbers_used": [], "narrative": "We found $999,999 missing."},
-        {"revenue": 1_000_000.0},
+        {
+            "numbers_used": [999_999.0],
+            "narrative": "We found $999,999 missing.",
+        },
+        {"revenue": 999_999.0},
         strict=True,
     )
-    assert passed is False
-    assert "999999" in msg.replace(",", "") or "999999.0" in msg.replace(",", "")
+    assert passed is True
+    assert msg == "Success"
 
 
 def test_narrative_number_present_in_numbers_used_is_not_a_violation() -> None:
@@ -302,3 +315,115 @@ def test_mismatch_returns_false_with_message() -> None:
     )
     assert passed is False
     assert "Mismatch" in msg
+
+
+def test_named_mom_pct_scalars_land_in_the_percent_pool() -> None:
+    """Lists are skipped by flatten; named *_pct keys are percent refs."""
+    money, pct = flatten_summary_by_unit(
+        {
+            "q_total_revenue": 350_000.0,
+            "mom_feb_vs_jan_revenue_pct": 20.0,
+            "q_mom_revenue_growth": [20.0, 8.33],
+        }
+    )
+    assert 350_000.0 in money
+    assert 20.0 in pct
+    assert 8.33 not in pct
+    assert 8.33 not in money
+
+
+def test_collect_recon_values_includes_roster_and_match_money() -> None:
+    values = collect_reconciliation_reference_values(
+        [
+            {
+                "gl_amount": 3_540.0,
+                "non_gl_total": 3_825.0,
+                "delta": -285.0,
+                "hints": {
+                    "implied_monthly": 1_100.0,
+                    "n_active": 85,
+                    "n_billed_in_period": 82,
+                    "count_delta": 3,
+                    "fee_sum_active": 3_825.0,
+                    "fee_pct": 0.045,
+                },
+                "matches": [
+                    {
+                        "gross": 1_000.0,
+                        "fee": 45.0,
+                        "net": 955.0,
+                        "gl_amount": 1_000.0,
+                        "candidate_count": 2,
+                        "fee_pct": 0.045,
+                    }
+                ],
+                "unmatched_count": 1,
+                "sources": [{"amount": 3_825.0}],
+            }
+        ]
+    )
+    for expected in (
+        3_540.0,
+        3_825.0,
+        285.0,
+        1_100.0,
+        85.0,
+        82.0,
+        3.0,
+        1_000.0,
+        45.0,
+        955.0,
+        2.0,
+        1.0,
+    ):
+        assert expected in values
+    assert 0.045 not in values
+
+
+def test_collect_recon_values_accepts_model_dump_objects() -> None:
+    class _Hint:
+        def model_dump(self) -> dict:
+            return {"implied_monthly": 250.0, "n_active": 10}
+
+    class _Item:
+        def model_dump(self) -> dict:
+            return {
+                "gl_amount": 500.0,
+                "non_gl_total": 500.0,
+                "delta": 0.0,
+                "hints": _Hint(),
+                "matches": [],
+                "sources": [],
+            }
+
+    values = collect_reconciliation_reference_values([_Item()])
+    assert 500.0 in values
+    assert 250.0 in values
+    assert 10.0 in values
+
+
+def test_production_verify_guardrail_callers_pass_strict_true() -> None:
+    import ast
+    from pathlib import Path
+
+    callers = [
+        Path("backend/agents/interpreter.py"),
+        Path("backend/agents/quarterly.py"),
+        Path("backend/agents/opus_upgrade.py"),
+    ]
+    found = 0
+    for path in callers:
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = getattr(func, "id", None) or getattr(func, "attr", None)
+            if name != "verify_guardrail":
+                continue
+            found += 1
+            keywords = {kw.arg: kw.value for kw in node.keywords}
+            assert "strict" in keywords, f"{path} missing strict="
+            strict = keywords["strict"]
+            assert isinstance(strict, ast.Constant) and strict.value is True, path
+    assert found == 3

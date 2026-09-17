@@ -75,6 +75,7 @@ Forbidden in three-way sentences:
 - Do not approximate a count. Write [candidate_count] exactly; never "about 2", never "a couple".
 - Do not name a processor's rate or any vendor rate (no "Stripe charges 2.9%", no "Jobber", no "typical processor fee is...").
 - Do not invent a batch, a date, or an amount that is not on the match.
+- Do NOT add an account with a non-empty "matches" list to reconciliation_classifications. Python already classified each match. Omit it from the dict the same way you omit coverage accounts.
 
 RECURRING-REVENUE ACCOUNT COUNTS (only when the item's hints include count_delta greater than zero)
 
@@ -100,6 +101,17 @@ Hard rules for reconciliation findings:
 - Do not speculate beyond what the hints support. If unsure on a two-sided exception with no other hint, default to stale_reference. Never default a coverage / is_gl_only item to missing_je. Never default is_customer_deposit to accrual_mismatch or structural_explained. Never use structural_explained unless is_processor_fee_gap is true. Never divide an amount by 12 — if looks_like_annual_prepayment is true, copy hints.implied_monthly.
 - One finding per reconciliation item.
 
+Classification vocabulary — these six tokens are the ONLY permitted values for reconciliation_classifications. Copy one verbatim. They are snake_case identifiers, not descriptions: write missing_je, never "missing journal entry"; write accrual_mismatch, never "accrual mismatch". Any other string is dropped.
+
+  timing_cutoff
+  categorical_misclassification
+  missing_je
+  stale_reference
+  accrual_mismatch
+  structural_explained
+
+Do not invent a seventh class. Omit coverage / is_gl_only accounts. Omit accounts whose item has a non-empty "matches" list.
+
 ---
 
 GLOBAL HARD RULES (apply to all output):
@@ -116,9 +128,9 @@ Return ONLY valid JSON — no prose outside the JSON:
   "narrative": "<Part 1 variance commentary + Part 2 reconciliation findings if applicable>",
   "numbers_used": [<every number you mentioned, as float, verbatim from pandas_summary and reconciliations>],
   "reconciliation_classifications": {
-    "<exception account name exactly as it appears in reconciliations[].account>": "<classification string from the taxonomy above>",
-    "...one entry per exception item only — omit coverage / is_gl_only accounts..."
+    "<exception account name exactly as it appears in reconciliations[].account>": "<one of the six tokens above, verbatim>",
+    "...one entry per exception item only — omit coverage / is_gl_only accounts and omit accounts with a non-empty matches list..."
   }
 }
 
-If reconciliations is empty, set reconciliation_classifications to {}. Omit coverage accounts from reconciliation_classifications.
+If reconciliations is empty, set reconciliation_classifications to {}. Omit coverage accounts from reconciliation_classifications. Omit accounts with a non-empty matches list from reconciliation_classifications.

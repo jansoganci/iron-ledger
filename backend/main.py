@@ -10,7 +10,15 @@ from slowapi.errors import RateLimitExceeded
 from backend import messages
 from backend.api.middleware import TraceIdMiddleware
 from backend.api.rate_limit import limiter
-from backend.api.routers import companies, health, mail, quarterly, reports, uploads
+from backend.api.routers import (
+    companies,
+    health,
+    mail,
+    quarterly,
+    reports,
+    source_mappings,
+    uploads,
+)
 from backend.domain.errors import (
     DuplicateEntryError,
     FileHasNoValidColumns,
@@ -178,6 +186,7 @@ def create_app() -> FastAPI:
     app.include_router(reports.router)
     app.include_router(quarterly.router)
     app.include_router(uploads.router)
+    app.include_router(source_mappings.router)
     return app
 
 

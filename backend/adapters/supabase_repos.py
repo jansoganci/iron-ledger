@@ -14,7 +14,7 @@ from typing import Callable, TypeVar
 from supabase import Client
 
 from backend.domain.contracts import MappingOutput
-from backend.domain.entities import Anomaly, MonthlyEntry, Report
+from backend.domain.entities import Anomaly, MonthlyEntry, Report, SourceAccountMapping
 from backend.domain.errors import (
     DuplicateEntryError,
     RLSForbiddenError,
@@ -1054,8 +1054,112 @@ class SupabaseAccountsRepo:
 
 
 # ---------------------------------------------------------------------------
+# Source account mappings (vendor / expense memory)
+# ---------------------------------------------------------------------------
+
+
+class SupabaseSourceAccountMappingsRepo:
+    def __init__(self, client: Client) -> None:
+        self._db = client
+
+    def list_for_company(self, company_id: str) -> list[SourceAccountMapping]:
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("source_account_mappings")
+                .select(
+                    "id, company_id, file_type, source_pattern, "
+                    "gl_account, created_at, updated_at"
+                )
+                .eq("company_id", company_id)
+                .order("source_pattern")
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        return [_row_to_source_mapping(row) for row in (resp.data or [])]
+
+    def upsert(
+        self,
+        company_id: str,
+        file_type: str,
+        source_pattern: str,
+        gl_account: str,
+    ) -> SourceAccountMapping:
+        payload = {
+            "company_id": company_id,
+            "file_type": file_type,
+            "source_pattern": source_pattern.strip(),
+            "gl_account": gl_account.strip(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("source_account_mappings")
+                .upsert(payload, on_conflict="company_id,file_type,source_pattern")
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        rows = resp.data or []
+        if not rows:
+            raise TransientIOError("source mapping upsert returned no row")
+        return _row_to_source_mapping(rows[0])
+
+    def update(
+        self,
+        company_id: str,
+        mapping_id: str,
+        gl_account: str,
+    ) -> SourceAccountMapping | None:
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("source_account_mappings")
+                .update(
+                    {
+                        "gl_account": gl_account.strip(),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("company_id", company_id)
+                .eq("id", mapping_id)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        rows = resp.data or []
+        if not rows:
+            return None
+        return _row_to_source_mapping(rows[0])
+
+    def delete(self, company_id: str, mapping_id: str) -> bool:
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("source_account_mappings")
+                .delete()
+                .eq("company_id", company_id)
+                .eq("id", mapping_id)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        return bool(resp.data)
+
+
+# ---------------------------------------------------------------------------
 # Row converters (private)
 # ---------------------------------------------------------------------------
+
+
+def _row_to_source_mapping(r: dict) -> SourceAccountMapping:
+    return SourceAccountMapping(
+        id=r["id"],
+        company_id=r["company_id"],
+        file_type=r["file_type"],
+        source_pattern=r["source_pattern"],
+        gl_account=r["gl_account"],
+        created_at=r.get("created_at"),
+        updated_at=r.get("updated_at"),
+    )
 
 
 def _row_to_entry(r: dict) -> MonthlyEntry:
