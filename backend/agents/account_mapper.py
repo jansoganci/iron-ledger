@@ -4,8 +4,8 @@ Called from the orchestrator BEFORE parse_file_silently's final aggregation.
 Operates on unique account values only; the caller applies the result via
 pandas .map() inside parse_file_silently.
 
-No database calls. No cache reads or writes (post-MVP). Only a single Haiku
-call per non-GL file plus validation of the output against the GL pool.
+No database calls inside this class. Saved vendor mappings are overlaid by
+the orchestrator via `backend.tools.source_mapping` after Haiku returns.
 """
 
 from __future__ import annotations

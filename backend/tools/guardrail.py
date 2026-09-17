@@ -12,14 +12,14 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 # Stage 1 checks that every number written in the narrative also appears in
-# numbers_used. It is MEASUREMENT-ONLY for one release: violations are logged
-# at WARNING and the report still saves.
+# numbers_used. Measured on live Redhawk (test-plan E2: 0 unlisted figures),
+# then flipped to enforcing so an empty numbers_used array cannot hide a
+# dollar or percent written in the prose.
 #
-# Flip to True to make an unlisted narrative number fail the report. This is a
-# deliberate, named switch — do not re-express it as an inline conditional and
-# do not flip it without an explicit decision. See
-# docs/sprint/guardrail-fix-pre-analysis.md, decision 3.
-ENFORCE_NARRATIVE_CONSISTENCY = False
+# This flag only affects the strict=True path (monthly interpreter, and
+# quarterly/Opus once those callers pass strict=True). Do not re-express it
+# as an inline conditional. See docs/sprint/pre-analysis-guardrail-second-gate.md.
+ENFORCE_NARRATIVE_CONSISTENCY = True
 
 
 # ---------------------------------------------------------------------------
@@ -36,11 +36,10 @@ _MONEY_REL = 1e-6
 # without admitting a fabricated percentage.
 _PCT_TOLERANCE = 0.05
 
-# Legacy tolerance — retained ONLY for callers not yet migrated to strict mode
-# (quarterly.py, opus_upgrade.py). max(1% of ref, $1,000). Do not use for new
-# call sites: on SMB-scale data it accepts ~41% of invented dollar values,
-# because percentages share the reference pool with dollars and each one
-# whitelists a +/-$1,000 band.
+# Legacy tolerance — retained so a caller can revert without deleting the
+# formula. No production caller should pass strict=False. On SMB-scale data
+# this pool accepts ~41% of invented dollar values, because percentages share
+# the reference pool with dollars and each one whitelists a +/-$1,000 band.
 _LEGACY_DOLLAR_FLOOR = 1_000.0
 _LEGACY_REL = 0.01
 
@@ -110,6 +109,77 @@ def flatten_summary_by_unit(d: dict) -> tuple[list[float], list[float]]:
 
     _walk(d)
     return money, percent
+
+
+def collect_reconciliation_reference_values(items: list | None) -> list[float]:
+    """Money and point-count refs Claude may copy from reconciliation cards.
+
+    Shared by the monthly interpreter and the Opus upgrade so the two pools
+    cannot drift. fee_pct is never included (internal gate, mixed-unit).
+    """
+    recon_values: list[float] = []
+    for raw in items or []:
+        item = raw
+        if not isinstance(item, dict):
+            dumper = getattr(item, "model_dump", None)
+            item = dumper() if callable(dumper) else {}
+        if not isinstance(item, dict):
+            continue
+        for field in ("gl_amount", "non_gl_total", "delta"):
+            v = item.get(field)
+            if v is not None:
+                recon_values.append(float(v))
+                recon_values.append(float(abs(v)))
+        hints = item.get("hints") or {}
+        if not isinstance(hints, dict):
+            dumper = getattr(hints, "model_dump", None)
+            hints = dumper() if callable(dumper) else {}
+        if isinstance(hints, dict):
+            implied_monthly = hints.get("implied_monthly")
+            if implied_monthly is not None:
+                recon_values.append(float(implied_monthly))
+                recon_values.append(float(abs(implied_monthly)))
+            for roster_field in (
+                "n_active",
+                "n_billed_in_period",
+                "count_delta",
+                "fee_sum_active",
+                "fee_sum_billed",
+                "fee_gap",
+            ):
+                v = hints.get(roster_field)
+                if v is not None:
+                    recon_values.append(float(v))
+                    recon_values.append(float(abs(v)))
+        for match in item.get("matches") or []:
+            if not isinstance(match, dict):
+                dumper = getattr(match, "model_dump", None)
+                match = dumper() if callable(dumper) else {}
+            if not isinstance(match, dict):
+                continue
+            for money_field in ("gross", "fee", "net", "gl_amount"):
+                v = match.get(money_field)
+                if v is not None:
+                    recon_values.append(float(v))
+                    recon_values.append(float(abs(v)))
+            candidate_count = match.get("candidate_count")
+            if candidate_count is not None:
+                recon_values.append(float(candidate_count))
+        for count_field in (
+            "unmatched_count",
+            "unmatched_processor_count",
+            "unmatched_bank_count",
+        ):
+            v = item.get(count_field)
+            if v is not None:
+                recon_values.append(float(v))
+        for src in item.get("sources", []):
+            if isinstance(src, dict):
+                recon_values.append(float(src.get("amount", 0)))
+            else:
+                amount = getattr(src, "amount", 0)
+                recon_values.append(float(amount))
+    return recon_values
 
 
 # ---------------------------------------------------------------------------
@@ -258,8 +328,8 @@ def verify_guardrail(
     consolidated total.
 
     strict=False (default) — legacy behaviour: one unit-blind reference pool,
-        tolerance max(1% of ref, $1,000), zero references excluded. Retained
-        for callers not yet migrated (quarterly.py, opus_upgrade.py).
+        tolerance max(1% of ref, $1,000), zero references excluded. No
+        production caller should use this path.
 
     strict=True — money and percentage references are kept in separate pools
         with separate tolerances, so neither unit can widen the other:
@@ -267,7 +337,7 @@ def verify_guardrail(
           percent : 0.05 percentage points
         Zero references are NOT excluded, so a legitimate $0.00 can match a
         real 0.0 and nothing else. Additionally runs the Stage 1 narrative
-        consistency check (warn-only unless ENFORCE_NARRATIVE_CONSISTENCY).
+        consistency check (blocked when ENFORCE_NARRATIVE_CONSISTENCY is True).
     """
     if not strict:
         flat_values = flatten_summary(pandas_summary)
@@ -287,7 +357,7 @@ def verify_guardrail(
     if reconciliation_values:
         money_refs.extend(float(v) for v in reconciliation_values if v is not None)
 
-    # Stage 1 — narrative vs numbers_used. Warn-only for this release.
+    # Stage 1 — narrative vs numbers_used. Blocking when the named flag is on.
     violations = check_narrative_consistency(claude_json, run_id=run_id)
     if violations and ENFORCE_NARRATIVE_CONSISTENCY:
         first = violations[0]

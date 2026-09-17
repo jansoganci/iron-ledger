@@ -7,6 +7,7 @@ from io import BytesIO
 
 import openpyxl
 
+from backend import messages
 from backend.tools.excel_export import build_close_package
 
 
@@ -39,10 +40,21 @@ def test_coverage_row_exports_as_info_not_compared() -> None:
     )
     wb = openpyxl.load_workbook(BytesIO(raw))
     ws = wb["Reconciliations"]
-    accounts = {
-        ws.cell(row=r, column=1).value: r
-        for r in range(3, ws.max_row + 1)
-    }
+    assert ws.cell(row=2, column=1).value == messages.BANK_OUTSIDE_ATTESTATION
+    assert ws.cell(row=3, column=1).value == "Account"
+    accounts = {ws.cell(row=r, column=1).value: r for r in range(4, ws.max_row + 1)}
     row = accounts["Advertising — Meta"]
     assert ws.cell(row=row, column=6).value == "INFO"
     assert ws.cell(row=row, column=7).value == "Not compared"
+
+
+def test_recon_sheet_states_bank_rec_is_outside_even_when_empty() -> None:
+    raw = build_close_package(
+        entries=[],
+        reconciliations=[],
+        period=date(2026, 3, 1),
+        company_name="Redhawk",
+    )
+    wb = openpyxl.load_workbook(BytesIO(raw))
+    ws = wb["Reconciliations"]
+    assert ws.cell(row=2, column=1).value == messages.BANK_OUTSIDE_ATTESTATION

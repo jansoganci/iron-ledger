@@ -96,10 +96,10 @@ def test_quarterly_agent_aggregation_with_3_months():
     # Mock LLM to return valid NarrativeJSON
     llm_client.call = MagicMock(
         return_value=NarrativeJSON(
-            narrative="Q1 2026 revenue was $350,000 with a gross margin of 40%.",
+            narrative="Q1 2026 revenue was $350,000 with a gross margin of 60%.",
             numbers_used=[
                 350000.0,
-                40.0,
+                60.0,
                 350000.0,
                 140000.0,
                 97000.0,
@@ -393,7 +393,7 @@ def test_quarterly_agent_yoy_null_when_prior_year_incomplete():
     runs_repo.get_by_id = mock_get_by_id
     anomalies_repo.list_for_period = MagicMock(return_value=[])
     llm_client.call = MagicMock(
-        return_value=NarrativeJSON(narrative="Test", numbers_used=[300000.0, 60.0])
+        return_value=NarrativeJSON(narrative="Test", numbers_used=[300000.0])
     )
 
     # Create agent and run
@@ -563,6 +563,137 @@ def test_get_quarterly_report_datetime_created_at_does_not_raise():
     )
 
     assert result == dt.isoformat()
+
+
+def test_quarterly_prompt_is_copy_only():
+    """Claude copies pandas fields; it is not asked to derive N/M or year-1."""
+    from pathlib import Path
+
+    text = Path("backend/prompts/quarterly_report_prompt.txt").read_text()
+    assert "months_present" in text
+    assert "months_in_quarter" in text
+    assert "prior_year" in text
+    assert "mom_" in text and "revenue_pct" in text
+    assert "if derivable" not in text
+    assert "year-1" not in text
+    assert "$12.9M" not in text
+
+
+def test_quarterly_copy_only_fields_and_mom_pct_reach_the_percent_pool():
+    """months_present / prior_year / named MoM percents sit on aggregated_summary."""
+    from backend.tools.guardrail import flatten_summary_by_unit, verify_guardrail
+
+    runs_repo = MagicMock()
+    anomalies_repo = MagicMock()
+    llm_client = MagicMock()
+    reports_repo = MagicMock()
+
+    jan_summary = {
+        "accounts": {
+            "Revenue": {"category": "REVENUE", "current": 100000.0},
+            "COGS": {"category": "COGS", "current": 40000.0},
+            "OpEx": {"category": "OPEX", "current": 30000.0},
+        }
+    }
+    feb_summary = {
+        "accounts": {
+            "Revenue": {"category": "REVENUE", "current": 120000.0},
+            "COGS": {"category": "COGS", "current": 48000.0},
+            "OpEx": {"category": "OPEX", "current": 32000.0},
+        }
+    }
+    mar_summary = {
+        "accounts": {
+            "Revenue": {"category": "REVENUE", "current": 130000.0},
+            "COGS": {"category": "COGS", "current": 52000.0},
+            "OpEx": {"category": "OPEX", "current": 35000.0},
+        }
+    }
+
+    def mock_get_latest_run_id(company_id, period):
+        return f"run-{period.month}"
+
+    def mock_get_by_id(run_id):
+        summaries = {
+            "run-1": jan_summary,
+            "run-2": feb_summary,
+            "run-3": mar_summary,
+        }
+        pandas_summary = summaries.get(run_id)
+        if pandas_summary is None:
+            return None
+        return {"status": "complete", "pandas_summary": pandas_summary}
+
+    runs_repo.get_latest_run_id_for_period = mock_get_latest_run_id
+    runs_repo.get_by_id = mock_get_by_id
+    anomalies_repo.list_for_period = MagicMock(return_value=[])
+    llm_client.call = MagicMock(
+        return_value=NarrativeJSON(
+            narrative="Q1 2026 revenue was $350,000 with a gross margin of 60%.",
+            numbers_used=[350000.0, 60.0],
+        )
+    )
+
+    agent = QuarterlyAgent(runs_repo, anomalies_repo, llm_client, reports_repo)
+    result = agent.run(company_id="test-company", year=2026, quarter=1)
+    assert result["status"] == "complete"
+
+    summary = llm_client.call.call_args.kwargs["context"]["aggregated_summary"]
+    assert summary["months_present"] == 3.0
+    assert summary["months_in_quarter"] == 3.0
+    assert summary["reporting_year"] == 2026.0
+    assert summary["prior_year"] == 2025.0
+    assert summary["reporting_quarter"] == 1.0
+    assert "q_mom_revenue_growth" not in summary
+    assert summary["mom_feb_vs_jan_revenue_pct"] == 20.0
+    assert summary["mom_mar_vs_feb_revenue_pct"] == 8.33
+
+    _money, pct = flatten_summary_by_unit(summary)
+    assert 20.0 in pct
+    assert 8.33 in pct
+
+    passed, msg = verify_guardrail(
+        {
+            "numbers_used": [20.0, 8.33],
+            "narrative": "Revenue grew 20% then 8.33%.",
+        },
+        summary,
+        strict=True,
+    )
+    assert passed is True, msg
+
+
+def test_quarterly_invented_dollar_fails_strict_guardrail():
+    """$999 against a ~$350k quarter must fail; the $1,000 floor no longer hides it."""
+    runs_repo = MagicMock()
+    anomalies_repo = MagicMock()
+    llm_client = MagicMock()
+    reports_repo = MagicMock()
+
+    summary = {
+        "accounts": {
+            "Revenue": {"category": "REVENUE", "current": 100000.0},
+            "COGS": {"category": "COGS", "current": 40000.0},
+        }
+    }
+    runs_repo.get_latest_run_id_for_period = MagicMock(return_value="run-1")
+    runs_repo.get_by_id = MagicMock(
+        return_value={"status": "complete", "pandas_summary": summary}
+    )
+    anomalies_repo.list_for_period = MagicMock(return_value=[])
+    llm_client.call = MagicMock(
+        return_value=NarrativeJSON(
+            narrative="We found $999 of unexplained spend.",
+            numbers_used=[999.0],
+        )
+    )
+
+    agent = QuarterlyAgent(runs_repo, anomalies_repo, llm_client, reports_repo)
+    result = agent.run(company_id="test-company", year=2026, quarter=1)
+
+    assert result["status"] == "failed"
+    assert result["error_type"] == "guardrail_failed"
+    reports_repo.write_quarterly.assert_not_called()
 
 
 def test_get_quarterly_report_none_created_at_returns_none():

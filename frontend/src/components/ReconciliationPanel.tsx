@@ -3,6 +3,12 @@ import {
   isCoverageItem,
   type ReconciliationItem,
 } from "./ReconciliationCard";
+import {
+  TIE_OUT_GROUP_LABELS,
+  TIE_OUT_GROUP_ORDER,
+  tieOutGroupFromSources,
+  type TieOutGroupKey,
+} from "../lib/tieOut";
 
 interface ReconciliationPanelProps {
   reconciliations: ReconciliationItem[] | null | undefined;
@@ -15,19 +21,16 @@ function severityOf(delta: number): "high" | "medium" | "low" {
   return "low";
 }
 
-const SEVERITY_ORDER = ["high", "medium", "low"] as const;
-
-const SEVERITY_LABELS: Record<string, string> = {
-  high: "High severity",
-  medium: "Medium severity",
-  low: "Low severity",
-};
-
-const SEVERITY_COLORS: Record<string, string> = {
-  high: "text-severity-high-fg",
-  medium: "text-severity-medium-fg",
-  low: "text-text-secondary",
-};
+function groupOf(item: ReconciliationItem): TieOutGroupKey {
+  if (item.tie_out_group) return item.tie_out_group;
+  return (
+    tieOutGroupFromSources(
+      item.sources,
+      item.card_kind,
+      item.hints?.is_gl_only
+    ) ?? "other"
+  );
+}
 
 export function ReconciliationPanel({ reconciliations }: ReconciliationPanelProps) {
   const items = reconciliations ?? [];
@@ -42,18 +45,17 @@ export function ReconciliationPanel({ reconciliations }: ReconciliationPanelProp
     );
   }
 
-  const grouped: Record<string, ReconciliationItem[]> = { high: [], medium: [], low: [] };
+  const grouped = new Map<TieOutGroupKey, ReconciliationItem[]>();
   for (const item of exceptions) {
-    grouped[severityOf(item.delta)].push(item);
+    const key = groupOf(item);
+    const list = grouped.get(key) ?? [];
+    list.push(item);
+    grouped.set(key, list);
   }
 
   const countLabel = [
-    exceptions.length
-      ? `${exceptions.length} to review`
-      : null,
-    coverage.length
-      ? `${coverage.length} not compared`
-      : null,
+    exceptions.length ? `${exceptions.length} to review` : null,
+    coverage.length ? `${coverage.length} not compared` : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -62,7 +64,7 @@ export function ReconciliationPanel({ reconciliations }: ReconciliationPanelProp
     <section className="space-y-6">
       <div className="flex items-center gap-3">
         <h2 className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
-          Reconciliation findings
+          Exceptions
         </h2>
         <div className="flex-1 h-px bg-border" />
         <span className="text-xs text-text-secondary tabular-nums">
@@ -70,17 +72,24 @@ export function ReconciliationPanel({ reconciliations }: ReconciliationPanelProp
         </span>
       </div>
 
-      {SEVERITY_ORDER.map((level) => {
-        const levelItems = grouped[level];
-        if (!levelItems.length) return null;
+      {TIE_OUT_GROUP_ORDER.map((key) => {
+        const levelItems = grouped.get(key);
+        if (!levelItems?.length) return null;
+        const sorted = [...levelItems].sort(
+          (a, b) => Math.abs(b.delta) - Math.abs(a.delta)
+        );
         return (
-          <div key={level} className="space-y-2">
-            <p className={`text-xs font-semibold uppercase tracking-widest ${SEVERITY_COLORS[level]}`}>
-              {SEVERITY_LABELS[level]} · {levelItems.length}
+          <div key={key} className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
+              {TIE_OUT_GROUP_LABELS[key]} · {sorted.length}
             </p>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-              {levelItems.map((item, i) => (
-                <ReconciliationCard key={`${item.account}-${i}`} {...item} severity={level} />
+              {sorted.map((item, i) => (
+                <ReconciliationCard
+                  key={`${item.account}-${i}`}
+                  {...item}
+                  severity={severityOf(item.delta)}
+                />
               ))}
             </div>
           </div>

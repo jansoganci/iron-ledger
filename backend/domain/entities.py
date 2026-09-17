@@ -77,6 +77,17 @@ class Report:
 
 
 @dataclass
+class SourceAccountMapping:
+    id: str
+    company_id: str
+    file_type: str
+    source_pattern: str
+    gl_account: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass
 class Run:
     id: str
     company_id: str

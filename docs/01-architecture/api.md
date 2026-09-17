@@ -395,6 +395,45 @@ No body. JWT required.
 
 ---
 
+### 11. GET /source-mappings
+List saved vendor and expense names for the authenticated company.
+`company_id` is never accepted from the client.
+
+**Response 200**
+```json
+{
+  "mappings": [
+    {
+      "id": "uuid",
+      "file_type": "supplier_invoices",
+      "source_pattern": "AlarmTech Industries",
+      "gl_account": "Equipment COGS",
+      "updated_at": "2026-09-16T12:00:00"
+    }
+  ],
+  "gl_account_pool": ["Equipment COGS", "Salaries & Wages"]
+}
+```
+
+**Rate limit:** 60/min per user.
+
+---
+
+### 12. PATCH /source-mappings/{id}
+Change the GL account for a saved name. Body: `{ "gl_account": "..." }`.
+Missing or another company's row → 404.
+
+**Rate limit:** 30/min per user.
+
+---
+
+### 13. DELETE /source-mappings/{id}
+Forget a saved name. Missing or another company's row → 404.
+
+**Rate limit:** 30/min per user.
+
+---
+
 ## Error Codes Reference
 
 | error | meaning | HTTP status |

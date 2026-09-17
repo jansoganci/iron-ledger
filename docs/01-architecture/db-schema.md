@@ -178,6 +178,25 @@ CREATE TABLE runs (
 
 ---
 
+### 8. source_account_mappings
+Persistent vendor / expense-item → GL memory (migration `0011`). Payroll
+people and GL account names are excluded by CHECK constraint. v1 writes
+`supplier_invoices` only. Unique on `(company_id, file_type, source_pattern)`.
+
+```sql
+CREATE TABLE source_account_mappings (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id      UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  file_type       TEXT NOT NULL,
+  source_pattern  TEXT NOT NULL,
+  gl_account      TEXT NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+---
+
 ## Indexes
 
 ```sql
@@ -204,7 +223,9 @@ companies
     │
     ├── reports (company_id)
     │
-    └── runs (company_id, report_id)
+    ├── runs (company_id, report_id)
+    │
+    └── source_account_mappings (company_id)
 
 supabase-storage/
 └── financial-uploads/{company_id}/{period}/{filename}
@@ -238,7 +259,8 @@ CREATE POLICY accounts_via_company ON accounts
     WHERE c.id = accounts.company_id AND c.owner_id = auth.uid()
   ));
 
--- Repeat the same policy pattern for monthly_entries, anomalies, reports, runs.
+-- Repeat the same policy pattern for monthly_entries, anomalies, reports,
+-- runs, and source_account_mappings.
 
 -- account_categories is a public lookup table — no RLS.
 ```

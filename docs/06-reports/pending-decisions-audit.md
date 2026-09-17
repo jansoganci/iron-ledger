@@ -11,17 +11,13 @@
 
 Önem sırasına göre.
 
-### 1.1 Close-flow ilk kod dilimi — hiç başlamamış
-**Kaynak:** `docs/02-planning/close-flow-contract.md`
-**Durum:** Sözleşme kilitli ("Kilit kararlar" tablosu, §1), Sentinel kâğıt yürüyüşü tanımlanmış (§4), ilk dilimin kapsamı net yazılmış (§5) — ama "henüz yazma" notuyla. Kodda karşılığı yok: `frontend/` ve `backend/` içinde `tie-out`, `tie_out`, `checklist`, `closed_period`, `sign-off` hiçbir eşleşme vermiyor. `RunStateMachine`'de `closed` state yok (`backend/domain/run_state_machine.py` — mevcut terminal state'ler: `upload_failed`, `parsing_failed`, `guardrail_failed`, `report_failed`).
+### 1.1 Close-flow — Dil 1 bitti, Dil 2 şimdilik açık
+**Kaynak:** `docs/02-planning/close-flow-contract.md`; uygulama kaydı `docs/sprint/pre-analysis-close-checklist.md`
+**Durum (16 Eylül 2026):** Sözleşmenin *ilk iskelet* dilimi (raporu checklist gibi okutmak) **Dil 1 olarak kodlandı**: Python `tie_out_summary`, GET `/report` `tie_out_group`, sayfa sırası tie-out → istisna (Payroll / Vendors / Contracts / Other) → coverage → anlatı → oturumluk banka kutusu. `closed` hâlâ yok.
 
-Somut olarak eksik olan (§5'te tanımlı):
-- Rapor sayfası sırasını "tie-out özeti 5/N → istisnalar → flux/anlatı → banka teyit satırı" şeklinde yeniden gruplama (bugün: özet anlatı en üstte, recon kartları hesap-yığını halinde).
-- Recon'u dosya etiketine göre gruplama (bordro / tedarikçi / sözleşme / kurulum / yakıt) — bugün hesap bazında düz liste.
-- Materiality tabanını `$100` dokümante edilen kuraldan `$100 ve %5`'e çekmek (consolidator zaten bunu yapıyor mu — bkz. §3.2, kısmen yapılmış).
-- Banka teyidi için tek checkbox + "Month Proof dışında yapıldı" cümlesi.
+**Şimdilik açık bırakıldı (Dil 2, 16 Eylül 2026):** isimli beş kontrol (install/fuel dahil), `SourceFileType` iğneleri, dosya-toplamı→GL eşleme modu. Redhawk’ta üç destek dosyası var; install/fuel fixture yok. Dosyası olmayan kontrolü “passed” saymak ve etiket uydurmak yasak. Yanlış GL hedefi sahte temiz/sahte açık üretir. Yeniden açmak yeni bir kilit ister (gerçek demo dosyası + file-total modu, sonra etiket). Dil 3 (`closed` / SQL) ayrı ve daha sonra.
 
-**Neden önemli:** Bu, "ürünü pivot etmeden close akışını bitirme" kararının ilk somut adımı. Sözleşme 24 Ağustos'ta kilitlendi, 2 haftadan uzun süredir kodlanmadı. Ya bilinçli olarak ertelendi (o zaman `risks.md`'ye R-numarasıyla girmeli) ya da unutuldu.
+Bu madde artık “hiç başlamamış ilk dilim” değil. Okuyan kişi Dil 2’yi unutulmuş iş sanmasın: **bilinçli açık**.
 
 ### 1.2 Agentic-memory roadmap Phase 3 — Persisted Quarterly Artifacts
 **Kaynak:** `docs/02-planning/agentic-memory-roadmap.md` §2 Phase 3
@@ -33,13 +29,17 @@ Somut olarak eksik olan (§5'te tanımlı):
 **Kaynak:** `backend/tools/guardrail.py:22` `ENFORCE_NARRATIVE_CONSISTENCY = False`
 **Doğrulandı:** `docs/sprint/test-plan-full-product.md` §E "Note on E2" ve `docs/audit_results.md` (c) tablosu satır 1 — ikisi de aynı bayrağı, aynı nedenle ("bir ölçüm turu bitmeden enforce etme") açık olarak işaretliyor. Şu anki canlı ölçüm: Redhawk raporunda **0 ihlal** (`test-plan-full-product.md` §E2). Bir ölçüm turu geçti, bayrak hâlâ kapalı — flip etme kararı kimseye ait değil, dokümante edilmiş ama tetiklenmemiş.
 
+**Güncelleme (2026-09-16):** Slice A (`docs/sprint/pre-analysis-guardrail-second-gate.md`) bayrağı `True` yaptı. `$999,999` + boş `numbers_used` artık `strict=True` altında fail. `main`'e merge kullanıcı kapılı.
+
 ### 1.4 Quarterly ve Opus-upgrade path'leri hâlâ eski (non-strict) guardrail toleransında
 **Kaynak:** `docs/audit_results.md` (c) tablosu satır 2-3
 **Doğrulandı:** `grep -n "strict=True" backend/agents/*.py` → yalnızca `interpreter.py:526`. `quarterly.py` ve `opus_upgrade.py` `strict` parametresi geçmiyor → `verify_guardrail`'in eski `max(1%, $1,000)` toleransını kullanıyorlar, `CLAUDE.md`'nin "aylık interpreter strict, quarterly/opus-upgrade legacy tolerance kullanıyor (belgelenmiş)" notuyla tutarlı — yani bu **CLAUDE.md'de zaten kabul edilmiş bir borç**, ama audit'in belirttiği asıl sorun şu: quarterly ve opus prompt'ları hâlâ Claude'dan türetilmiş değer istiyor (`{N} of {M}`, `year-1`, "net position if derivable") — bu ikisi düzeltilmeden strict'e geçiş mümkün değil. Migrasyon planı yok.
 
+**Güncelleme (2026-09-16):** Slice B pandas alanlarını ve kopyala-only prompt'ları ekledi, sonra her iki çağırıcıya `strict=True` verdi. Opus recon havuzu aylık interpreter ile aynı kolektörü kullanıyor; `net_income` Python'dan geliyor. `_tolerance_for` modülde duruyor, production kullanmıyor. `main`'e merge kullanıcı kapılı.
+
 ### 1.5 "exception_three_way_matches" — invalid classification token bug
 **Kaynak:** `docs/sprint/test-plan-full-product.md` gap #7b, bu oturumda kullanıcı tarafından da doğrulandı.
-**Durum:** Bu depoda (`e41c2f2` HEAD) **hâlâ açık** — commit geçmişinde bir düzeltme yok. Kullanıcı bunu **kendi makinesinde** çözdüğünü ama commit/push etmediğini belirtti; bu uzak oturumun çalışma kopyasında değişiklik yok (`git status` temiz, `git log` içinde ilgili bir commit yok). Yani: iki farklı yerde iki farklı durum var — local'de çözüm var, bu repo'da (ve GitHub'da) yok. Push edilene kadar "çözüldü" sayılmamalı.
+**Durum:** Düzeltme `docs/sprint/pre-analysis-invalid-classification-token.md` kilidiyle kodlandı. Yedinci sınıf eklenmedi. Bilinmeyen token `NarrativeJSON`'da düşülüyor; interpreter şema hatasında Discovery gibi bir kez daha deniyor. `main`'e merge edilene kadar canlı proje hâlâ eski davranışı gösterir.
 
 ---
 
@@ -111,6 +111,6 @@ Dosyanın kendisi bunu en üstte açıkça söylüyor ("Tours 1-3 tarihsel, düz
 
 1. **`exception_three_way_matches` düzeltmesini push'la.** Zaten local'de çözülmüş — GitHub'a gitmediği sürece bu repo'da yok sayılır. En düşük efor, en yüksek risk kapatma.
 2. **Doküman hijyenini önce yap, sonra konsolide et.** §4'teki altı madde düzeltilmeden (özellikle CURRENT_STATUS/YAPILACAKLAR arşivleme + pre-analysis "SONUÇ" bantları) konsolidasyon yanlış girdilerle başlar — bayat dosyalar "aktif" dosyalarla aynı ağırlıkta okunur.
-3. **Close-flow ilk kod dilimine karar ver (§1.1).** İki haftadan uzun süredir kilitli sözleşme kodlanmadı — ya şimdi başla ya da `risks.md`'ye R-numarasıyla gerekçeli ertele.
+3. **Close-flow Dil 2 şimdilik açık (§1.1).** Dil 1 (iskelet) kodlandı. İsimli beş kontrol + file-total→GL yeni kilit olmadan başlamaz. Dil 3 (`closed`) ayrı.
 4. **`ENFORCE_NARRATIVE_CONSISTENCY` flip kararı.** Bir ölçüm turu geçti, 0 ihlal ölçüldü — flip etmenin maliyeti düşük görünüyor, karar sahibi belirlenmeli.
 5. **§3'teki sekiz "yarım kalan" maddeyi `risks.md`'ye R-numarasıyla işle.** Şu an hiçbiri oradan görünmüyor; audit dosyasına gömülü kalmışlar.

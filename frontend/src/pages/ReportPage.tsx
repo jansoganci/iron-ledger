@@ -12,6 +12,7 @@ import {
   LowConfidenceColumn,
 } from "../components/MappingConfirmPanel";
 import type { ReconciliationItem } from "../components/ReconciliationCard";
+import type { TieOutSummary } from "../lib/tieOut";
 import { useState, useEffect, useRef } from "react";
 
 const CATEGORY_ORDER = [
@@ -59,6 +60,7 @@ interface ReportResponse {
   anomalies: AnomalyResponse[];
   reconciliations: ReconciliationItem[] | null;
   financials: Financials | null;
+  tie_out_summary: TieOutSummary | null;
 }
 
 interface RunStatusResponse {
@@ -301,6 +303,8 @@ export default function ReportPage() {
             financials={report.financials}
             onRegenerate={() => navigate(`/upload?period=${report.period}`)}
             reconciliations={report.reconciliations}
+            tieOutSummary={report.tie_out_summary}
+            companyId={report.company_id}
             excelDownloadUrl={`/report/${report.company_id}/${report.period}/export.xlsx`}
           />
         ) : null}

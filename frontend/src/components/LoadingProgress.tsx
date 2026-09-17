@@ -79,6 +79,9 @@ export interface MappingDraftItem {
   file_type: string;
   suggested_gl_account: string | null;
   confident: boolean;
+  origin?: "new" | "remembered" | "conflict";
+  remembered_gl_account?: string | null;
+  haiku_gl_account?: string | null;
 }
 
 export interface MappingDraft {

@@ -20,7 +20,10 @@ from backend.agents.interpreter import (
     _residue_from_matches,
 )
 from backend.domain.contracts import BatchMatch
-from backend.tools.guardrail import verify_guardrail
+from backend.tools.guardrail import (
+    collect_reconciliation_reference_values,
+    verify_guardrail,
+)
 
 
 def _match(classification: str | None = None, **overrides) -> dict:
@@ -142,36 +145,8 @@ def test_residue_accepts_model_objects_not_only_dicts() -> None:
 
 
 def _recon_values_for(items: list[dict]) -> list[float]:
-    """Mirror of the interpreter's reference-building loop, for assertion."""
-    values: list[float] = []
-    for item in items:
-        for field in ("gl_amount", "non_gl_total", "delta"):
-            v = item.get(field)
-            if v is not None:
-                values.extend([float(v), float(abs(v))])
-        hints = item.get("hints") or {}
-        if isinstance(hints, dict) and hints.get("implied_monthly") is not None:
-            values.extend(
-                [float(hints["implied_monthly"]), float(abs(hints["implied_monthly"]))]
-            )
-        for match in item.get("matches") or []:
-            for money_field in ("gross", "fee", "net", "gl_amount"):
-                v = match.get(money_field)
-                if v is not None:
-                    values.extend([float(v), float(abs(v))])
-            if match.get("candidate_count") is not None:
-                values.append(float(match["candidate_count"]))
-        for count_field in (
-            "unmatched_count",
-            "unmatched_processor_count",
-            "unmatched_bank_count",
-        ):
-            v = item.get(count_field)
-            if v is not None:
-                values.append(float(v))
-        for src in item.get("sources", []):
-            values.append(float(src.get("amount", 0)))
-    return values
+    """Shared collector — same pool the interpreter and Opus upgrade use."""
+    return collect_reconciliation_reference_values(items)
 
 
 @pytest.mark.parametrize("number", [1000.0, 45.0, 955.0])

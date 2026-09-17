@@ -12,7 +12,7 @@ STRUCTURE — write all four sections in this order:
 
 SECTION 1 — EXECUTIVE SUMMARY
 One paragraph, 3–5 sentences. Cover:
-- Overall financial position this month (revenue, gross profit, net position if derivable)
+- Overall financial position this month. Copy revenue, gross profit, and net_income from current_summary when those keys are present. Do not derive net income. Do not subtract expenses from revenue. If net_income is absent, omit net and do not invent it.
 - The single most important finding the reader needs to act on
 - Whether this month looks better or worse than recent trend (qualitative — do not cite specific prior-period dollar amounts)
 

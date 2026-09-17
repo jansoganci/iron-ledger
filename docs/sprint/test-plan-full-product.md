@@ -325,11 +325,11 @@ Take the completed Redhawk report from Section B.
 | E4 | Look for arithmetic in the prose | The narrative never *derives* a number. No "3,825 minus 3,540", no "which is 7.5% of", no computed ratio | **PASS.** None of `minus`, `subtract`, `which is`, `divided by`, `times` occur. Consistent with D4: the narrative gives both sides rather than a difference. |
 | E5 | Check `fee_pct` | The string `fee_pct` appears **nowhere** in the report payload, and no fee percentage appears in the prose | **PASS.** `fee_pct` absent from the entire serialized report; no `%` anywhere in the prose. |
 
-**Note on E2.** Narrative-vs-`numbers_used` consistency is currently
-**warn-only** — `ENFORCE_NARRATIVE_CONSISTENCY = False` in
-`backend/tools/guardrail.py`. A violation is **logged, not blocked**. Check the
-backend log for `guardrail_narrative_unlisted_number` and report the count; that
-measurement is the reason the flag is still off.
+**Note on E2.** Narrative-vs-`numbers_used` consistency is **enforced** —
+`ENFORCE_NARRATIVE_CONSISTENCY = True` in `backend/tools/guardrail.py`. A
+prose `$` or `%` figure absent from `numbers_used` fails the monthly report.
+The measurement window (this row: 0 violations on run `cc19d60d`) is what
+justified the flip. See `docs/sprint/pre-analysis-guardrail-second-gate.md`.
 
 ---
 
@@ -369,11 +369,14 @@ measurement is the reason the flag is still off.
    bypasses RLS so the backend is unaffected, but any direct
    anon/authenticated read of that table returns zero rows. Flag if the
    frontend ever needs to read it directly.
-5. **Narrative consistency is warn-only** (E2). Record the violation count
-   rather than treating a log line as a failure.
+5. ~~**Narrative consistency is warn-only** (E2). Record the violation count
+   rather than treating a log line as a failure.~~ **RESOLVED (2026-09-16).**
+   `ENFORCE_NARRATIVE_CONSISTENCY = True`. Quarterly and Opus now pass
+   `strict=True` after copy-only pandas/prompt work. See
+   `docs/sprint/pre-analysis-guardrail-second-gate.md`.
 6. ~~**`export.xlsx` is broken for every user (found 5 Sep).**~~ **RESOLVED.** The handler passed a company id to `get_by_owner`, which expects an owner id → `RLSForbiddenError` → 403. Now uses `Depends(get_cached_company)`. B8/B9 both pass live. Detail in E.0.
 7. ~~**Item 1's fixtures cannot be uploaded through the product.**~~ **RESOLVED** by `docs/demo_data/riverbend/`. Item 1 verified live end to end on 5 Sep, run `c0f269d6` — 6 matches, all C1-C11 outcomes correct. Detail in C.0c.
-7b. **An invalid classification token from Claude kills the run, intermittently (found 5 Sep).** Claude returned `exception_three_way_matches` for a card carrying nested matches; `NarrativeJSON` rejected it and the run died as `guardrail_failed` with a generic internal-error message. The value would have been overwritten by the pandas residue anyway, and the semantic retry cannot catch a schema error because it is raised inside `llm.call`. Roughly one run in two. Not patched. Detail in C.0c.
+7b. ~~**An invalid classification token from Claude kills the run, intermittently (found 5 Sep).**~~ **RESOLVED.** Unknown `reconciliation_classifications` values are dropped at `NarrativeJSON`; pandas residue / hints fill the gap. Schema errors retry once like Discovery. Exhausted schema retries stay in `guardrail_failed` with `messages.NARRATIVE_SCHEMA_FAILED`, not `INTERNAL_ERROR`. Six classes only — `exception_three_way_matches` was never added. Detail in `docs/sprint/pre-analysis-invalid-classification-token.md`.
 8. **Duplicate monthly report blocks any period re-run.** `reports_monthly_unique` on `(company_id, report_type, period)`; the interpreter inserts without deleting first, unlike the parser which explicitly deletes `monthly_entries` for the period. A second run of a period that already has a report raises `DuplicateEntryError` mid-`generating`, and the outer handler cannot recover it (`Cannot transition run from 'RunStatus.GENERATING' to 'RunStatus.PARSING_FAILED'`), so the run is stranded at 98% forever rather than reaching a terminal state. Hit live on 5 Sep by run `a84d3e60`. Two bugs really: the missing delete-first, and `GENERATING → PARSING_FAILED` missing from the state machine. Not patched — reported for a decision.
 9. **Opus narrative upgrade — validation fixed, guardrail now rejects it.** `opus_upgrade` gets prose classification labels back from Opus (`'missing journal entry'`, `'accrual mismatch'`) where `NarrativeJSON` requires the six enum tokens (`missing_je`, `accrual_mismatch`, …), so `model_validate` raises and `opus_status` is `failed`. Seen on both `086ce7f0` and `a84d3e60`. `opus_narrative_prompt.txt` does not pin the token list the way `narrative_prompt.txt` does. Fails closed — the base narrative still stands — so this is quality loss, not corruption. Not patched.
 10. **Cloud-agent VM (30 Aug evening) cannot continue live E2E.** No `.env`, no `ANTHROPIC_API_KEY` / `SUPABASE_*` in the process environment, no uvicorn on `:8000`, no demo password. Prior session's JWT and `run_id` are not on this machine. Mapping confirm route is known (see B3) but was not called.
