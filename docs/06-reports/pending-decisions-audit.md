@@ -11,17 +11,13 @@
 
 Önem sırasına göre.
 
-### 1.1 Close-flow ilk kod dilimi — hiç başlamamış
-**Kaynak:** `docs/02-planning/close-flow-contract.md`
-**Durum:** Sözleşme kilitli ("Kilit kararlar" tablosu, §1), Sentinel kâğıt yürüyüşü tanımlanmış (§4), ilk dilimin kapsamı net yazılmış (§5) — ama "henüz yazma" notuyla. Kodda karşılığı yok: `frontend/` ve `backend/` içinde `tie-out`, `tie_out`, `checklist`, `closed_period`, `sign-off` hiçbir eşleşme vermiyor. `RunStateMachine`'de `closed` state yok (`backend/domain/run_state_machine.py` — mevcut terminal state'ler: `upload_failed`, `parsing_failed`, `guardrail_failed`, `report_failed`).
+### 1.1 Close-flow — Dil 1 bitti, Dil 2 şimdilik açık
+**Kaynak:** `docs/02-planning/close-flow-contract.md`; uygulama kaydı `docs/sprint/pre-analysis-close-checklist.md`
+**Durum (16 Eylül 2026):** Sözleşmenin *ilk iskelet* dilimi (raporu checklist gibi okutmak) **Dil 1 olarak kodlandı**: Python `tie_out_summary`, GET `/report` `tie_out_group`, sayfa sırası tie-out → istisna (Payroll / Vendors / Contracts / Other) → coverage → anlatı → oturumluk banka kutusu. `closed` hâlâ yok.
 
-Somut olarak eksik olan (§5'te tanımlı):
-- Rapor sayfası sırasını "tie-out özeti 5/N → istisnalar → flux/anlatı → banka teyit satırı" şeklinde yeniden gruplama (bugün: özet anlatı en üstte, recon kartları hesap-yığını halinde).
-- Recon'u dosya etiketine göre gruplama (bordro / tedarikçi / sözleşme / kurulum / yakıt) — bugün hesap bazında düz liste.
-- Materiality tabanını `$100` dokümante edilen kuraldan `$100 ve %5`'e çekmek (consolidator zaten bunu yapıyor mu — bkz. §3.2, kısmen yapılmış).
-- Banka teyidi için tek checkbox + "Month Proof dışında yapıldı" cümlesi.
+**Şimdilik açık bırakıldı (Dil 2, 16 Eylül 2026):** isimli beş kontrol (install/fuel dahil), `SourceFileType` iğneleri, dosya-toplamı→GL eşleme modu. Redhawk’ta üç destek dosyası var; install/fuel fixture yok. Dosyası olmayan kontrolü “passed” saymak ve etiket uydurmak yasak. Yanlış GL hedefi sahte temiz/sahte açık üretir. Yeniden açmak yeni bir kilit ister (gerçek demo dosyası + file-total modu, sonra etiket). Dil 3 (`closed` / SQL) ayrı ve daha sonra.
 
-**Neden önemli:** Bu, "ürünü pivot etmeden close akışını bitirme" kararının ilk somut adımı. Sözleşme 24 Ağustos'ta kilitlendi, 2 haftadan uzun süredir kodlanmadı. Ya bilinçli olarak ertelendi (o zaman `risks.md`'ye R-numarasıyla girmeli) ya da unutuldu.
+Bu madde artık “hiç başlamamış ilk dilim” değil. Okuyan kişi Dil 2’yi unutulmuş iş sanmasın: **bilinçli açık**.
 
 ### 1.2 Agentic-memory roadmap Phase 3 — Persisted Quarterly Artifacts
 **Kaynak:** `docs/02-planning/agentic-memory-roadmap.md` §2 Phase 3
@@ -115,6 +111,6 @@ Dosyanın kendisi bunu en üstte açıkça söylüyor ("Tours 1-3 tarihsel, düz
 
 1. **`exception_three_way_matches` düzeltmesini push'la.** Zaten local'de çözülmüş — GitHub'a gitmediği sürece bu repo'da yok sayılır. En düşük efor, en yüksek risk kapatma.
 2. **Doküman hijyenini önce yap, sonra konsolide et.** §4'teki altı madde düzeltilmeden (özellikle CURRENT_STATUS/YAPILACAKLAR arşivleme + pre-analysis "SONUÇ" bantları) konsolidasyon yanlış girdilerle başlar — bayat dosyalar "aktif" dosyalarla aynı ağırlıkta okunur.
-3. **Close-flow ilk kod dilimine karar ver (§1.1).** İki haftadan uzun süredir kilitli sözleşme kodlanmadı — ya şimdi başla ya da `risks.md`'ye R-numarasıyla gerekçeli ertele.
+3. **Close-flow Dil 2 şimdilik açık (§1.1).** Dil 1 (iskelet) kodlandı. İsimli beş kontrol + file-total→GL yeni kilit olmadan başlamaz. Dil 3 (`closed`) ayrı.
 4. **`ENFORCE_NARRATIVE_CONSISTENCY` flip kararı.** Bir ölçüm turu geçti, 0 ihlal ölçüldü — flip etmenin maliyeti düşük görünüyor, karar sahibi belirlenmeli.
 5. **§3'teki sekiz "yarım kalan" maddeyi `risks.md`'ye R-numarasıyla işle.** Şu an hiçbiri oradan görünmüyor; audit dosyasına gömülü kalmışlar.

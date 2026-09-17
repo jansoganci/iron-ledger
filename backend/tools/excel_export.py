@@ -14,6 +14,8 @@ from __future__ import annotations
 import io
 from datetime import date
 
+from backend import messages
+
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -154,6 +156,10 @@ def _build_reconciliation_sheet(
     _style_row(ws, 1, font=Font(bold=True, size=13))
     ws.merge_cells("A1:G1")
 
+    ws.append([messages.BANK_OUTSIDE_ATTESTATION])
+    _style_row(ws, 2, font=Font(italic=True, size=10, color="5A5853"))
+    ws.merge_cells("A2:G2")
+
     if not reconciliations:
         ws.append(["No cross-source discrepancies detected for this period."])
         return
@@ -168,7 +174,7 @@ def _build_reconciliation_sheet(
         "Classification",
     ]
     ws.append(headers)
-    _style_header_row(ws, 2)
+    _style_header_row(ws, 3)
 
     ws.column_dimensions["A"].width = 28
     ws.column_dimensions["B"].width = 16
@@ -178,7 +184,7 @@ def _build_reconciliation_sheet(
     ws.column_dimensions["F"].width = 12
     ws.column_dimensions["G"].width = 28
 
-    row_num = 3
+    row_num = 4
     for item in sorted(reconciliations, key=lambda x: -abs(x.get("delta", 0))):
         coverage = _is_coverage_item(item)
         severity = item.get("severity", "low")
@@ -205,7 +211,7 @@ def _build_reconciliation_sheet(
                 cell.number_format = _CURRENCY_FMT
         row_num += 1
 
-    ws.freeze_panes = "A3"
+    ws.freeze_panes = "A4"
 
     # Sources detail block below
     row_num += 1

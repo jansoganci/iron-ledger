@@ -23,14 +23,7 @@ from backend.domain.contracts import DEFAULT_GL_CATEGORIES, DiscoveryPlan, Mappi
 from backend.domain.errors import DiscoveryLowConfidence
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
-from backend.tools.source_mapping import (
-    annotate_draft_items,
-    auto_map_payroll,
-    index_stored,
-    is_payroll,
-    needs_user_review,
-    remembered_decisions,
-)
+
 
 logger = get_logger(__name__)
 
@@ -539,36 +532,8 @@ def run_parser_after_discovery_approval(
 # AccountMapper pipeline — Phase A + Phase B
 # ---------------------------------------------------------------------------
 
-_FILE_TYPE_PATTERNS: dict[str, list[str]] = {
-    "general_ledger": [
-        "gl",
-        "general_ledger",
-        "quickbooks",
-        "qb",
-        "gl_export",
-        "ledger",
-    ],
-    "payroll": ["payroll", "salary", "salaries", "wages", "gusto", "adp", "rippling"],
-    "contracts": ["contract", "subscription", "recurring", "roster", "customer"],
-    "supplier_invoices": ["invoice", "supplier", "vendor", "purchase", "bill", "ap"],
-    # Item 1 (PR-B). Deliberately LAST: on any overlap the pre-existing types
-    # win, so a genuine processor file that also looks like a vendor file falls
-    # back to today's behaviour rather than being fed to the matcher.
-    # Conservative needles per C.2 — note bare "statement" is intentionally NOT
-    # used, because it would capture "income_statement" / "profit_and_loss
-    # _statement" P&L exports. "deposit_account" rather than "deposit" for the
-    # same reason the spec gives: do not steal customer-deposit files.
-    "bank_statement": ["bank", "bank_statement", "checking", "deposit_account"],
-    "processor_settlement": [
-        "stripe",
-        "shopify_payout",
-        "paypal",
-        "square",
-        "processor",
-        "settlement",
-        "payout",
-    ],
-}
+# File-type needles live in backend.tools.file_type so the close checklist
+# and the mapper cannot drift. Re-exported under the original names.
 
 
 def _attach_roster_counts(recon_items, per_file_data, period, run_id) -> None:
@@ -761,15 +726,6 @@ def _unpack_parse(result) -> tuple:
         return result
     preview_rows, source_column, raw_df = result
     return preview_rows, source_column, raw_df, None
-
-
-def _detect_file_type(filename: str) -> str:
-    """Infer SourceFileType from the filename stem — no user input required."""
-    stem = filename.lower().replace("-", "_").replace(" ", "_").split(".")[0]
-    for file_type, patterns in _FILE_TYPE_PATTERNS.items():
-        if any(p in stem for p in patterns):
-            return file_type
-    return "supplier_invoices"
 
 
 def run_multi_file_parser_with_mapping(
