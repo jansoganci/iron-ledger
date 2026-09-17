@@ -28,6 +28,7 @@ export interface ReconciliationItem {
   sources?: ReconciliationSource[];
   card_kind?: CardKind | null;
   hints?: ReconciliationHints | null;
+  tie_out_group?: "payroll" | "supplier_invoices" | "contracts" | "other" | null;
 }
 
 interface ReconciliationCardProps extends ReconciliationItem {

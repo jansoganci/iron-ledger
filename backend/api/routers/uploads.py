@@ -14,7 +14,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from backend import messages
 from backend.agents.opus_upgrade import run_opus_upgrade
@@ -31,19 +31,23 @@ from backend.api.deps import (
     get_companies_repo,
     get_entries_repo,
     get_file_storage,
+    get_reports_repo,
     get_runs_repo,
+    get_source_mappings_repo,
 )
 from backend.api.rate_limit import limiter
-from backend.domain.contracts import DiscoveryPlan
+from backend.domain.contracts import DiscoveryPlan, MappingDraft
 from backend.domain.entities import MonthlyEntry
 from backend.domain.errors import (
     DuplicateEntryError,
     RLSForbiddenError,
     TransientIOError,
 )
+from backend.domain.regenerate import run_wants_regenerate, strip_regenerate_flag
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger
 from backend.tools.file_reader import SUPPORTED_EXTENSIONS
+from backend.tools.source_mapping import persistable_upserts
 
 # Categories accepted by POST /runs/{run_id}/mapping/confirm.
 # "SKIP" is a frontend-only sentinel — never written to the database.
@@ -83,6 +87,7 @@ class ConfirmOverride(BaseModel):
 
 class ConfirmRequest(BaseModel):
     overrides: list[ConfirmOverride] = []
+    regenerate: bool = False
 
 
 class ConfirmDiscoveryRequest(BaseModel):
@@ -123,6 +128,7 @@ async def upload(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
     period: str = Form(...),
+    regenerate: bool = Form(False),
     user_id: str = Depends(get_current_user),
     company_id: str = Depends(get_company_id),
 ):
@@ -149,6 +155,17 @@ async def upload(
 
     run = runs_repo.create(company_id=company_id, period=period_date)
     run_id = run["id"]
+
+    if regenerate:
+        existing_report = get_reports_repo().get(company_id, period_date)
+        if existing_report is not None:
+            try:
+                runs_repo.set_regenerate(run_id, True)
+            except Exception as exc:
+                logger.warning(
+                    "failed to persist regenerate flag on run",
+                    extra={"run_id": run_id, "error": str(exc)},
+                )
 
     storage_keys: list[str] = []
     for f in files:
@@ -244,7 +261,8 @@ async def run_status(
         "low_confidence_columns": _map_low_confidence(
             run.get("low_confidence_columns") or []
         ),
-        "parse_preview": run.get("parse_preview"),
+        "parse_preview": strip_regenerate_flag(run.get("parse_preview")),
+        "regenerate": run_wants_regenerate(run),
     }
     if run["status"] == RunStatus.AWAITING_MAPPING_CONFIRMATION.value:
         pp = run.get("parse_preview") or {}
@@ -387,6 +405,14 @@ async def run_retry(
     # Create fresh run row; inherit storage_key for downstream retries if this one also fails
     new_run = runs_repo.create(company_id=company_id, period=period_date)
     new_run_id = new_run["id"]
+    if run_wants_regenerate(old_run):
+        try:
+            runs_repo.set_regenerate(new_run_id, True)
+        except Exception as exc:
+            logger.warning(
+                "failed to copy regenerate flag on retry run",
+                extra={"run_id": new_run_id, "error": str(exc)},
+            )
     try:
         runs_repo.set_storage_key(new_run_id, storage_key)
     except Exception as exc:
@@ -525,6 +551,19 @@ async def confirm_run(
             status_code=422,
             detail=messages.INVALID_PERIOD.format(period=period_value),
         ) from exc
+
+    existing_report = get_reports_repo().get(company_id, period_date)
+    wants_regenerate = bool(body.regenerate) or run_wants_regenerate(run)
+    if existing_report is not None and not wants_regenerate:
+        raise HTTPException(status_code=409, detail=messages.REGENERATE_REQUIRED)
+    if wants_regenerate:
+        try:
+            runs_repo.set_regenerate(run_id, True)
+        except Exception as exc:
+            logger.warning(
+                "failed to persist regenerate flag on confirm",
+                extra={"run_id": run_id, "error": str(exc)},
+            )
 
     storage_key = run.get("storage_key") or ""
     source_column = parse_preview.get("source_column", "amount")
@@ -671,6 +710,9 @@ async def confirm_mappings(
     except RLSForbiddenError as exc:
         raise HTTPException(status_code=403, detail=messages.FORBIDDEN) from exc
 
+    if run.get("company_id") != company_id:
+        raise HTTPException(status_code=403, detail=messages.FORBIDDEN)
+
     # State guard
     if run.get("status") != RunStatus.AWAITING_MAPPING_CONFIRMATION.value:
         raise HTTPException(
@@ -697,6 +739,16 @@ async def confirm_mappings(
         raise HTTPException(
             status_code=422, detail="Could not determine run period"
         ) from exc
+
+    try:
+        draft_model = MappingDraft.model_validate(draft)
+    except ValidationError:
+        draft_model = MappingDraft(items=[], gl_account_pool=pool)
+    mappings_repo = get_source_mappings_repo()
+    for file_type, source_pattern, gl_account in persistable_upserts(
+        draft_model.items, body.decisions
+    ):
+        mappings_repo.upsert(company_id, file_type, source_pattern, gl_account)
 
     # Synchronously transition to APPLYING_MAPPING before firing the background task.
     # This prevents re-entry: any subsequent confirm-mappings call will see a non-

@@ -220,8 +220,8 @@ class ComparisonAgent:
                     )
                 )
 
-        # 7. Persist anomalies
-        self._anomalies.write_many(flagged_anomalies)
+        # 7. Persist anomalies — replace the period so a re-run cannot stack.
+        self._anomalies.replace_period(company_id, period, flagged_anomalies)
 
         # Update progress: comparison complete
         try:

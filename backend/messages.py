@@ -27,6 +27,10 @@ GUARDRAIL_FAILED = (
     "We couldn't verify the report numbers after two attempts. "
     "Download the raw data below and try again."
 )
+NARRATIVE_SCHEMA_FAILED = (
+    "We couldn't write the report from the model's output after two attempts. "
+    "Your data is safe — please try again."
+)
 REPORT_WRITE_FAILED = (
     "We verified your numbers but couldn't save the report. "
     "Please try running this period again."
@@ -34,6 +38,10 @@ REPORT_WRITE_FAILED = (
 REPORT_ALREADY_EXISTS = (
     "A report already exists for this period. "
     "Delete it explicitly first if you want to regenerate it."
+)
+REGENERATE_REQUIRED = (
+    "This period already has a verified report. "
+    "Confirm that you want to replace it before continuing."
 )
 NOT_FOUND = "No verified report found for this company and period."
 
@@ -79,3 +87,4 @@ DISCOVERY_REJECTED = (
 
 COMPANY_CREATE_FAILED = "We couldn't create your workspace. Please try again."
 COMPANY_UPDATE_FAILED = "We couldn't save your company details. Please try again."
+

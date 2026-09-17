@@ -46,7 +46,7 @@ from backend.domain.contracts import (
     MappingResponse,
     NarrativeJSON,
 )
-from backend.domain.entities import Report
+from backend.domain.entities import Report, SourceAccountMapping
 from backend.domain.run_state_machine import RunStatus
 from backend.main import app
 
@@ -107,12 +107,13 @@ GL_BYTES = _xlsx(
     ]
 )
 
-# Payroll: employee names (raw, messy) — AccountMapper maps these to GL names
-PAYROLL_BYTES = _xlsx(
+# Payroll is identity-mapped and skipped; this flow uses a vendor file so
+# AccountMapper + MappingReview still run.
+VENDOR_BYTES = _xlsx(
     [
         ["Account", "Amount", "Date"],
-        ["Alice Johnson", 9500.0, "2026-03-01"],  # → Salaries & Wages
-        ["Bob Smith", 1000.0, "2026-03-01"],  # → Salaries & Wages (creates delta)
+        ["AlarmTech Industries", 9500.0, "2026-03-01"],
+        ["VisionPro", 1000.0, "2026-03-01"],
     ]
 )
 
@@ -150,7 +151,23 @@ class _FakeRunsRepo:
             run.update(extra)
 
     def set_parse_preview(self, run_id: str, preview: dict) -> None:
-        _state["runs"][run_id]["parse_preview"] = preview
+        from backend.domain.regenerate import (
+            attach_regenerate_flag,
+            run_wants_regenerate,
+        )
+
+        current = _state["runs"][run_id]
+        _state["runs"][run_id]["parse_preview"] = attach_regenerate_flag(
+            preview, regenerate=run_wants_regenerate(current)
+        )
+
+    def set_regenerate(self, run_id: str, regenerate: bool) -> None:
+        from backend.domain.regenerate import attach_regenerate_flag
+
+        current = _state["runs"][run_id]
+        _state["runs"][run_id]["parse_preview"] = attach_regenerate_flag(
+            current.get("parse_preview"), regenerate=regenerate
+        )
 
     def set_file_count(self, run_id: str, count: int) -> None:
         _state["runs"][run_id]["file_count"] = count
@@ -215,6 +232,26 @@ class _FakeAccountsRepo:
         return result
 
 
+class _FakeSourceMappingsRepo:
+    def list_for_company(self, company_id: str) -> list[SourceAccountMapping]:
+        return []
+
+    def upsert(
+        self,
+        company_id: str,
+        file_type: str,
+        source_pattern: str,
+        gl_account: str,
+    ) -> SourceAccountMapping:
+        return SourceAccountMapping(
+            id=str(uuid.uuid4()),
+            company_id=company_id,
+            file_type=file_type,
+            source_pattern=source_pattern,
+            gl_account=gl_account,
+        )
+
+
 class _FakeEntriesRepo:
     def list_for_period(self, company_id, period):
         return []
@@ -225,6 +262,23 @@ class _FakeEntriesRepo:
     def replace_period(self, company_id, period, entries):
         _state["entries"] = list(entries)
         return len(_state["entries"])
+
+
+class _FakeReportsRepo:
+    def get(self, company_id, period):
+        for report in _state["reports"].values():
+            if report.company_id == company_id and report.period == period:
+                return report
+        return None
+
+    def delete_monthly(self, company_id, period):
+        gone = [
+            rid
+            for rid, report in _state["reports"].items()
+            if report.company_id == company_id and report.period == period
+        ]
+        for rid in gone:
+            _state["reports"].pop(rid, None)
 
 
 # ---------------------------------------------------------------------------
@@ -246,19 +300,19 @@ _CAT_RESP = MappingResponse(
     mappings=[
         MappingOutput(column="Salaries & Wages", category="OPEX", confidence=0.95),
         MappingOutput(column="Equipment COGS", category="COGS", confidence=0.95),
-        MappingOutput(column="Alice Johnson", category="OTHER", confidence=0.30),
-        MappingOutput(column="Bob Smith", category="OTHER", confidence=0.30),
+        MappingOutput(column="AlarmTech Industries", category="COGS", confidence=0.95),
+        MappingOutput(column="VisionPro", category="COGS", confidence=0.95),
     ]
 )
 
 # AccountMapper (account_mapping_prompt.txt)
 _AMAP_RESP = AccountMappingResponse(
     mappings={
-        "Alice Johnson": AccountMappingDecision(
-            gl_account="Salaries & Wages", confident=True
+        "AlarmTech Industries": AccountMappingDecision(
+            gl_account="Equipment COGS", confident=True
         ),
-        "Bob Smith": AccountMappingDecision(
-            gl_account="Salaries & Wages", confident=True
+        "VisionPro": AccountMappingDecision(
+            gl_account="Equipment COGS", confident=True
         ),
     }
 )
@@ -337,10 +391,7 @@ def _make_patches(llm_mock: MagicMock) -> list:
             return_value=_FakeAccountsRepo(),
         ),
         patch("backend.agents.orchestrator.get_llm_client", return_value=llm_mock),
-        # Routes deps (used by HTTP handlers). get_anomalies_repo/get_reports_repo
-        # are not called by anything in the uploads router — the confirm endpoint
-        # only touches runs/accounts/entries directly and hands the background
-        # task nothing but IDs, which resolves its own repos inside orchestrator.py.
+
         patch(
             "backend.api.routers.uploads.get_runs_repo", return_value=_FakeRunsRepo()
         ),
@@ -355,6 +406,9 @@ def _make_patches(llm_mock: MagicMock) -> list:
         patch(
             "backend.api.routers.uploads.get_entries_repo",
             return_value=_FakeEntriesRepo(),
+        ),
+        patch(
+
         ),
         # Stub out the heavy comparison+report pipeline
         patch(
@@ -378,13 +432,16 @@ def test_account_mapper_full_flow() -> None:
         for p in _make_patches(llm_mock):
             stack.enter_context(p)
 
-        # ── Step 1: Upload GL + payroll ──────────────────────────────────
+        # ── Step 1: Upload GL + vendor invoices ──────────────────────────
         resp = client.post(
             "/upload",
             data={"period": "2026-03-01"},
             files=[
                 ("files", ("gl.xlsx", GL_BYTES, "application/octet-stream")),
-                ("files", ("payroll.xlsx", PAYROLL_BYTES, "application/octet-stream")),
+                (
+                    "files",
+                    ("vendor_invoices.xlsx", VENDOR_BYTES, "application/octet-stream"),
+                ),
             ],
         )
         assert resp.status_code == 200, f"Upload failed: {resp.text}"
@@ -397,18 +454,18 @@ def test_account_mapper_full_flow() -> None:
             run["status"] == RunStatus.AWAITING_MAPPING_CONFIRMATION.value
         ), f"Expected AWAITING_MAPPING_CONFIRMATION, got {run['status']}"
 
-        # ── Step 3: mapping_draft has payroll employee names ───────────
+        # ── Step 3: mapping_draft has vendor names ────────────────────
         pp = run["parse_preview"]
         assert pp is not None, "parse_preview is None"
         assert "mapping_draft" in pp, "mapping_draft missing from parse_preview"
         draft = pp["mapping_draft"]
         patterns = {item["source_pattern"] for item in draft["items"]}
         assert (
-            "Alice Johnson" in patterns
-        ), f"Alice Johnson missing from draft: {patterns}"
-        assert "Bob Smith" in patterns, f"Bob Smith missing from draft: {patterns}"
+            "AlarmTech Industries" in patterns
+        ), f"AlarmTech Industries missing from draft: {patterns}"
+        assert "VisionPro" in patterns, f"VisionPro missing from draft: {patterns}"
         gl_pool = draft["gl_account_pool"]
-        assert "Salaries & Wages" in gl_pool, f"Salaries & Wages not in pool: {gl_pool}"
+        assert "Equipment COGS" in gl_pool, f"Equipment COGS not in pool: {gl_pool}"
 
         # Verify status endpoint exposes mapping_draft
         status_resp = client.get(f"/runs/{run_id}/status")
@@ -417,8 +474,8 @@ def test_account_mapper_full_flow() -> None:
 
         # ── Step 4: POST confirm-mappings ─────────────────────────────
         decisions = {
-            "Alice Johnson": "Salaries & Wages",
-            "Bob Smith": "Salaries & Wages",
+            "AlarmTech Industries": "Equipment COGS",
+            "VisionPro": "Equipment COGS",
         }
         map_resp = client.post(
             f"/runs/{run_id}/confirm-mappings",
@@ -457,13 +514,11 @@ def test_account_mapper_full_flow() -> None:
 
         account_names = {item["account"] for item in recon}
         assert (
-            "Alice Johnson" not in account_names
-        ), f"Employee name leaked into reconciliations: {account_names}"
+            "AlarmTech Industries" not in account_names
+        ), f"Vendor name leaked into reconciliations: {account_names}"
         assert (
-            "Bob Smith" not in account_names
-        ), f"Employee name leaked into reconciliations: {account_names}"
-        # GL account names should be present
-        gl_names = {"Salaries & Wages", "Equipment COGS", "Bonuses"}
+            "VisionPro" not in account_names
+        ), f"Vendor name leaked into reconciliations: {account_names}"
         assert (
-            account_names & gl_names
-        ), f"No GL account names found in reconciliations: {account_names}"
+            "Equipment COGS" in account_names
+        ), f"Equipment COGS missing from reconciliations: {account_names}"

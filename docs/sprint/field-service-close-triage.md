@@ -308,6 +308,8 @@ return abs_delta >= _DELTA_DOLLAR_HARD or abs_delta >= _DELTA_DOLLAR_MIN
 
 **Scope.** `yeni component` (label/group only) **or** `sadece not` until the checklist UI slice is approved. Engine already covers the math.
 
+**16 Sep 2026:** checklist Dil 1 shipped (file-type groups Payroll / Vendors / Contracts / Other). Named five controls + file-total→GL (this family’s Dil 2, including install/fuel labels) is **left open** — see `docs/sprint/pre-analysis-close-checklist.md`. Do not paint those labels until a new lock.
+
 ---
 
 ### 8. Owner-facing KPI strip from pandas (not a new statement)

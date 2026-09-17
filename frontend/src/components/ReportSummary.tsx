@@ -9,8 +9,11 @@ import {
 } from "lucide-react";
 import { formatPeriod, formatCurrency } from "../lib/formatters";
 import { ReconciliationPanel } from "./ReconciliationPanel";
+import { TieOutSummaryCard } from "./TieOutSummaryCard";
+import { BankAttestation } from "./BankAttestation";
 import { isCoverageItem, type ReconciliationItem } from "./ReconciliationCard";
 import { cn } from "../lib/utils";
+import type { TieOutSummary } from "../lib/tieOut";
 
 export type ReportStatus = "verified" | "stale" | "guardrail_failed";
 export type OpusStatus = "pending" | "running" | "done" | "failed";
@@ -38,6 +41,8 @@ interface ReportSummaryProps {
   financials?: Financials | null;
   onRegenerate?: () => void;
   reconciliations?: ReconciliationItem[] | null;
+  tieOutSummary?: TieOutSummary | null;
+  companyId?: string;
   excelDownloadUrl?: string;
 }
 
@@ -255,6 +260,8 @@ export function ReportSummary({
   financials = null,
   onRegenerate,
   reconciliations,
+  tieOutSummary,
+  companyId,
   excelDownloadUrl,
 }: ReportSummaryProps) {
   const periodLabel = formatPeriod(period);
@@ -328,7 +335,7 @@ export function ReportSummary({
               {status === "verified" && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-favorable-bg text-favorable-fg px-3 py-1 text-xs font-semibold">
                   <CheckCircle className="h-3.5 w-3.5" />
-                  Verified · Guardrail Passed
+                  Numbers verified
                 </span>
               )}
               {opusUpgraded && (
@@ -357,8 +364,28 @@ export function ReportSummary({
         </div>
       )}
 
+      <div className="px-8 pb-6">
+        <TieOutSummaryCard
+          summary={
+            tieOutSummary ?? {
+              groups: [],
+              compared: 0,
+              with_gap: 0,
+              not_compared: 0,
+            }
+          }
+        />
+      </div>
+
+      {/* Exceptions by supporting-file type, then coverage */}
+      {reconciliations && reconciliations.length > 0 && (
+        <div className="px-8 pb-7 border-t border-border pt-6">
+          <ReconciliationPanel reconciliations={reconciliations} />
+        </div>
+      )}
+
       {/* Narrative — full report, serif body */}
-      <div className="px-8 py-7">
+      <div className="px-8 py-7 border-t border-border">
         {narrativeParts.map((part, i) => (
           <div key={i} className={i > 0 ? "mt-8" : ""}>
             {part.title && (
@@ -376,18 +403,17 @@ export function ReportSummary({
         ))}
       </div>
 
-      {/* Reconciliation findings */}
-      {reconciliations && reconciliations.length > 0 && (
-        <div className="px-8 pb-7 border-t border-border pt-6">
-          <ReconciliationPanel reconciliations={reconciliations} />
-        </div>
-      )}
+      <div className="px-8 pb-7">
+        <BankAttestation
+          storageKey={`monthproof.bankAttested:${companyId ?? "unknown"}:${period}`}
+        />
+      </div>
 
       {/* Footer actions */}
       <div className="px-8 py-4 border-t border-border bg-canvas flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-text-secondary">
           {status === "verified"
-            ? "All numbers verified against source data by the numeric guardrail."
+            ? "These numbers match your uploaded files. This does not mean the month is closed."
             : "Source data has changed since this report was generated."}
         </p>
         {excelDownloadUrl && (

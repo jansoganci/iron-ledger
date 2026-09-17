@@ -13,7 +13,7 @@ Built with Claude Opus 4.7 — Anthropic Hackathon April 2026.
 - Claude NEVER does arithmetic. All calculations (variance, totals, anomaly thresholds) are Python/pandas.
 - Claude ONLY interprets the pandas output in plain English.
 - No report is saved to Supabase until the numeric guardrail passes.
-- The monthly interpreter uses strict, unit-aware guardrail checks: money uses cent/float-noise tolerance and percentages use 0.05 percentage points. Legacy quarterly and Opus-upgrade callers still use the documented legacy tolerance in `backend/tools/guardrail.py`.
+- Monthly, quarterly, and Opus-upgrade callers all use strict, unit-aware guardrail checks: money uses cent/float-noise tolerance and percentages use 0.05 percentage points. `_tolerance_for` remains in `backend/tools/guardrail.py` for a revert, unused by production.
 
 ---
 
@@ -149,7 +149,7 @@ The active workflow is coordinated by `agents/orchestrator.py`. It performs stru
 ## Critical Files
 
 **`backend/tools/guardrail.py`** — Do not break this.
-`verify_guardrail()` accepts the narrative contract, pandas summary, optional reconciliation reference values, and a `strict` mode. The monthly interpreter uses strict unit-separated money/percentage pools; quarterly and Opus-upgrade paths currently use the legacy pool. Narrative-vs-`numbers_used` consistency is measured and logged, with enforcement controlled by the named rollout flag in this module.
+`verify_guardrail()` accepts the narrative contract, pandas summary, optional reconciliation reference values, and a `strict` mode. Monthly, quarterly, and Opus-upgrade callers use strict unit-separated money/percentage pools. Narrative-vs-`numbers_used` consistency (Stage 1) is enforced on the strict path via `ENFORCE_NARRATIVE_CONSISTENCY`.
 
 **`backend/tools/file_reader.py`** — Handles NetSuite edge case.
 NetSuite exports `.xls` files that are actually XML Spreadsheet 2003. openpyxl cannot open them. Detect by reading first 2 bytes: if `b"<?"` → parse as XML, not binary xls.
@@ -196,6 +196,7 @@ On 429: `Retry-After` header + JSON body with `messages.RATE_LIMITED`. Frontend 
 | `DuplicateEntryError` | `EntriesRepo` on unique-constraint violation | Never | 409 |
 | `RLSForbiddenError` | Any repo when RLS denies the row | Never | 403 |
 | `GuardrailError` | Interpreter use case, after semantic retry | Never | surfaces as `guardrail_failed` run status, not a 5xx |
+| `NarrativeSchemaError` | Interpreter use case, after schema retry | Never | surfaces as `guardrail_failed` with `NARRATIVE_SCHEMA_FAILED`, not a number-mismatch message |
 | `InvalidRunTransition` | `RunStateMachine.transition()` | Never — programmer error | 500 |
 | `FileHasNoValidColumns` | Parser after PII sanitization | Never | 422 |
 | `MappingAmbiguous` | Parser/category mapping | User confirmation | 422 when it reaches the API handler |

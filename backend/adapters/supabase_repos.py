@@ -14,12 +14,13 @@ from typing import Callable, TypeVar
 from supabase import Client
 
 from backend.domain.contracts import MappingOutput
-from backend.domain.entities import Anomaly, MonthlyEntry, Report
+from backend.domain.entities import Anomaly, MonthlyEntry, Report, SourceAccountMapping
 from backend.domain.errors import (
     DuplicateEntryError,
     RLSForbiddenError,
     TransientIOError,
 )
+from backend.domain.regenerate import attach_regenerate_flag, run_wants_regenerate
 from backend.domain.run_state_machine import RunStatus
 from backend.logger import get_logger
 
@@ -264,6 +265,20 @@ class SupabaseAnomaliesRepo:
         except Exception as exc:
             raise _wrap_db(exc) from exc
 
+    def replace_period(
+        self,
+        company_id: str,
+        period: date,
+        anomalies: list[Anomaly],
+    ) -> None:
+        try:
+            self._db.table("anomalies").delete().eq("company_id", company_id).eq(
+                "period", str(period)
+            ).execute()
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        self.write_many(anomalies)
+
     def list_account_flag_counts_before(
         self,
         company_id: str,
@@ -318,6 +333,7 @@ class SupabaseReportsRepo:
                 .select("*")
                 .eq("company_id", company_id)
                 .eq("period", str(period))
+                .eq("report_type", "monthly")
                 .limit(1)
                 .execute()
             )
@@ -401,6 +417,19 @@ class SupabaseReportsRepo:
             self._db.table("reports").delete().eq("company_id", company_id).eq(
                 "report_type", "quarterly"
             ).eq("year", year).eq("quarter", quarter).execute()
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+
+    def delete_monthly(self, company_id: str, period: date) -> None:
+        """Delete the monthly report for this period. Idempotent.
+
+        Does not touch quarterly rows. company_id is always the caller-resolved
+        tenant — never taken from a client-supplied report body.
+        """
+        try:
+            self._db.table("reports").delete().eq("company_id", company_id).eq(
+                "report_type", "monthly"
+            ).eq("period", str(period)).execute()
         except Exception as exc:
             raise _wrap_db(exc) from exc
 
@@ -600,8 +629,32 @@ class SupabaseRunsRepo:
             raise _wrap_db(exc) from exc
 
     def set_parse_preview(self, run_id: str, preview: dict) -> None:
+        payload = dict(preview)
+        try:
+            current = self.get_by_id(run_id)
+            payload = attach_regenerate_flag(
+                payload, regenerate=run_wants_regenerate(current)
+            )
+        except Exception:
+            pass
         body = {
-            "parse_preview": preview,
+            "parse_preview": payload,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        try:
+            _with_retry(
+                lambda: self._db.table("runs").update(body).eq("id", run_id).execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+
+    def set_regenerate(self, run_id: str, regenerate: bool) -> None:
+        run = self.get_by_id(run_id)
+        payload = attach_regenerate_flag(
+            run.get("parse_preview"), regenerate=regenerate
+        )
+        body = {
+            "parse_preview": payload,
             "updated_at": datetime.utcnow().isoformat(),
         }
         try:
@@ -1054,8 +1107,112 @@ class SupabaseAccountsRepo:
 
 
 # ---------------------------------------------------------------------------
+# Source account mappings (vendor / expense memory)
+# ---------------------------------------------------------------------------
+
+
+class SupabaseSourceAccountMappingsRepo:
+    def __init__(self, client: Client) -> None:
+        self._db = client
+
+    def list_for_company(self, company_id: str) -> list[SourceAccountMapping]:
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("source_account_mappings")
+                .select(
+                    "id, company_id, file_type, source_pattern, "
+                    "gl_account, created_at, updated_at"
+                )
+                .eq("company_id", company_id)
+                .order("source_pattern")
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        return [_row_to_source_mapping(row) for row in (resp.data or [])]
+
+    def upsert(
+        self,
+        company_id: str,
+        file_type: str,
+        source_pattern: str,
+        gl_account: str,
+    ) -> SourceAccountMapping:
+        payload = {
+            "company_id": company_id,
+            "file_type": file_type,
+            "source_pattern": source_pattern.strip(),
+            "gl_account": gl_account.strip(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("source_account_mappings")
+                .upsert(payload, on_conflict="company_id,file_type,source_pattern")
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        rows = resp.data or []
+        if not rows:
+            raise TransientIOError("source mapping upsert returned no row")
+        return _row_to_source_mapping(rows[0])
+
+    def update(
+        self,
+        company_id: str,
+        mapping_id: str,
+        gl_account: str,
+    ) -> SourceAccountMapping | None:
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("source_account_mappings")
+                .update(
+                    {
+                        "gl_account": gl_account.strip(),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("company_id", company_id)
+                .eq("id", mapping_id)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        rows = resp.data or []
+        if not rows:
+            return None
+        return _row_to_source_mapping(rows[0])
+
+    def delete(self, company_id: str, mapping_id: str) -> bool:
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("source_account_mappings")
+                .delete()
+                .eq("company_id", company_id)
+                .eq("id", mapping_id)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        return bool(resp.data)
+
+
+# ---------------------------------------------------------------------------
 # Row converters (private)
 # ---------------------------------------------------------------------------
+
+
+def _row_to_source_mapping(r: dict) -> SourceAccountMapping:
+    return SourceAccountMapping(
+        id=r["id"],
+        company_id=r["company_id"],
+        file_type=r["file_type"],
+        source_pattern=r["source_pattern"],
+        gl_account=r["gl_account"],
+        created_at=r.get("created_at"),
+        updated_at=r.get("updated_at"),
+    )
 
 
 def _row_to_entry(r: dict) -> MonthlyEntry:

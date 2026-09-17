@@ -1,6 +1,6 @@
 # Month Proof — doküman haritası
 
-*16 Eylül 2026. Eski Nisan listeleri arşivde.*
+*17 Eylül 2026. Eski Nisan listeleri arşivde.*
 
 ## Önce burası
 
@@ -17,7 +17,7 @@
 | `04-status/` | Yalnız `REMAINING_WORK.md`. |
 | `05-guides/` | `runbook.md` — çalıştırma / deploy notları. |
 | `06-reports/` | `close-process-by-sector.md` — sektör araştırması. |
-| `sprint/` | Hâlâ referans: close triage, Kova 2 item planı, guardrail kilidi. Bitmiş pre-analysis arşivde. |
+| `sprint/` | Close triage, Kova 2 planı, guardrail kilidi, Dil 1/token/mapping/regenerate pre-analysis. Dil 2 açık. |
 | `demo_data/` | Redhawk, Riverbend ve diğer fixture’lar. |
 | `archive/` | Bitmiş, bayat veya yalan söyleyen dokümanlar. Silinmedi. |
 

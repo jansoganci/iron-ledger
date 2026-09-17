@@ -60,7 +60,8 @@ class _ExistingReportRepo:
     """Stands in for the unique index: a second write for a period is refused.
 
     Records every write so the test can prove the stored report was left
-    exactly as it was — no delete, no overwrite.
+    exactly as it was — no delete, no overwrite — unless delete_monthly
+    was called first (explicit regenerate).
     """
 
     def __init__(self, existing: Report | None = None) -> None:
@@ -68,6 +69,11 @@ class _ExistingReportRepo:
         if existing is not None:
             self.stored[(existing.company_id, existing.period)] = existing
         self.write_attempts: list[Report] = []
+        self.deletes: list[tuple[str, date]] = []
+
+    def delete_monthly(self, company_id: str, period: date) -> None:
+        self.deletes.append((str(company_id), period))
+        self.stored.pop((str(company_id), period), None)
 
     def write(self, report: Report) -> Report:
         self.write_attempts.append(report)
@@ -90,12 +96,17 @@ class _FailingReportRepo(_ExistingReportRepo):
 
 
 class _FakeRunsRepo:
-    def __init__(self) -> None:
+    def __init__(self, regenerate: bool = False) -> None:
         self.status = RunStatus.COMPARING.value
         self.updates: list[tuple[str, dict]] = []
+        self.parse_preview: dict = {"_regenerate": True} if regenerate else {}
 
     def get_by_id(self, run_id: str) -> dict:
-        return {"id": run_id, "status": self.status}
+        return {
+            "id": run_id,
+            "status": self.status,
+            "parse_preview": self.parse_preview,
+        }
 
     def update_status(self, run_id: str, status, extra: dict | None = None) -> None:
         self.status = status.value if hasattr(status, "value") else str(status)
@@ -233,6 +244,72 @@ def test_first_write_for_a_fresh_period_still_succeeds() -> None:
     assert ok is True
     assert runs.status == RunStatus.COMPLETE.value
     assert len(reports.stored) == 1
+    assert reports.deletes == []
+
+
+# ---------------------------------------------------------------------------
+# Explicit regenerate — delete then insert, only with the flag
+# ---------------------------------------------------------------------------
+
+
+def test_regenerate_flag_replaces_the_existing_report() -> None:
+    original = _existing_report()
+    reports = _ExistingReportRepo(existing=original)
+    runs = _FakeRunsRepo(regenerate=True)
+
+    ok = _interpreter(reports, runs).run(_summary(), [], RUN_ID)
+
+    assert ok is True
+    assert runs.status == RunStatus.COMPLETE.value
+    assert reports.deletes == [(str(COMPANY), PERIOD)]
+    assert len(reports.stored) == 1
+    survivor = reports.stored[(str(COMPANY), PERIOD)]
+    assert survivor.id != "the-original-report"
+    assert survivor.summary != "ORIGINAL — must survive untouched"
+
+
+def test_five_regenerates_leave_one_monthly_report() -> None:
+    reports = _ExistingReportRepo(existing=_existing_report())
+    for _ in range(5):
+        runs = _FakeRunsRepo(regenerate=True)
+        assert (
+            _interpreter(reports, runs).run(_summary(), [], str(uuid.uuid4())) is True
+        )
+    assert len(reports.stored) == 1
+    assert len(reports.deletes) == 5
+
+
+def test_regenerate_flag_does_not_delete_when_guardrail_fails() -> None:
+    original = _existing_report()
+    reports = _ExistingReportRepo(existing=original)
+    runs = _FakeRunsRepo(regenerate=True)
+
+    class _MismatchLLM:
+        def call(self, **kwargs):
+            return NarrativeJSON(
+                narrative="Revenue was 999999.00 for the period.",
+                numbers_used=[999999.00],
+                reconciliation_classifications={},
+            )
+
+    agent = InterpreterAgent(
+        llm_client=_MismatchLLM(),
+        reports_repo=reports,
+        runs_repo=runs,
+        file_storage=_FakeStorage(),
+    )
+    ok = agent.run(_summary(), [], RUN_ID)
+
+    assert ok is False
+    assert runs.status == RunStatus.GUARDRAIL_FAILED.value
+    assert reports.deletes == []
+    assert reports.stored[(str(COMPANY), PERIOD)] is original
+
+
+def test_second_run_does_not_call_delete_without_the_flag() -> None:
+    reports = _ExistingReportRepo(existing=_existing_report())
+    _interpreter(reports, _FakeRunsRepo()).run(_summary(), [], RUN_ID)
+    assert reports.deletes == []
 
 
 # ---------------------------------------------------------------------------
