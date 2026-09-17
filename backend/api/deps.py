@@ -13,6 +13,7 @@ from backend.adapters.supabase_repos import (
     SupabaseEntriesRepo,
     SupabaseReportsRepo,
     SupabaseRunsRepo,
+    SupabaseSourceAccountMappingsRepo,
 )
 from backend.adapters.supabase_storage import SupabaseFileStorage
 from backend.settings import get_settings
@@ -46,6 +47,10 @@ def get_companies_repo() -> SupabaseCompaniesRepo:
 
 def get_accounts_repo() -> SupabaseAccountsRepo:
     return SupabaseAccountsRepo(_supabase_client())
+
+
+def get_source_mappings_repo() -> SupabaseSourceAccountMappingsRepo:
+    return SupabaseSourceAccountMappingsRepo(_supabase_client())
 
 
 def get_file_storage() -> SupabaseFileStorage:

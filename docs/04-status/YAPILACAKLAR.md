@@ -1,5 +1,12 @@
 # MONTH PROOF HACKATHON MASTER BRIEF
 
+> **Superseded as a living status/backlog file (16 September 2026).**
+> This is the April 2026 hackathon brief. It is kept for history.
+> Current product status: `docs/04-status/CURRENT_STATUS.md`.
+> Mapping v1 spec: `docs/sprint/pre-analysis-source-mappings.md`.
+> Cross-doc inventory: `docs/06-reports/pending-decisions-audit.md`.
+> Do not use this file to decide what to build next.
+
 ## Context: What We're Building
 
 **Month Proof** is an AI-powered month-end close tool for US SMBs. Target: companies with 5–40 employees, no FP&A budget, using QuickBooks + manual Excel files from departments. They spend 5–10 hours every month manually consolidating files and hunting discrepancies.

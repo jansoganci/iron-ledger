@@ -384,7 +384,7 @@ Tone: friendly, inviting, not alarming. The user has done nothing wrong.
 
 ### 7. Mapping Confirmation Surfaces
 
-`MappingReview` pauses multi-source runs when source values need a canonical GL account. `MappingConfirmPanel` handles up to three low-confidence column/category mappings. The compact panel shows only the lowest-confidence columns so review stays focused.
+`MappingReview` pauses multi-source runs when vendor or expense names need a canonical GL account. Conflicts with a saved mapping are shown first; payroll lines never appear here. Saved names are edited on Data → Saved names, not in the sidebar. `MappingConfirmPanel` handles up to three low-confidence column/category mappings.
 
 Blocks the pipeline until resolved. Background is dimmed; rest of the UI is non-interactive.
 

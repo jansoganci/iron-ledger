@@ -101,12 +101,18 @@ class AccountMappingResponse(BaseModel):
     mappings: dict[str, AccountMappingDecision]
 
 
+MappingOrigin = Literal["new", "remembered", "conflict"]
+
+
 class MappingDraftItem(BaseModel):
     source_pattern: str  # raw value from file ("AlarmTech Industries")
     source_file: str  # filename it came from
     file_type: SourceFileType  # detected from filename
     suggested_gl_account: str | None
     confident: bool  # pre-check row in UI when True
+    origin: MappingOrigin = "new"
+    remembered_gl_account: str | None = None
+    haiku_gl_account: str | None = None
 
 
 class MappingDraft(BaseModel):

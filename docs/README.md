@@ -35,12 +35,13 @@ Post-hackathon planning (spec → approval → implementation).
 - `field-service-close-triage.md` - Triage of field-service close research against the current consolidator/classifier (no code until approved)
 - `pre-analysis-is-material.md` - Slice 1 pre-analysis: consolidator `_is_material` AND-gate (approval gate; not PAYROLL, not class-6)
 - `pre-analysis-orphan-policy.md` - GL-only / source-only policy (planning only; not the AND-gate PR)
+- `pre-analysis-source-mappings.md` - Locked v1 spec: remember vendors/expenses, skip payroll memory, Data-page dictionary
 
 ### 04-status/
 Current project status and TODO lists.
 
-- `CURRENT_STATUS.md` - Latest project status (English)
-- `YAPILACAKLAR.md` - Current TODO list (Turkish)
+- `CURRENT_STATUS.md` - Living one-page product status (start here)
+- `YAPILACAKLAR.md` - April 2026 hackathon brief (superseded; not the backlog)
 
 ### 05-guides/
 User guides and operational runbooks.
