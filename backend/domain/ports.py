@@ -81,6 +81,16 @@ class AnomaliesRepo(Protocol):
 
     def write_many(self, anomalies: list[Anomaly]) -> None: ...
 
+    def replace_period(
+        self,
+        company_id: str,
+        period: date,
+        anomalies: list[Anomaly],
+    ) -> None: ...
+
+    # DELETE-then-INSERT for one (company_id, period). Empty `anomalies`
+    # still clears the previous flags so a re-run does not stack cards.
+
     def list_account_flag_counts_before(
         self,
         company_id: str,
@@ -128,6 +138,12 @@ class ReportsRepo(Protocol):
     # Delete a quarterly report row. Idempotent — no error if row is absent.
     # Caller must delete before calling write_quarterly to avoid UNIQUE violations.
 
+    def delete_monthly(self, company_id: str, period: date) -> None: ...
+
+    # Delete the monthly report for (company_id, period). Idempotent.
+    # Interpreter calls this only after explicit regenerate consent AND a
+    # passing guardrail. write() stays insert-only.
+
 
 @runtime_checkable
 class RunsRepo(Protocol):
@@ -155,11 +171,17 @@ class RunsRepo(Protocol):
 
     def set_storage_key(self, run_id: str, storage_key: str) -> None: ...
 
-    def set_parse_preview(self, run_id: str, preview: dict) -> None: ...
-
     # Populated by POST /upload after the file lands in Storage.
     # Read by POST /runs/{run_id}/retry to re-run the pipeline against
     # the existing file (no re-upload required).
+
+    def set_parse_preview(self, run_id: str, preview: dict) -> None: ...
+
+    def set_regenerate(self, run_id: str, regenerate: bool) -> None: ...
+
+    # Persists explicit consent to replace a verified monthly report.
+    # Stored on parse_preview JSONB (no new column). Parser overwrites of
+    # parse_preview must preserve the flag.
 
     def set_discovery_plan(
         self,

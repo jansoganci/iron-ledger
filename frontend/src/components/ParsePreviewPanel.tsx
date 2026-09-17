@@ -40,10 +40,16 @@ const LOW_CONFIDENCE_THRESHOLD = 0.8;
 interface ParsePreviewPanelProps {
   runId: string;
   preview: ParsePreview;
+  regenerate?: boolean;
   onConfirmed: () => void;
 }
 
-export function ParsePreviewPanel({ runId, preview, onConfirmed }: ParsePreviewPanelProps) {
+export function ParsePreviewPanel({
+  runId,
+  preview,
+  regenerate = false,
+  onConfirmed,
+}: ParsePreviewPanelProps) {
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
   const [amountOverrides, setAmountOverrides] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,7 +112,7 @@ export function ParsePreviewPanel({ runId, preview, onConfirmed }: ParsePreviewP
       await apiFetch(`/runs/${runId}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ overrides }),
+        body: JSON.stringify({ overrides, regenerate }),
       });
       onConfirmed();
     } catch (err) {
@@ -231,6 +237,13 @@ export function ParsePreviewPanel({ runId, preview, onConfirmed }: ParsePreviewP
             ))}
           </ul>
         </details>
+      )}
+
+      {regenerate && (
+        <p className="text-sm text-severity-medium-fg">
+          Confirming replaces this period&apos;s current report after verification
+          passes.
+        </p>
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}

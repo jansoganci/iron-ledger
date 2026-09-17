@@ -151,7 +151,23 @@ class _FakeRunsRepo:
             run.update(extra)
 
     def set_parse_preview(self, run_id: str, preview: dict) -> None:
-        _state["runs"][run_id]["parse_preview"] = preview
+        from backend.domain.regenerate import (
+            attach_regenerate_flag,
+            run_wants_regenerate,
+        )
+
+        current = _state["runs"][run_id]
+        _state["runs"][run_id]["parse_preview"] = attach_regenerate_flag(
+            preview, regenerate=run_wants_regenerate(current)
+        )
+
+    def set_regenerate(self, run_id: str, regenerate: bool) -> None:
+        from backend.domain.regenerate import attach_regenerate_flag
+
+        current = _state["runs"][run_id]
+        _state["runs"][run_id]["parse_preview"] = attach_regenerate_flag(
+            current.get("parse_preview"), regenerate=regenerate
+        )
 
     def set_file_count(self, run_id: str, count: int) -> None:
         _state["runs"][run_id]["file_count"] = count
@@ -246,6 +262,23 @@ class _FakeEntriesRepo:
     def replace_period(self, company_id, period, entries):
         _state["entries"] = list(entries)
         return len(_state["entries"])
+
+
+class _FakeReportsRepo:
+    def get(self, company_id, period):
+        for report in _state["reports"].values():
+            if report.company_id == company_id and report.period == period:
+                return report
+        return None
+
+    def delete_monthly(self, company_id, period):
+        gone = [
+            rid
+            for rid, report in _state["reports"].items()
+            if report.company_id == company_id and report.period == period
+        ]
+        for rid in gone:
+            _state["reports"].pop(rid, None)
 
 
 # ---------------------------------------------------------------------------
@@ -358,14 +391,7 @@ def _make_patches(llm_mock: MagicMock) -> list:
             return_value=_FakeAccountsRepo(),
         ),
         patch("backend.agents.orchestrator.get_llm_client", return_value=llm_mock),
-        patch(
-            "backend.agents.orchestrator.get_source_mappings_repo",
-            return_value=_FakeSourceMappingsRepo(),
-        ),
-        # Routes deps (used by HTTP handlers). get_anomalies_repo/get_reports_repo
-        # are not called by anything in the uploads router — the confirm endpoint
-        # only touches runs/accounts/entries directly and hands the background
-        # task nothing but IDs, which resolves its own repos inside orchestrator.py.
+
         patch(
             "backend.api.routers.uploads.get_runs_repo", return_value=_FakeRunsRepo()
         ),
@@ -382,8 +408,7 @@ def _make_patches(llm_mock: MagicMock) -> list:
             return_value=_FakeEntriesRepo(),
         ),
         patch(
-            "backend.api.routers.uploads.get_source_mappings_repo",
-            return_value=_FakeSourceMappingsRepo(),
+
         ),
         # Stub out the heavy comparison+report pipeline
         patch(
