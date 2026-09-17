@@ -391,6 +391,10 @@ def _make_patches(llm_mock: MagicMock) -> list:
             return_value=_FakeAccountsRepo(),
         ),
         patch("backend.agents.orchestrator.get_llm_client", return_value=llm_mock),
+        patch(
+            "backend.agents.orchestrator.get_source_mappings_repo",
+            return_value=_FakeSourceMappingsRepo(),
+        ),
 
         patch(
             "backend.api.routers.uploads.get_runs_repo", return_value=_FakeRunsRepo()
@@ -408,7 +412,12 @@ def _make_patches(llm_mock: MagicMock) -> list:
             return_value=_FakeEntriesRepo(),
         ),
         patch(
-
+            "backend.api.routers.uploads.get_reports_repo",
+            return_value=_FakeReportsRepo(),
+        ),
+        patch(
+            "backend.api.routers.uploads.get_source_mappings_repo",
+            return_value=_FakeSourceMappingsRepo(),
         ),
         # Stub out the heavy comparison+report pipeline
         patch(

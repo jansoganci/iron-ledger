@@ -80,6 +80,12 @@ DISCOVERY_LOW_CONFIDENCE = (
 
 MAPPING_FAILED = "We couldn't classify your accounts. Please re-upload."
 MAPPING_INVALID_GL_ACCOUNT = "One or more selected GL accounts is no longer valid."
+MAPPING_NOT_FOUND = "That saved name was not found."
+MAPPING_GL_REQUIRED = "Choose a GL account before saving."
+BANK_OUTSIDE_ATTESTATION = (
+    "Bank and card reconciliation is done outside Month Proof. "
+    "This report does not confirm it."
+)
 
 DISCOVERY_REJECTED = (
     "You rejected our reading of this file. Please try a different export."
