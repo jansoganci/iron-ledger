@@ -177,7 +177,7 @@ APP_ENV=development
 
 ## Future Roadmap
 
-See `docs/03-sprint/risks.md` section "Post-MVP Backlog" for the original backlog. Highlights:
+See `docs/04-status/REMAINING_WORK.md` for what is still open. Post-MVP ideas (pgvector, ERP APIs, multi-user) live there under “Parked — post-MVP”. Highlights:
 
 - **pgvector** for long-term pattern recognition across fiscal years
 - **ERP API integrations** (NetSuite, QuickBooks, SAP direct)

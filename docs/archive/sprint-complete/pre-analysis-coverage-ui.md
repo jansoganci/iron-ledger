@@ -1,6 +1,8 @@
 # Pre-analysis: Coverage UI (GL-only “Not compared”)
 
-Status: analysis only. No code in this change.
+**SONUÇ: implementation tamamlandı (kod `main`'de).** `card_kind=coverage` ve GL-only “Not compared” kartları canlı. “Analysis only” başlığı artık yanlış.
+
+Status: implemented on `main`.
 Date: 2026-08-24.
 Checkout verified: `main` at `a876a73` (no `card_kind` on this branch).
 

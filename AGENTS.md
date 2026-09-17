@@ -23,7 +23,7 @@ Use this order when repository documentation disagrees:
 
 1. Current code, tests, and Supabase migrations
 2. `AGENTS.md`
-3. `docs/01-architecture/` and `docs/04-status/`
+3. `docs/01-architecture/` and `docs/04-status/REMAINING_WORK.md`
 4. `CLAUDE.md` and `README.md`
 
 Some docs describe an older three-agent/six-migration version of the product.

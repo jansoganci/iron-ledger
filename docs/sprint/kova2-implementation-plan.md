@@ -1,8 +1,9 @@
 # Kova 2 — implementation plan
 
-*Planning artifact only. No product code from this document until explicit go-ahead **per item**.*  
+*Tarihsel plan. Item 2 / 3 / 6 hâlâ tetikleyici bekliyor — canlı liste: `docs/04-status/REMAINING_WORK.md`.*  
+*Parent analysis archived at `docs/archive/sprint-complete/kova2-comprehensive-analysis.md`.*  
 *Date: 26 August 2026.*  
-*Parent: [kova2-comprehensive-analysis.md](kova2-comprehensive-analysis.md) (approved). Sequence here is the single checkpoint at the end of that document — do not re-rank, merge items, or add a seventh classification.*  
+*Parent: [kova2-comprehensive-analysis.md](../archive/sprint-complete/kova2-comprehensive-analysis.md) (approved, archived). Sequence here is the single checkpoint at the end of that document — do not re-rank, merge items, or add a seventh classification.*  
 *Code read on `cursor/kova2-comprehensive-analysis-d72a` (Kova 1 recon stack + analysis). PAYROLL tag still lives on PR #5 (`cursor/payroll-pattern-match-d72a`), off this stack and off `origin/main`.*
 
 This is the engineering spec that later PRs execute literally. Ambiguity left here is a failure of this document, not something to resolve while coding.

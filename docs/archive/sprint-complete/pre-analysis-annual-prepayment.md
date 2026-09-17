@@ -1,6 +1,8 @@
 # Pre-analysis — Annual prepayment vs `accrual_mismatch` (delta × 12)
 
-*Planning only. No implementation until this document is approved.*  
+**SONUÇ: implementation tamamlandı (kod `main`'de).** Yıllık peşin ipucu pandas'ta duruyor; deferred-revenue rollforward bu dilimin dışında kaldı. Planning-only başlığı artık yanlış.
+
+*Originally planning only.*  
 *Date: 26 August 2026.*  
 *Parent: [field-service-close-triage.md](field-service-close-triage.md) Bucket 1 item 5.*  
 *Code read on this branch (`main` + prior **docs** PRs). Fallback wiring after deposit/fee (PR #9) is cited as stacked state, not as code on this branch.*  

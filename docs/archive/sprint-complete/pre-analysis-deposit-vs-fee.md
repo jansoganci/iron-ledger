@@ -1,6 +1,8 @@
 # Pre-analysis — Customer deposit vs processor fee/netting
 
-*Planning only. No implementation until this document is approved.*  
+**SONUÇ: implementation tamamlandı (kod `main`'de).** `_is_processor_fee_gap` iki taraflı %3–8 farkı `structural_explained` için işaretler; müşteri depozitosu fee bandına girmez. Planning-only başlığı artık yanlış.
+
+*Originally planning only.*  
 *Date: 25 August 2026.*  
 *Parent: [field-service-close-triage.md](field-service-close-triage.md) Bucket 1 item 3.*  
 *Depends on: class-6 GÜNCELLEME (PR #6) for Sentinel recount; coverage cards (PR #4) for GL-only behaviour.*  

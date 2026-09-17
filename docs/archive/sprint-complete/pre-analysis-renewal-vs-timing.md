@@ -1,6 +1,8 @@
 # Pre-analysis — Renewal / roster dates vs `crosses_period_boundary`
 
-*Planning only. No implementation until this document is approved.*  
+**SONUÇ: implementation tamamlandı (kod `main`'de).** Roster/yenileme kolonları ve contracts-şekilli dosyalar cutoff taramasından çıkarıldı. Planning-only başlığı artık yanlış.
+
+*Originally planning only.*  
 *Date: 25 August 2026.*  
 *Parent: [field-service-close-triage.md](field-service-close-triage.md) Bucket 1 item 4.*  
 *Process: (1) this pre-analysis → approval, (2) implementation as one piece, (3) verification vs this file.*
