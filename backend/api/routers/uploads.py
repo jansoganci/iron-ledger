@@ -47,7 +47,7 @@ from backend.domain.regenerate import run_wants_regenerate, strip_regenerate_fla
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger
 from backend.tools.file_reader import SUPPORTED_EXTENSIONS
-from backend.tools.source_mapping import persistable_upserts
+from backend.tools.source_mapping import mapping_confirmation_error, persistable_upserts
 
 # Categories accepted by POST /runs/{run_id}/mapping/confirm.
 # "SKIP" is a frontend-only sentinel — never written to the database.
@@ -686,8 +686,10 @@ async def confirm_run(
 
 
 class ConfirmMappingsRequest(BaseModel):
-    decisions: dict[str, str]
-    # {source_pattern: gl_account_name} — flat, no per-file-type nesting
+    decisions: dict[str, str] = {}
+    # {source_pattern: gl_account_name} — row mapping
+    file_total_decisions: dict[str, str] = {}
+    # {source_file: gl_account_name} — file-total mapping, not persisted as a vendor rule
 
 
 @router.post("/runs/{run_id}/confirm-mappings")
@@ -701,9 +703,6 @@ async def confirm_mappings(
     company_id: str = Depends(get_company_id),
 ):
     """Accept user-approved account mappings and resume the pipeline (Phase B)."""
-    if not body.decisions:
-        raise HTTPException(status_code=400, detail="decisions must not be empty")
-
     runs_repo = get_runs_repo()
     try:
         run = runs_repo.get_by_id(run_id)
@@ -720,16 +719,19 @@ async def confirm_mappings(
             detail=f"Run is not awaiting mapping confirmation (status: {run.get('status')})",
         )
 
-    # Validate all submitted gl_accounts are in the saved pool
     pp = run.get("parse_preview") or {}
     draft = pp.get("mapping_draft") or {}
-    pool: list[str] = draft.get("gl_account_pool", [])
-    bad = [gl for gl in body.decisions.values() if gl and gl not in pool]
-    if bad:
+    try:
+        draft_model = MappingDraft.model_validate(draft)
+    except ValidationError as exc:
         raise HTTPException(
-            status_code=400,
-            detail=f"{messages.MAPPING_INVALID_GL_ACCOUNT} Unknown: {bad}",
-        )
+            status_code=400, detail=messages.MAPPING_DRAFT_INVALID
+        ) from exc
+    error = mapping_confirmation_error(
+        draft_model, body.decisions, body.file_total_decisions
+    )
+    if error:
+        raise HTTPException(status_code=400, detail=error)
 
     # Resolve period from the run row
     period_raw = run.get("period")
@@ -740,15 +742,14 @@ async def confirm_mappings(
             status_code=422, detail="Could not determine run period"
         ) from exc
 
-    try:
-        draft_model = MappingDraft.model_validate(draft)
-    except ValidationError:
-        draft_model = MappingDraft(items=[], gl_account_pool=pool)
     mappings_repo = get_source_mappings_repo()
     for file_type, source_pattern, gl_account in persistable_upserts(
         draft_model.items, body.decisions
     ):
         mappings_repo.upsert(company_id, file_type, source_pattern, gl_account)
+
+    pp["file_total_decisions"] = dict(body.file_total_decisions)
+    runs_repo.set_parse_preview(run_id, pp)
 
     # Synchronously transition to APPLYING_MAPPING before firing the background task.
     # This prevents re-entry: any subsequent confirm-mappings call will see a non-

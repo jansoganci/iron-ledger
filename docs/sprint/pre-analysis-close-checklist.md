@@ -1,7 +1,14 @@
 # Pre-analysis — Close checklist (raporu kapanış listesine çevir)
 
-Status: Slice 1 implemented. Slice 2 **left open** (2026-09-16) — not
-started, not cancelled. Reopen only with a new lock.
+Status: Slice 1 implemented. Slice 2 **first delivery implemented**
+(2026-09-17) for payroll, vendor, and contract controls. Installation/fuel
+remain outside this delivery. Slice 3 (`closed` / period lock) is still later.
+Update 2026-09-17: product direction and report UX recorded in
+[§11](#11-17-eylül-2026--dil-2-ürün-kararı-ve-rapor-ux-tasarımı); implementation
+result is in [§11.11](#1111-17-eylül-2026--ilk-teslim-uygulandı).
+Three supported controls first; install/fuel remain outside the first delivery.
+Earlier sections retain historical context. §11 is the design; §11.11 is what
+the code actually does.
 Date: 2026-09-16.
 Parent: `docs/02-planning/close-flow-contract.md`;
 `docs/06-reports/close-process-by-sector.md` §5;
@@ -273,9 +280,10 @@ slice is locked.
 - [x] This is **two slices**, not “add closed + checklist in one job.”
 - [x] Slice 1: regroup existing cards + bank sentence + Verified copy.
       No new file types. No `closed`. No SQL.
-- [ ] Slice 2: named five controls + file-total→GL map, **after** 1.
-      **Left open 2026-09-16.** Do not start. Do not paint Install/Fuel.
-      An invented 5th control with no file must not count as passed.
+- [x] Slice 2 first delivery (2026-09-17): three named controls +
+      file-total→GL map for a single-target supporting source. Install/Fuel
+      still not painted. An invented 5th control with no file does not count
+      as passed.
 - [x] Demo fixture for slice 1 is **Redhawk**, not restoring Sentinel binaries.
 - [x] Do not reopen materiality, coverage/`missing_je`, or a 7th class.
 - [x] Do not ask Claude to calculate N of M.
@@ -317,3 +325,352 @@ Do not sneak it in while slice 2 is open.
 To reopen slice 2: lock names against real demo files, then file-total
 mode, then UI labels — in that order. Until then this family stops at
 slice 1.
+
+**Superseded 2026-09-17:** first delivery of the three named controls is
+implemented. See [§11.11](#1111-17-eylül-2026--ilk-teslim-uygulandı).
+Install/fuel remain out. This historical lock is kept for the audit trail.
+
+---
+
+## 11. 17 Eylül 2026 — Dil 2 ürün kararı ve rapor UX tasarımı
+
+**Karar tarihi:** 17 Eylül 2026.
+
+**Durum:** İlk teslim uygulandı (2026-09-17). Üç desteklenen kontrol
+(bordro, tedarikçi, sözleşme), run-scoped file-total eşleme ve rapor/Excel
+kanıtı kodda. Kurulum/yakıt hâlâ çalışan kontrol değildir. Bu kayıt SQL,
+deploy veya yeni fixture üretmez.
+
+**Kullanıcı:** Saha hizmeti ofis müdürü ve fractional controller.
+
+**Amaç:** Kullanıcının hangi kaynağın muhasebeyle tutarlı olduğunu, hangi
+konuyu incelemesi gerektiğini ve hangi alanın kontrol edilemediğini anlayıp
+kanıtlarıyla birlikte bir kapanış çalışma paketi paylaşabilmesi.
+
+### 11.1. Alınan ürün yönü kararı
+
+İlk teslim hedefi bordro, tedarikçi ve sözleşme kontrolleridir. Öncelik bu üç
+kontrolden güvenilir ve aksiyon alınabilir sonuç çıkarmaktır. Kurulum ve yakıt
+kontrolleri iptal edilmez; gerçek fixture, detector ve karşılaştırma kapsamı
+doğrulanana kadar çalışan kontrol olarak sunulmaz.
+
+Raporun önceliği açık işler ve kontrol kapsamıdır; aylık performans anlatısı
+bunların ardından gelir. Belirsiz kaynak → GL eşlemesi kullanıcı onayına
+sunulur. Kaynak eksikliği veya onaysız eşleme başarı sayılmaz.
+
+Bu teslim, sözleşmedeki beş kontrolün tamamının bitmesi değildir. Üç kontrolün
+temiz çıkması da bütün ay sonu kapanışının tamamlandığı anlamına gelmez.
+Ürün vaadi: “Yüklediğiniz kaynakların GL ile tutarlılığını kontrol edin;
+açıkları ve kanıtlarıyla kapanış çalışma paketinizi hazırlayın.”
+
+### 11.2. Kullanıcının alacağı somut sonuç
+
+Ofis müdürü raporu açtıktan sonra 60 saniyede şu soruları cevaplayabilmelidir:
+
+1. Hangi kontroller yapıldı, hangilerinde inceleme gerekiyor?
+2. Şimdi hangi dosyayı, hesabı veya kaydı kontrol etmeliyim?
+3. Hangi alan kaynak ya da eşleme eksikliği nedeniyle değerlendirilemedi?
+4. Hangi sonuç hangi dosyaya ve GL hesabına dayanıyor?
+5. Excel paketini paylaşırken hangi açıkları ve kapsam sınırlarını belirtmeliyim?
+
+Controller aynı raporda kaynak tutarı, GL tutarı, fark, dönem ve eşleme
+kapsamına ulaşabilmelidir. Kanıtlanmış bulgu ile olası neden birbirinden
+ayrılır. Dosyanın doğrulamadığı bir eksik fatura, JE veya neden kesinmiş gibi
+yazılmaz. Sonraki adım bir inceleme önerisidir; otomatik JE veya ERP işlemi değildir.
+
+### 11.3. Rapor ekranı: bilgi sırası
+
+Dil 1'in mevcut iskeleti korunur. Aşağıdaki sıra gelecekteki UX hedefidir;
+bugünkü uygulamanın bu davranışı zaten sağladığı iddia edilmez.
+
+```text
+Şirket · Dönem · Raporun veri güncelliği
+Numbers verified — dönem kapanışı veya insan onayı değildir
+Mevcut finansal KPI şeridi
+
+KONTROL ÖZETİ
+Karşılaştırılan kontroller · Fark bulunanlar · Değerlendirilemeyenler
+Bordro       [durum]   [kanıtı incele / eksik bilgiyi gör]
+Tedarikçiler [durum]   [kanıtı incele / eksik bilgiyi gör]
+Sözleşmeler  [durum]   [kanıtı incele / eksik bilgiyi gör]
+Kapsam notu: Kurulum ve yakıt bu sürümde değerlendirilmedi.
+
+İNCELEMENİZ GEREKENLER
+Kontrole göre gruplu bulgular · mevcut önem sırası
+Bulgu → kaynak/GL karşılaştırması → inceleme için sonraki adım
+
+KARŞILAŞTIRILMAYAN GL HESAPLARI
+Mevcut coverage kartları; eksik JE veya başarısız kontrol sayılmaz
+
+BU AY NE DEĞİŞTİ?
+Mevcut flux / anlatı; kaynakta kanıtlanmayan neden kesinleştirilmez
+
+BANKA VE KAPSAM
+Banka mutabakatı Month Proof dışında · mevcut oturumluk teyit
+
+EXCEL PAKETİNİ İNDİR
+Kontrol özeti + açıklar + kanıtlar + mevcut finansal tablolar
+```
+
+Ekrandaki açıklamalar ürün diline uyarlanır; bu taslaktaki Türkçe ifadeler
+ayrıca bir yerelleştirme projesi başlatmaz. Durumlar yalnız renkle anlatılmaz;
+metin, klavye erişimi, odak ve yüklenme/hata durumları korunur.
+
+### 11.4. Kontrol durumları ve sayım sözleşmesi
+
+| Durum | Ne zaman gösterilir? | Kullanıcının sonraki adımı |
+|---|---|---|
+| Tied out | Kapsam/hedef doğrulanmış; iki taraflı karşılaştırma tamamlanmış; mevcut eşiklere göre istisna yok | İsterse kanıtı incele |
+| Has exceptions | Karşılaştırma yapılmış; inceleme gereken mevcut recon bulgusu var | İlgili kaydı ve kanıtı incele |
+| Mapping required | Kaynak var; hedef veya tutar kapsamı henüz doğrulanmamış | Karşılaştırma taslağını onayla/düzelt |
+| Source missing | Desteklenen kontrol için gereken kaynak yok | Sonraki analizde ilgili kaynağı ekle |
+| Not compared | GL tarafı eksik, kaynak boş/geçersiz veya kapsamın bir bölümü karşılaştırılamıyor | Gösterilen eksikliği gider |
+
+Bu durumlar kontrol özeti içindir; yeni recon sınıfı veya run durumu değildir.
+Kurulum/yakıt ilk teslimde ayrı bir kapsam notudur; bu tabloya sahte bir
+çalışan kontrol veya “dosya yükleyince çalışır” çağrısı olarak eklenmez.
+Bu not Gün 0 beklenen-dosya manifesti değildir.
+
+Bir kontrol kısmen karşılaştırıldıysa bütünü Tied out olamaz. Karşılaştırılan
+hesaplardaki bulgular görünür kalır; eksik kapsam ayrıca belirtilir. Kontrolün
+tamamlanmış karşılaştırma sayısına girmesi için bütün tanımlı kapsamı işlenmelidir.
+
+Özetin birimi **kontrol**dür. Karşılaştırılanlar tamamı değerlendirilmiş
+kontrolleri; fark bulunanlar bunların istisnalı alt kümesini;
+değerlendirilemeyenler eksik/onaysız/kısmi kontrolleri ifade eder. Kısmi bir
+kontrolde bulunan farklar ayrıca gösterilir; özet eksik kapsamı gizlemez.
+Coverage hesaplarının sayısı kontrol sayısına karıştırılmaz. Bütün sayıları
+Python üretir; frontend ve Claude yeni N/M hesabı yapmaz.
+
+İlk teslimde “3/5 tamamlandı” veya kapanış yüzdesi kullanılmaz. “Karşılaştırıldı”
+ile “fark bulunmadı” ayrı anlamlardır. Kart çıkmaması tek başına Tied out kanıtı
+değildir. Tied out, kuruşuna eşitlik veya bütün finansal tabloların doğruluğu
+iddiası değildir; mevcut materiality kuralları altındaki sonucu ifade eder.
+Timing ya da açıklanmış fark da insan onayı olmadan “çözüldü” yapılmaz.
+
+### 11.5. Karşılaştırma ve kanıt UX'i
+
+Her kontrolün detayında dönem, kaynak dosya, tutar kolonu/kapsamı, hedef GL
+hesabı veya hesapları, kaynak tutarı, GL tutarı, fark ve mevcut bulgu sınıfı
+görülür. Kullanıcı bir farkın hangi karşılaştırmadan geldiğini izleyebilir.
+Kişisel veriler ve ham müşteri/çalışan satırları rapor kanıtı diye açılmaz;
+mevcut sanitizasyon ve erişim sınırları korunur.
+
+Belirsiz eşlemede karşılaştırmadan önce bir taslak gösterilir: “Bu dosyanın
+şu dönem ve tutar kapsamı, şu GL hesabıyla karşılaştırılacak.” Kullanıcı
+onaylar veya hedefi düzeltir. Otomatik öneri, onaylanmış muhasebe kararı değildir.
+Onay bekleyen analiz, tamamlanmış/verified rapor gibi gösterilmez; rapor tablosu
+bu eksikliği ancak ilgili akışın gerçekten desteklediği yerde gösterir.
+
+Account kolonunun olmaması file-total modunu otomatik seçtirmez. Bu mod yalnız
+tek GL hesabına ait olduğu doğrulanan kapsam için kullanılır. Satır mapping'i
+aynı tutarlara ayrıca uygulanmaz. Birden çok hesap içeren bordro veya vendor
+dosyası sırf Account kolonu yok diye tek hesaba toplanmaz.
+
+İlk yaklaşım kullanıcı onaylı run-scoped taslaktır; yeni SQL veya kalıcı
+dosya-kuralı tablosu değildir. Karar mevcut run/veri yapıları üzerinden
+sonuçla ilişkilendirilebilmeli; yeniden okuma ve Excel'de kapsam kaybolmamalıdır.
+Bu imkân teknik tasarımda doğrulanmadan “SQL'siz çözüldü” denmez.
+
+Aynı tutar farklı kaynaklarda tekrar bulunuyorsa toplamlar körlemesine
+toplanmaz. Kapsam çakışması ve farklı kontrollerin aynı GL hedefini kullanması
+çözülmeden bağımsız bir başarılı kontrol sonucu verilmez. Mevcut motorun bu
+durumlarda destek kaynaklarını topladığı dikkate alınmalıdır.
+
+### 11.6. Redhawk ile doğrulanacak kapsam
+
+17 Eylül 2026 salt okunur dosya incelemesinde mevcut dört dosya: GL, payroll,
+vendor invoices ve contracts. Üç destek dosyasında da Account kolonu yoktur.
+
+| Kontrol | Dosyada bulunan yapı | Uygulamadan önce netleştirilecek kapsam |
+|---|---|---|
+| Bordro | Base Compensation, Bonus, Benefits Cost, Role, Pay Period | Tutarların dönemi ve ücret hesaplarına dağılımı; Technician Wages, Admin Wages, Owner Salary ve varsa Installation Labor ilişkisi |
+| Tedarikçiler | Vendor, Product Line, Description, Amount, Invoice Date | Satırların ilgili gider/COGS hesaplarına eşlemesi; bütün dosyanın tek hesaba ait olduğu varsayılmaz |
+| Sözleşmeler | Monthly Fee, Status, Start Date, Last Billed | Service Revenue hedefi; mevcut roster kurallarıyla dönem/aktiflik kapsamı; hazır Monthly Fee tekrar çarpılmaz |
+
+Bu tablo onaylı finansal hesaplama formülü değildir. Kolon adları tek başına
+bordro tutarının aylık mı yıllık mı olduğunu veya hangi yan hakların hangi GL
+hesabına girdiğini kanıtlamaz. Her kontrol için deterministik beklenen sonuç
+uygulamadan önce yazılmalıdır. Mevcut roster davranışı farkı yok etmek amacıyla
+değiştirilmez. Yanlış GL hedefini mevcut sayısal guardrail kendiliğinden bulamaz.
+
+Kurulum/yakıtın sonraki tesliminde Installation Revenue ve Vehicle & Fuel
+hesaplarının kapsamı doğrulanır. Depozito/tahsilat toplamının gelirle veya
+sadece yakıtın birleşik araç/yakıt gideriyle aynı olduğu varsayılmaz.
+Yeni dosya adı, şema ve detector birlikte kilitlenmeden bu kontroller açılmaz.
+
+### 11.7. Excel ve paylaşım
+
+Mevcut Reconciliations sayfasının başına aynı kontrol özeti ve kapsam bilgisi
+yerleştirilir; altında mevcut recon ayrıntıları korunur. Consolidated P&L ve
+Source Breakdown korunur. Yeni bir checklist sayfası bu ilk teslim için şart
+değildir. Ekran ve Excel aynı deterministik kontrol sonucundan beslenir.
+
+Temiz kontrolde de kaynak/hedef ve karşılaştırma kanıtı bulunmalıdır. Eksik
+kaynaklar ve değerlendirilmemiş alanlar export'ta kaybolmamalıdır. Banka için
+mevcut dışarıda-mutabakat cümlesi kalır; oturumluk kutu kalıcı sign-off veya
+Excel onayı gibi sunulmaz. Açıklar varken indirilen paket bunları açıkça taşır;
+“dönem kapandı” etiketi almaz. Eski raporun yeniden indirilmesi güncel dosyalarla
+yapılmış yeni bir karşılaştırma gibi gösterilmez.
+
+### 11.8. Kabul: kullanıcı gerçekten sonuç alıyor mu?
+
+Aşağıdakiler yapılmış testler değil, uygulama öncesi kabul şartlarıdır:
+
+- Redhawk'ın mevcut dosyalarıyla her kontrolün kapsamı, hedefi ve beklenen
+  sonucu deterministik olarak tanımlıdır. Salt dosya varlığı başarı değildir.
+- Temiz eşleşmede recon kartı çıkmasa da kontrolün yapıldığı kanıtlanır.
+- Account'suz tek hedefli kaynak doğru karşılaştırılır; çok hedefli kaynak
+  yanlışlıkla file-total moduna sokulmaz.
+- Yanlış hedef, GL yokluğu, kaynak yokluğu, boş kaynak, kısmi mapping ve
+  dosyalar arası kapsam çakışması sahte Tied out üretmez.
+- Kullanıcı her açık için “hangi hesabı/kaynağı inceleyeceğim?” sorusunu
+  cevaplayabilir; desteklenmeyen satır-seviyesi teşhis uydurulmaz.
+- Mevcut guardrail, materiality, coverage ve altı sınıf davranışı korunur;
+  kasıtlı sayısal uyuşmazlık doğrulanmış sonuç gibi sunulmaz.
+- UI ve Excel sayıları/durumları aynıdır; bankanın dışarıda olduğu ve
+  kurulum/yakıtın değerlendirilmediği ikisinde de görünür.
+- Hedef kullanıcıyla 60 saniyelik okuma yürüyüşünde açık iş, eksik kapsam,
+  kaynak kanıtı ve sonraki adım bulunabilir. Kullanıcı doğrulaması henüz yapılmadı.
+
+### 11.9. Sınırlar ve uygulama öncesi açıklar
+
+Dil 1 iskeleti korunur. Yeni ajan, recon sınıfı, banka matching, ERP JE,
+closed/sign-off, run kilidi, SQL, Cloudflare/deploy, Gün 0 manifesti ve açık
+madde yaşlandırması bu kaydın dışındadır. Takılı-run / yeniden üretme işi
+yeniden açılmaz. Sentinel binary restore bir kabul kapısı değildir.
+
+Ürün yönü belirlenmiştir; teknik uygulama kilidi için hâlâ üç somut çıktı
+gereklidir: Redhawk kontrol bazlı tutar/dönem/GL kapsamı ve beklenen sonuçları;
+eksik/kısmi/çakışan kapsamın karşılaştırma kanıtı; run-scoped mapping ile rapor
+ve Excel arasındaki izlenebilirliğin mevcut şemayla nasıl korunacağı.
+Bu açıklar çözülmeden uygulama hazır veya finansal sonuç doğrulanmış sayılmaz.
+
+### 11.10. Kararın araştırma dayanağı
+
+17 Eylül 2026 tarihli web incelemesi. Kaynaklar ürün/uygulama rehberleridir;
+Month Proof kullanıcı araştırması ya da talep doğrulaması değildir.
+
+- [ServiceTitan — Closing Timeline](https://www.servicetitan.com/guides/contractor-playbook/closing-timeline):
+  Örnek kapanışta kayıt ve mutabakat işleri finansal inceleme, yönetimle paylaşım
+  ve dönem kilidinden önce gelir. Kapsam bu üç/beş kontrolden daha geniştir.
+- [ServiceTitan — Commercial Accounting](https://www.servicetitan.com/commercial-playbook/commercial-accounting):
+  Bekleyen faturalar, aktarılmamış ödemeler ve operasyon/muhasebe tutarlılığı
+  gibi somut kayıt eksiklerini görünür kılan kontroller sunar.
+- [FloQast — Global Month-End Close](https://www.floqast.com/optimize-the-close/products/global-month-end-close):
+  Durum görünürlüğü, iş sorumluluğu ve destekleyici belgeleri öne çıkarır.
+- [BlackLine — Pluralsight örneği](https://www.blackline.com/blog/online-learning-company-learns-how-to-cut-close-cycle/):
+  Hazırlama ve inceleme adımlarının belgelenmesi, inceleyenin tamamlanan
+  mutabakatı erişilebilir kanıtlarla değerlendirebilmesini destekler.
+
+Month Proof için çıkarımımız: önce açık iş ve kapsam, ardından erişilebilir
+kanıt ve finansal anlatı. Bu çıkarım yeni görev atama, çok kullanıcılı onay veya
+tam kapanış yönetimi özelliklerini bu dilime dahil etmez.
+
+### 11.11. 17 Eylül 2026 — İlk teslim uygulandı
+
+İnceleme sonrası not: Bu bölüm ilk uygulamanın kaydıdır; tamamlanma kabulü
+değildir. Bulunan dört hata için güncel karar ve düzeltme kapsamı §11.12'dedir.
+
+Uygulama yetkisi bu tarihte verildi. Dil 2 ilk teslimi kodda:
+
+**Kontrol sözleşmesi (Redhawk, 2026-03, pandas ile doğrulandı)**
+
+- Bordro: tutar = keşfedilen amount kolonu (fixture’da Base Compensation).
+  Bonus ve Benefits Cost amount olarak map edilmedikçe kapsam dışıdır.
+  Pay Period close ayına eşitse satır tutulur. Eşleme tanesi Role → GL;
+  çalışan adları Haiku’ya veya rapor kanıtına gitmez. Installation Labor
+  bordro hedefi değildir. Onaylı Role eşlemesinde Owner Salary 5,500,
+  Technician Wages 6,200, Admin Wages 1,400 GL ile tutar.
+- Tedarikçiler: Amount + Product Line tanesi. Dosya tek COGS hesabına
+  toplanmaz. Yakıt faturası bu kontrolün gider satırıdır; ayrı Fuel
+  kontrolü açılmaz.
+- Sözleşmeler: Monthly Fee çarpılmaz. Mevcut roster (85 / 82 / 3) korunur.
+  File-total hedefi yalnız **Service Revenue**. Monitoring Revenue icat
+  edilmez. Fixture: 3,825.00 vs 3,540.00, fark 285.00 → has_exceptions.
+
+**Davranış**
+
+- Kontrol durumları Python’da üretilir: Tied out, Has exceptions, Mapping
+  required, Source missing, Not compared. Kart çıkmaması Tied out değildir.
+- Tied out için iki taraflı karşılaştırma, doğrulanmış hedef, tam kapsam ve
+  mevcut `_is_material` gerekir. Kısmi kontrol Tied out olamaz.
+- File-total, Account kolonunun yokluğundan otomatik seçilmez. Sözleşme
+  roster’ı veya parse sonrası boş satır tanesi kullanıcı onaylı tek GL
+  hedefine gider. Satır mapping’i aynı tutara ikinci kez uygulanmaz.
+- Onay run-scoped `parse_preview.file_total_decisions` içindedir. Vendor
+  satır hafızasına yazılmaz. Yeni SQL yoktur.
+- Rapor `reconciliations` JSONB’si `close_controls_v1` zarfına konur.
+  Eski liste şekli Tied out uydurmaz. GET /report ve Excel aynı özeti okur.
+- Kurulum/yakıt yalnız kapsam notudur. `3/5` veya kapanış yüzdesi yoktur.
+- Banka cümlesi ve oturumluk kutu aynıdır; Excel’e sign-off yazılmaz.
+
+**Açık kalan**
+
+- Kurulum ve yakıt named kontrolleri (fixture + detector + kapsam).
+- Bordro Bonus / Benefits’in ücret hesaplarına dağıtımı — kullanıcı onayı
+  veya ayrı GL olmadan tahmin edilmez.
+- 60 saniyelik kullanıcı yürüyüşü henüz yapılmadı.
+- Dil 3: `closed` / sign-off / dönem kilidi.
+
+SQL, `supabase db push`, Cloudflare, banka satır eşleme ve period lock
+yapılmadı.
+
+### 11.12. 17 Eylül 2026 — İnceleme sonrası dört düzeltme kararı
+
+Kullanıcı, aşağıdaki sadeleştirilmiş yaklaşımı onayladı; önce bu kayıt,
+ardından uygulama ve regresyon testleri yapılacak. Yeni ekran, ajan veya
+veritabanı tablosu gerekmiyor. Önceki 571 testin geçmesi bu dört durumu
+doğrulamadığı için ilk teslimin kabulü henüz tamamlanmış sayılmaz.
+
+1. **Kontrol başına tek destek dosyası:** Aynı kontrol için birden fazla
+   dosya varsa otomatik başarılı karşılaştırma yapılmaz. Kullanıcıdan
+   dosyaları birleştirip yeniden yüklemesi istenir; durum Not compared olur.
+   Tek dosyanın birden fazla GL hesabına dağılması desteklenir. Boş dosya
+   Tied out olamaz. Dosyaların birbirini tamamlayıp tamamlamadığını tahmin
+   eden yeni bir motor yapılmaz.
+2. **Dar file-total kapsamı:** Gerçek Account/GL kolonu varsa satır eşlemesi
+   korunur. Sözleşmelerde file-total yalnız desteklenen müşteri roster'ı +
+   aylık ücret şeması doğrulandığında ve kullanıcı hedefi onayladığında
+   kullanılır. Dosya türü veya Account yokluğu tek başına yeterli değildir.
+   Belirsiz yapıda sessiz tek-hesap toplaması yapılmaz.
+3. **Sunucuda tam onay kontrolü:** Gerekli tüm mapping kararları dolu ve
+   geçerli olmalıdır. Boş, eksik veya taslak dışı karar kabul edilmez;
+   kayıt yazma ve arka plan işi başlamadan mevcut eşleme ekranına anlaşılır
+   hata döner. Şirket ve run yetki kontrolleri korunur.
+4. **Excel açıklama eşitliği:** Kontrol seviyesindeki eksiklik nedeni ve
+   sonraki adım mevcut Reconciliations sayfasında korunur. Yeni sayfa veya
+   ayrı hesaplama eklenmez; aynı control summary kullanılır.
+
+Doğrulama: Her hata için regresyon testi; gerçek Account içeren çok hedefli
+sözleşme ile Redhawk roster yolunun ayrılması; eksik/boş onayda hiçbir yan
+etki olmaması; UI/Excel eksiklik açıklaması eşitliği. İlgili backend suite,
+guardrail kontrolleri ve frontend doğrulaması tekrar çalıştırılacak.
+Tarayıcı yürüyüşü yapılmadıysa açıkça açık iş olarak kalacak. Commit, SQL,
+deploy, banka matching ve Dil 3 bu onayın dışındadır.
+
+**Uygulama sonucu — 17 Eylül 2026:** Dört düzeltme working tree'de uygulandı.
+Çoklu destek dosyası kontrolü Not compared üretir; gerçek GL kolonu bulunan
+sözleşmeler satır eşlemesinde kalır. File-total ilk teslimde yalnız doğrulanmış
+aylık ücret roster şemasına açıktır; boş parse sonucu uygunluk kanıtı değildir.
+Belirsiz sözleşme şemasında mevcut hata akışı desteklenen export'u ister.
+Onaysız roster taslağı yalnız toplu tutarı taşır; müşteri kimlikleri hesap
+eşleme LLM'ine gönderilmez. Eksik/boş/taslak dışı mapping onayı yan etki
+başlamadan reddedilir. Excel'in mevcut sayfasında Why not compared ve Next
+action birlikte korunur.
+
+**Doğrulama:** `pytest -q tests/tools tests/agents tests/api tests/domain`:
+588 passed (17 yeni regresyon testi; guardrail testleri dahil). Gerçek Redhawk
+roster'ının parser yolunda 3,825 toplamını koruması, çok hesaplı sözleşmenin
+satır mapping'inde kalması, sanitizasyon ve reddedilen onayların yan etkisizliği
+yerel fixture/mock testleriyle doğrulandı. Frontend typecheck ve production
+build geçti; build mevcut büyük chunk uyarısını verdi. Değiştirilen Python
+dosyalarında Black geçti; Flake8 `--ignore E501,W503` ile geçti. Genel
+`black --check backend tests` kapsam dışında kalan beş dosyada, genel Flake8
+ise mevcut repo biçim/unused-import sorunlarında başarısız; tüm repo lint'i
+yeşil denmiyor. Code-auditor kontrolünde mevcut guardrail toleransları ve
+yetkilendirme korunmuştur; skill'in eski tolerans notu uygulanmamıştır.
+
+Tarayıcıda 60 saniyelik kullanıcı yürüyüşü ve Excel'in görsel incelemesi henüz
+yapılmadı; otomatik testler bunların yerine geçmiş sayılmaz. Canlı servis,
+ücretli LLM, SQL, deploy veya commit yapılmadı.

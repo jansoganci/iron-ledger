@@ -10,17 +10,20 @@ Tek canlı backlog burasıdır. Bitmiş planları buraya geri kopyalama. Yeni i�
 
 ## Şimdi açık — ürün
 
-### Close checklist Dil 2 — şimdilik açık
+### Close checklist Dil 2 — dört kabul düzeltmesi uygulandı (2026-09-17)
 
-İsimli beş kontrol (install / fuel dahil), yeni `SourceFileType` iğneleri, dosya-toplamı → GL eşleme **başlamadı ve iptal değil**. Tasarım bekleniyor.
+Bordro, tedarikçi ve sözleşme kontrolleri, run-scoped file-total eşleme ve
+rapor/Excel kanıtı working tree'de. §11.12'de onaylanan dört düzeltme uygulandı:
+kontrol başına tek destek dosyası; doğrulanmış roster için file-total; sunucuda
+eksiksiz mapping onayı; Excel'de eksiklik nedeni ve sonraki adım. 588 yerel
+backend testi, frontend typecheck ve build geçti. Commit veya canlıya çıkış yok.
 
-Dil 1 (Payroll / Vendors / Contracts / Other, banka teyit kutusu) `main`’de. Dil 2 onun üstüne gelir.
+Açık kalan: install/fuel named kontrolleri; bordro Bonus/Benefits dağıtımı;
+hedef kullanıcıyla 60 saniyelik okuma yürüyüşü ve Excel görsel kontrolü.
+Genel repo lint sorunları ayrıca sürüyor; `closed` yok.
 
-Neden açık: Redhawk’ta üç destek dosyası var; install/fuel fixture yok. Dosyası olmayan kontrolü “passed” saymak yalan olur. Yanlış GL hedefi sahte temiz veya sahte açık üretir.
-
-Yeniden açmak: gerçek demo dosyası + file-total kilidi + tasarım, sonra etiket. `closed` yok.
-
-Kayıt: `docs/02-planning/close-flow-contract.md`, `docs/sprint/field-service-close-triage.md`.
+Güncel karar, UX ve uygulama kaydı:
+[Close checklist pre-analysis §11](../sprint/pre-analysis-close-checklist.md#11-17-eylül-2026--dil-2-ürün-kararı-ve-rapor-ux-tasarımı).
 
 ### Close checklist Dil 3 — dönem kilidi
 

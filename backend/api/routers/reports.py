@@ -14,7 +14,11 @@ from backend.api.deps import (
     get_reports_repo,
 )
 from backend.api.rate_limit import limiter
-from backend.tools.tie_out_summary import build_tie_out_summary, group_for_item
+from backend.tools.close_controls import (
+    build_legacy_control_summary,
+    unpack_report_reconciliations,
+)
+from backend.tools.tie_out_summary import group_for_item
 
 router = APIRouter()
 
@@ -191,9 +195,10 @@ async def get_report(
     except Exception:
         financials = None
 
-    source_files = [Path(e.source_file).name for e in entries if e.source_file]
-    recon_items = list(report.reconciliations or [])
-    tie_out_summary = build_tie_out_summary(source_files, recon_items)
+    recon_items, control_summary = unpack_report_reconciliations(report.reconciliations)
+    if control_summary is None:
+        control_summary = build_legacy_control_summary(recon_items)
+    tie_out_summary = control_summary.model_dump(mode="json")
     reconciliations = []
     for item in recon_items:
         if not isinstance(item, dict):
@@ -267,11 +272,16 @@ async def export_report_xlsx(
         for e in entries
     ]
 
+    recon_items, control_summary = unpack_report_reconciliations(report.reconciliations)
+    if control_summary is None:
+        control_summary = build_legacy_control_summary(recon_items)
+
     xlsx_bytes = build_close_package(
         entries=entry_dicts,
-        reconciliations=report.reconciliations,
+        reconciliations=recon_items,
         period=period_date,
         company_name=company_name,
+        control_summary=control_summary.model_dump(mode="json"),
     )
 
     filename = f"monthproof_{period}_close_package.xlsx"

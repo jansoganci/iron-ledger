@@ -108,6 +108,27 @@ def test_persistable_upserts_skip_payroll() -> None:
     assert rows == [("supplier_invoices", "AlarmTech Industries", "Equipment COGS")]
 
 
+def test_persistable_upserts_skip_file_total() -> None:
+    items = [
+        _item(
+            source_pattern="(entire file)",
+            source_file="contracts.xlsx",
+            file_type="contracts",
+            mapping_mode="file_total",
+            suggested_gl_account="Service Revenue",
+        ),
+        _item(),
+    ]
+    rows = persistable_upserts(
+        items,
+        {
+            "(entire file)": "Service Revenue",
+            "AlarmTech Industries": "Equipment COGS",
+        },
+    )
+    assert rows == [("supplier_invoices", "AlarmTech Industries", "Equipment COGS")]
+
+
 def test_index_stored_uses_company_file_type_pattern() -> None:
     indexed = index_stored(
         [

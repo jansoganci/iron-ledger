@@ -49,6 +49,7 @@ from backend.domain.contracts import (
 from backend.domain.entities import Report, SourceAccountMapping
 from backend.domain.run_state_machine import RunStatus
 from backend.main import app
+from backend.tools.close_controls import unpack_report_reconciliations
 
 # ---------------------------------------------------------------------------
 # Auth override (module-scoped — applied once, reset in teardown)
@@ -395,7 +396,6 @@ def _make_patches(llm_mock: MagicMock) -> list:
             "backend.agents.orchestrator.get_source_mappings_repo",
             return_value=_FakeSourceMappingsRepo(),
         ),
-
         patch(
             "backend.api.routers.uploads.get_runs_repo", return_value=_FakeRunsRepo()
         ),
@@ -518,7 +518,7 @@ def test_account_mapper_full_flow() -> None:
         report = _state["reports"].get(report_id)
         assert report is not None, "Report not found in state"
 
-        recon = report.reconciliations or []
+        recon, _ = unpack_report_reconciliations(report.reconciliations)
         assert len(recon) > 0, "No reconciliation items in report"
 
         account_names = {item["account"] for item in recon}

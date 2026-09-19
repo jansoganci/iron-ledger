@@ -82,6 +82,10 @@ export interface MappingDraftItem {
   origin?: "new" | "remembered" | "conflict";
   remembered_gl_account?: string | null;
   haiku_gl_account?: string | null;
+  mapping_mode?: "row" | "file_total";
+  amount_scope?: string | null;
+  source_amount?: number | null;
+  period?: string | null;
 }
 
 export interface MappingDraft {

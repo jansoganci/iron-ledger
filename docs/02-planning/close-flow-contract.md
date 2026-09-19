@@ -3,7 +3,7 @@
 *Araştırma ([close-process-by-sector.md](../06-reports/close-process-by-sector.md)) ile kod dilimleri arasındaki köprü.*  
 *Kilit: 24 Ağustos 2026.*
 
-**Durum 17 Eylül 2026.** Kilit tablo değişmedi. Dil 1 (mevcut kartları gruplamak, banka cümlesi, Verified ≠ dönem kapandı) `main`’de. Dil 2 (isimli beş kontrol + dosya-toplamı→GL) **şimdilik açık** — tasarım bekleniyor; `docs/04-status/REMAINING_WORK.md`. `closed` sonraki dilim.
+**Durum 17 Eylül 2026.** Kilit tablo değişmedi. Dil 1 `main`’de. Dil 2 ilk uygulaması ve dört inceleme düzeltmesi working tree'de: bordro, tedarikçi ve sözleşme kontrolleri + run-scoped file-total eşleme. Kontrol başına tek destek dosyası; file-total yalnız doğrulanmış aylık ücret roster'ında. Kurulum/yakıt çalışan kontrol değildir. Güncel kayıt: [pre-analysis §11.12](../sprint/pre-analysis-close-checklist.md#1112-17-eylül-2026--inceleme-sonrası-dört-düzeltme-kararı). Kullanıcı yürüyüşü açık; commit/deploy yok. `closed` sonraki dilim.
 
 Ürünü pivot etmiyoruz. Direkt “checklist ekranı / closed status / yeni ajan” yazmıyoruz. Önce bu sözleşmeyi kilitle, sonra Sentinel’i kâğıt üzerinde yürüt, en son en küçük dilimi kodla.
 

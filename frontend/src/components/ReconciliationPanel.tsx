@@ -64,7 +64,7 @@ export function ReconciliationPanel({ reconciliations }: ReconciliationPanelProp
     <section className="space-y-6">
       <div className="flex items-center gap-3">
         <h2 className="text-xs font-semibold text-text-secondary uppercase tracking-widest">
-          Exceptions
+          Needs review
         </h2>
         <div className="flex-1 h-px bg-border" />
         <span className="text-xs text-text-secondary tabular-nums">
@@ -99,7 +99,7 @@ export function ReconciliationPanel({ reconciliations }: ReconciliationPanelProp
       {coverage.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
-            Not compared · {coverage.length}
+            GL accounts not compared · {coverage.length}
           </p>
           <p className="text-xs text-text-secondary">
             These general-ledger accounts were not in any uploaded supporting file.

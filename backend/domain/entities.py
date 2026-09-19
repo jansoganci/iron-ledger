@@ -66,7 +66,8 @@ class Report:
     error_count: int = 0
     mail_sent: bool = False
     mail_sent_at: datetime | None = None
-    reconciliations: list[dict] | None = None
+    # List of recon items, or a close_controls_v1 envelope dict.
+    reconciliations: list[dict] | dict | None = None
     opus_upgraded: bool = False
     report_type: str = "monthly"
     quarter: int | None = None

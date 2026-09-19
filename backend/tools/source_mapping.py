@@ -6,11 +6,35 @@ vendor/expense mappings and decides whether the user must review.
 
 from __future__ import annotations
 
-from backend.domain.contracts import MappingDraftItem, SourceFileType
+from backend import messages
+from backend.domain.contracts import MappingDraft, MappingDraftItem, SourceFileType
 from backend.domain.entities import SourceAccountMapping
 
 PERSISTABLE_FILE_TYPES: frozenset[str] = frozenset({"supplier_invoices"})
 PAYROLL_FILE_TYPE: SourceFileType = "payroll"
+
+
+def mapping_confirmation_error(
+    draft: MappingDraft,
+    decisions: dict[str, str],
+    file_total_decisions: dict[str, str],
+) -> str | None:
+    """Validate the entire confirmation before any persistence or pipeline work."""
+    row_keys = {i.source_pattern for i in draft.items if i.mapping_mode == "row"}
+    total_keys = {i.source_file for i in draft.items if i.mapping_mode == "file_total"}
+    row_files = {i.source_file for i in draft.items if i.mapping_mode == "row"}
+    if not draft.items or row_files & total_keys:
+        return messages.MAPPING_DRAFT_INVALID
+    if set(decisions) - row_keys or set(file_total_decisions) - total_keys:
+        return messages.MAPPING_DRAFT_INVALID
+    if set(decisions) != row_keys or set(file_total_decisions) != total_keys:
+        return messages.MAPPING_CONFIRMATION_REQUIRED
+    selected = [*decisions.values(), *file_total_decisions.values()]
+    if any(not value.strip() for value in selected):
+        return messages.MAPPING_CONFIRMATION_REQUIRED
+    if any(value not in draft.gl_account_pool for value in selected):
+        return messages.MAPPING_INVALID_GL_ACCOUNT
+    return None
 
 
 def is_persistable(file_type: str) -> bool:
@@ -98,6 +122,8 @@ def persistable_upserts(
     out: list[tuple[str, str, str]] = []
     seen: set[tuple[str, str]] = set()
     for item in items:
+        if item.mapping_mode == "file_total":
+            continue
         if not is_persistable(item.file_type):
             continue
         gl_account = decisions.get(item.source_pattern)

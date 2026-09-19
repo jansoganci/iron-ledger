@@ -25,6 +25,7 @@ from backend.domain.contracts import (
 )
 from backend.domain.errors import GuardrailError
 from backend.domain.run_state_machine import RunStatus
+from backend.tools.close_controls import unpack_report_reconciliations
 
 PERIOD = date(2026, 3, 1)
 COMPANY = uuid.uuid4()
@@ -39,9 +40,7 @@ class _FakeRunsRepo:
     def get_by_id(self, run_id: str) -> dict:
         return {"id": run_id, "status": self.status}
 
-    def update_status(
-        self, run_id: str, status, extra: dict | None = None
-    ) -> None:
+    def update_status(self, run_id: str, status, extra: dict | None = None) -> None:
         self.status = status.value if hasattr(status, "value") else str(status)
         self.updates.append((self.status, extra or {}))
 
@@ -210,7 +209,8 @@ def test_invented_token_does_not_kill_the_run() -> None:
 
     assert ok is True
     assert runs.status == RunStatus.COMPLETE.value
-    stored = reports.written[0].reconciliations[0]
+    stored_items, _ = unpack_report_reconciliations(reports.written[0].reconciliations)
+    stored = stored_items[0]
     assert stored["classification"] == "missing_je"
 
 

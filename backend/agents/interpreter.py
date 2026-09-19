@@ -17,6 +17,10 @@ from backend.domain.ports import FileStorage, LLMClient, ReportsRepo, RunsRepo
 from backend.domain.regenerate import run_wants_regenerate
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
+from backend.tools.close_controls import (
+    pack_report_reconciliations,
+    summary_from_parse_preview,
+)
 from backend.tools.guardrail import (
     collect_reconciliation_reference_values,
     verify_guardrail,
@@ -354,6 +358,10 @@ class InterpreterAgent:
                 self._reports.delete_monthly(
                     str(pandas_summary.company_id), pandas_summary.period
                 )
+            recon_items = list(reconciliations or [])
+            control_summary = summary_from_parse_preview(
+                run.get("parse_preview") or {}, recon_items
+            )
             report = self._reports.write(
                 Report(
                     id=str(uuid.uuid4()),
@@ -364,7 +372,9 @@ class InterpreterAgent:
                         [a for a in anomalies if a.severity in ("high", "medium")]
                     ),
                     error_count=0,
-                    reconciliations=reconciliations,
+                    reconciliations=pack_report_reconciliations(
+                        recon_items, control_summary
+                    ),
                 )
             )
         except Exception as exc:

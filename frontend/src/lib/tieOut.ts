@@ -6,18 +6,57 @@ export type TieOutGroupKey =
   | "contracts"
   | "other";
 
+export type ControlStatus =
+  | "tied_out"
+  | "has_exceptions"
+  | "mapping_required"
+  | "source_missing"
+  | "not_compared";
+
+export interface ControlComparison {
+  gl_account: string;
+  supporting_amount: number | null;
+  gl_amount: number | null;
+  difference: number | null;
+  classification?: string | null;
+  complete: boolean;
+  incomplete_reason?: string | null;
+}
+
+export interface ControlResult {
+  key: "payroll" | "supplier_invoices" | "contracts";
+  label: string;
+  status: ControlStatus;
+  source_file?: string | null;
+  period?: string | null;
+  amount_scope?: string | null;
+  gl_targets: string[];
+  mapping_mode: "row" | "file_total" | "none";
+  comparisons: ControlComparison[];
+  next_action: string;
+  incomplete_reason?: string | null;
+}
+
+export interface TieOutSummary {
+  schema_version?: string;
+  controls: ControlResult[];
+  compared: number;
+  with_exceptions: number;
+  not_evaluated: number;
+  coverage_account_count: number;
+  scope_note: string;
+  legacy?: boolean;
+  // Slice 1 payload still parsed for tests that inspect old fixtures.
+  groups?: TieOutGroup[];
+  with_gap?: number;
+  not_compared?: number;
+}
+
 export interface TieOutGroup {
   key: TieOutGroupKey;
   label: string;
   status: "clean" | "gap";
   files: string[];
-}
-
-export interface TieOutSummary {
-  groups: TieOutGroup[];
-  compared: number;
-  with_gap: number;
-  not_compared: number;
 }
 
 export const TIE_OUT_GROUP_ORDER: TieOutGroupKey[] = [
@@ -32,6 +71,14 @@ export const TIE_OUT_GROUP_LABELS: Record<TieOutGroupKey, string> = {
   supplier_invoices: "Vendors",
   contracts: "Contracts",
   other: "Other supporting files",
+};
+
+export const CONTROL_STATUS_LABEL: Record<ControlStatus, string> = {
+  tied_out: "Tied out",
+  has_exceptions: "Has exceptions",
+  mapping_required: "Mapping required",
+  source_missing: "Source missing",
+  not_compared: "Not compared",
 };
 
 const PATTERNS: { type: string; needles: string[] }[] = [

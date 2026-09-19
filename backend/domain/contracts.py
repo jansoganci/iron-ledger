@@ -139,6 +139,16 @@ class AccountMappingResponse(BaseModel):
 
 
 MappingOrigin = Literal["new", "remembered", "conflict"]
+MappingMode = Literal["row", "file_total"]
+
+ControlKey = Literal["payroll", "supplier_invoices", "contracts"]
+ControlStatus = Literal[
+    "tied_out",
+    "has_exceptions",
+    "mapping_required",
+    "source_missing",
+    "not_compared",
+]
 
 
 class MappingDraftItem(BaseModel):
@@ -150,11 +160,55 @@ class MappingDraftItem(BaseModel):
     origin: MappingOrigin = "new"
     remembered_gl_account: str | None = None
     haiku_gl_account: str | None = None
+    # File-total is a distinct mode. Absence of Account does not set this.
+    mapping_mode: MappingMode = "row"
+    amount_scope: str | None = None
+    source_amount: float | None = None
+    period: date | None = None
 
 
 class MappingDraft(BaseModel):
     items: list[MappingDraftItem]
     gl_account_pool: list[str]  # valid GL account names for the dropdown
+
+
+class ControlComparison(BaseModel):
+    """One GL target inside a named close control. Python-only."""
+
+    gl_account: str
+    supporting_amount: float | None = None
+    gl_amount: float | None = None
+    difference: float | None = None
+    classification: ReconciliationClassification | None = None
+    complete: bool = True
+    incomplete_reason: str | None = None
+
+
+class ControlResult(BaseModel):
+    key: ControlKey
+    label: str
+    status: ControlStatus
+    source_file: str | None = None
+    period: date | None = None
+    amount_scope: str | None = None
+    gl_targets: list[str] = Field(default_factory=list)
+    mapping_mode: MappingMode | Literal["none"] = "none"
+    comparisons: list[ControlComparison] = Field(default_factory=list)
+    next_action: str = ""
+    incomplete_reason: str | None = None
+
+
+class ControlSummary(BaseModel):
+    """Persisted close-control evidence. Counts are controls, not coverage cards."""
+
+    schema_version: str = "close_controls_v1"
+    controls: list[ControlResult]
+    compared: int
+    with_exceptions: int
+    not_evaluated: int
+    coverage_account_count: int
+    scope_note: str
+    legacy: bool = False
 
 
 class ParserOutput(BaseModel):

@@ -82,9 +82,47 @@ MAPPING_FAILED = "We couldn't classify your accounts. Please re-upload."
 MAPPING_INVALID_GL_ACCOUNT = "One or more selected GL accounts is no longer valid."
 MAPPING_NOT_FOUND = "That saved name was not found."
 MAPPING_GL_REQUIRED = "Choose a GL account before saving."
+MAPPING_CONFIRMATION_REQUIRED = (
+    "Select a valid GL account for every required mapping before continuing."
+)
+MAPPING_DRAFT_INVALID = "The mapping choices no longer match this analysis. Please reload and review them again."
 BANK_OUTSIDE_ATTESTATION = (
     "Bank and card reconciliation is done outside Month Proof. "
     "This report does not confirm it."
+)
+CONTROL_SCOPE_INSTALL_FUEL = (
+    "Installation and fuel were not evaluated in this delivery."
+)
+CONTROL_NEXT_REVIEW_EVIDENCE = "Review the comparison evidence."
+CONTROL_NEXT_REVIEW_EXCEPTION = (
+    "Review this exception against the source file and the GL account."
+)
+CONTROL_NEXT_CONFIRM_MAPPING = "Confirm or correct the mapping in a new analysis."
+CONTROL_NEXT_ADD_SOURCE = "Add this supporting file in the next analysis."
+CONTROL_NEXT_INCOMPLETE = "Resolve the missing evidence shown for this control."
+CONTROL_HISTORICAL_INSUFFICIENT = (
+    "This report does not include enough stored control evidence to mark a tie-out."
+)
+CONTROL_OVERLAPPING_SOURCES = (
+    "More than one supporting file maps to this GL account, so this control "
+    "cannot be marked tied out on its own."
+)
+CONTROL_MISSING_GL = "No matching general-ledger amount was found for this target."
+CONTROL_EMPTY_SOURCE = "The supporting file had no usable amounts for this period."
+CONTROL_MULTIPLE_SOURCES = "This control supports one supporting file per analysis."
+CONTROL_NEXT_COMBINE_SOURCES = (
+    "Combine the supporting files for this control into one file, remove duplicate "
+    "rows, and upload it in a new analysis."
+)
+CONTROL_CONTRACT_SCHEMA = (
+    "Use a contracts export with GL account columns, or a customer roster with "
+    "monthly fees, status and last-billed dates. We could not confirm this file's scope."
+)
+CONTROL_PARTIAL_SCOPE = (
+    "Only part of this control could be compared, so it is not tied out."
+)
+CONTROL_UNCONFIRMED_MAPPING = (
+    "The source-to-GL mapping for this file has not been confirmed."
 )
 
 DISCOVERY_REJECTED = (
@@ -93,4 +131,3 @@ DISCOVERY_REJECTED = (
 
 COMPANY_CREATE_FAILED = "We couldn't create your workspace. Please try again."
 COMPANY_UPDATE_FAILED = "We couldn't save your company details. Please try again."
-

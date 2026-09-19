@@ -178,7 +178,7 @@ def test_gl_plus_payroll_skips_mapping_review(
 ):
     """Payroll is identity-mapped and never pauses for Haiku review."""
     gl_preview = _mock_preview_rows(["Salaries & Wages", "Bonuses"])
-    payroll_preview = _mock_preview_rows(["Meals", "Office Rent", "Salary"])
+    payroll_preview = _mock_preview_rows(["Salaries & Wages", "Bonuses"])
 
     def _parse(**kwargs):
         key = kwargs.get("storage_key", "")
@@ -199,9 +199,8 @@ def test_gl_plus_payroll_skips_mapping_review(
         parse_preview={
             "file_keys": file_keys,
             "auto_decisions": {
-                "Meals": "Meals",
-                "Office Rent": "Office Rent",
-                "Salary": "Salary",
+                "Salaries & Wages": "Salaries & Wages",
+                "Bonuses": "Bonuses",
             },
             "is_multi_file": True,
         },
@@ -254,8 +253,8 @@ def test_gl_plus_payroll_skips_mapping_review(
     assert RunStatus.AWAITING_MAPPING_CONFIRMATION not in statuses_set
     assert RunStatus.APPLYING_MAPPING in statuses_set
     phase_a_preview = runs_repo.set_parse_preview.call_args_list[0][0][1]
-    assert phase_a_preview["auto_decisions"]["Meals"] == "Meals"
-    assert phase_a_preview["auto_decisions"]["Office Rent"] == "Office Rent"
+    assert phase_a_preview["auto_decisions"]["Salaries & Wages"] == "Salaries & Wages"
+    assert phase_a_preview["auto_decisions"]["Bonuses"] == "Bonuses"
 
 
 # ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ from datetime import date
 from backend.api.deps import get_llm_client, get_reports_repo, get_runs_repo
 from backend.domain.contracts import NarrativeJSON
 from backend.logger import get_logger, get_trace_id
+from backend.tools.close_controls import unpack_report_reconciliations
 from backend.tools.guardrail import (
     collect_reconciliation_reference_values,
     verify_guardrail,
@@ -97,7 +98,9 @@ def run_opus_upgrade(run_id: str, company_id: str, period: date) -> None:
             runs_repo.set_opus_status(run_id, "failed")
             return
 
-        reconciliations = current_report.reconciliations or []
+        reconciliations, _ = unpack_report_reconciliations(
+            current_report.reconciliations
+        )
 
         # Fetch up to 3 prior months' summaries for trend context.
         prior_rows = runs_repo.get_prior_pandas_summaries(

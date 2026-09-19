@@ -24,7 +24,13 @@ from backend.domain.ports import (
 )
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger
-from backend.tools import file_reader, normalizer, pii_sanitizer, validator
+from backend.tools import (
+    file_reader,
+    mapping_grain,
+    normalizer,
+    pii_sanitizer,
+    validator,
+)
 from backend.tools.sidecar import build_sidecar
 
 logger = get_logger(__name__)
@@ -385,6 +391,7 @@ class ParserAgent:
         run_id: str,
         account_name_map: dict[str, str] | None = None,
         file_type: str | None = None,
+        file_total_account: str | None = None,
     ) -> tuple[list[dict], str, pd.DataFrame, "pd.DataFrame | None"]:
         """Download, discover, normalize, validate, map — without state transitions.
 
@@ -419,21 +426,60 @@ class ParserAgent:
         # integer positional columns at this point.
         sidecar = build_sidecar(df_raw, file_type, plan)
 
+        promoted = normalizer.promote_headers(df_raw, plan)
+        plan = mapping_grain.retarget_account_column(
+            plan, file_type or "", list(promoted.columns)
+        )
+        extra_skips = mapping_grain.payroll_period_skip_indices(
+            promoted, file_type, period
+        )
+        if extra_skips:
+            plan = plan.model_copy(
+                update={
+                    "skip_row_indices": sorted(set(plan.skip_row_indices) | extra_skips)
+                }
+            )
+
+        source_column = self._extract_source_column(plan)
+        file_total_candidate = mapping_grain.is_file_total_candidate(
+            file_type or "",
+            list(promoted.columns),
+            roster_sidecar_present=(
+                sidecar is not None
+                and {"customer_id", "status", "monthly_fee", "last_billed"}
+                <= set(sidecar.columns)
+            ),
+            amount_scope=source_column,
+        )
+        if file_type == "contracts" and not (
+            mapping_grain.has_true_account_header(list(promoted.columns))
+            or file_total_candidate
+        ):
+            raise MappingAmbiguous(messages.CONTROL_CONTRACT_SCHEMA)
+        if file_total_account and not file_total_candidate:
+            raise MappingAmbiguous(messages.CONTROL_CONTRACT_SCHEMA)
+
         df_normalized, _ = normalizer.apply_plan(df_raw, plan, period)
         df_validated = validator.validate(df_normalized)
 
-        # Apply AccountMapper decisions before category mapping and groupby (B2 fix).
-        # Must run here so GL account names are in place before map_accounts aggregates.
-        if account_name_map:
+        # File-total and row mapping are mutually exclusive for the same amounts.
+        if file_total_account:
+            df_validated["account"] = file_total_account
+        elif file_total_candidate:
+            # Before approval expose only the aggregate draft; customer values
+            # are not account names and must not reach the account-mapping LLM.
+            df_validated["account"] = mapping_grain.FILE_TOTAL_PATTERN
+        elif account_name_map:
             df_validated["account"] = df_validated["account"].map(
                 lambda x: account_name_map.get(str(x).strip(), x)
             )
 
-        source_column = self._extract_source_column(plan)
-
-        mapped_columns, _ = map_accounts(
-            run_id, company_id, df_validated, self._accounts, self._llm, self._runs
-        )
+        if file_total_candidate and not file_total_account:
+            mapped_columns = {mapping_grain.FILE_TOTAL_PATTERN: {"category": "REVENUE"}}
+        else:
+            mapped_columns, _ = map_accounts(
+                run_id, company_id, df_validated, self._accounts, self._llm, self._runs
+            )
 
         account_totals: dict[str, float] = (
             df_validated.groupby("account")["amount"].sum().to_dict()
@@ -452,6 +498,7 @@ class ParserAgent:
         df_detailed["category"] = df_detailed["account"].map(
             lambda a: mapped_columns.get(str(a), {}).get("category", "OTHER")
         )
+        df_detailed.attrs["file_total_candidate"] = file_total_candidate
 
         return preview_rows, source_column, df_detailed, sidecar
 

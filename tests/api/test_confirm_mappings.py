@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.api.auth import get_company_id, get_current_user
+from backend import messages
 from backend.domain.run_state_machine import RunStatus
 from backend.main import app
 
@@ -122,12 +123,85 @@ def test_confirm_mappings_empty_decisions_returns_400(mock_repo):
         parse_preview=_preview_with_pool(["Equipment COGS"]),
     )
     mock_repo.return_value = runs_repo
+    runs_repo.get_by_id.return_value = _mock_run(
+        RunStatus.AWAITING_MAPPING_CONFIRMATION.value,
+        parse_preview=_preview_with_pool(["Equipment COGS"]),
+    )
 
     resp = client.post(
         "/runs/run-123/confirm-mappings",
         json={"decisions": {}},
     )
     assert resp.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "decisions,totals,detail",
+    [
+        (
+            {"AlarmTech": "Equipment COGS"},
+            {"contracts.xlsx": ""},
+            messages.MAPPING_CONFIRMATION_REQUIRED,
+        ),
+        (
+            {"AlarmTech": "Equipment COGS"},
+            {"contracts.xlsx": "   "},
+            messages.MAPPING_CONFIRMATION_REQUIRED,
+        ),
+        ({"AlarmTech": "Equipment COGS"}, {}, messages.MAPPING_CONFIRMATION_REQUIRED),
+        (
+            {},
+            {"contracts.xlsx": "Service Revenue"},
+            messages.MAPPING_CONFIRMATION_REQUIRED,
+        ),
+        (
+            {"AlarmTech": "Equipment COGS", "extra": "Service Revenue"},
+            {"contracts.xlsx": "Service Revenue"},
+            messages.MAPPING_DRAFT_INVALID,
+        ),
+        (
+            {"AlarmTech": "Other tenant account"},
+            {"contracts.xlsx": "Service Revenue"},
+            messages.MAPPING_INVALID_GL_ACCOUNT,
+        ),
+    ],
+)
+def test_incomplete_or_invalid_confirmation_has_no_side_effects(
+    decisions, totals, detail
+):
+    preview = _preview_with_pool(["Service Revenue", "Equipment COGS"])
+    preview["mapping_draft"]["items"].append(
+        {
+            "source_pattern": "(entire file)",
+            "source_file": "contracts.xlsx",
+            "file_type": "contracts",
+            "mapping_mode": "file_total",
+            "suggested_gl_account": "Service Revenue",
+            "confident": True,
+        }
+    )
+    with patch("backend.api.routers.uploads.get_runs_repo") as get_runs, patch(
+        "backend.api.routers.uploads.get_source_mappings_repo"
+    ) as get_maps, patch(
+        "backend.api.routers.uploads.apply_mapping_and_consolidate"
+    ) as apply:
+        runs = get_runs.return_value
+        runs.get_by_id.return_value = _mock_run(
+            RunStatus.AWAITING_MAPPING_CONFIRMATION.value, parse_preview=preview
+        )
+        resp = client.post(
+            "/runs/run-123/confirm-mappings",
+            json={
+                "decisions": decisions,
+                "file_total_decisions": totals,
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == detail
+        runs.update_status.assert_not_called()
+        runs.set_parse_preview.assert_not_called()
+        get_maps.assert_not_called()
+        apply.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +252,66 @@ def test_confirm_mappings_foreign_company_returns_403(mock_repo):
         json={"decisions": {"AlarmTech": "Equipment COGS"}},
     )
     assert resp.status_code == 403
+
+
+@patch("backend.api.routers.uploads.get_source_mappings_repo")
+@patch("backend.api.routers.uploads.apply_mapping_and_consolidate")
+@patch("backend.api.routers.uploads.get_runs_repo")
+def test_confirm_mappings_file_total_validates_gl_and_is_not_persisted(
+    mock_repo, mock_apply, mock_maps
+):
+    preview = _preview_with_pool(["Service Revenue", "Equipment COGS"])
+    preview["mapping_draft"]["items"].append(
+        {
+            "source_pattern": "(entire file)",
+            "source_file": "contracts.xlsx",
+            "file_type": "contracts",
+            "suggested_gl_account": "Service Revenue",
+            "confident": True,
+            "mapping_mode": "file_total",
+            "amount_scope": "Monthly Fee",
+        }
+    )
+    runs_repo = MagicMock()
+    runs_repo.get_by_id.return_value = _mock_run(
+        RunStatus.AWAITING_MAPPING_CONFIRMATION.value,
+        parse_preview=preview,
+    )
+    mock_repo.return_value = runs_repo
+    maps_repo = MagicMock()
+    mock_maps.return_value = maps_repo
+
+    bad = client.post(
+        "/runs/run-123/confirm-mappings",
+        json={
+            "decisions": {},
+            "file_total_decisions": {"contracts.xlsx": "Made Up Account"},
+        },
+    )
+    assert bad.status_code == 400
+
+    other_file = client.post(
+        "/runs/run-123/confirm-mappings",
+        json={
+            "decisions": {},
+            "file_total_decisions": {"not-in-draft.xlsx": "Service Revenue"},
+        },
+    )
+    assert other_file.status_code == 400
+
+    ok = client.post(
+        "/runs/run-123/confirm-mappings",
+        json={
+            "decisions": {"AlarmTech": "Equipment COGS"},
+            "file_total_decisions": {"contracts.xlsx": "Service Revenue"},
+        },
+    )
+    assert ok.status_code == 200
+    maps_repo.upsert.assert_called_once_with(
+        "co-1", "supplier_invoices", "AlarmTech", "Equipment COGS"
+    )
+    stored_preview = runs_repo.set_parse_preview.call_args[0][1]
+    assert stored_preview["file_total_decisions"]["contracts.xlsx"] == "Service Revenue"
 
 
 @patch("backend.api.routers.uploads.get_source_mappings_repo")

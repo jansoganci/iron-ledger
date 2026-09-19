@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AlertTriangle, Bookmark, Loader2, Sparkles, X } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { cn } from "../lib/utils";
+import { formatCurrency } from "../lib/formatters";
 import type { MappingDraft, MappingDraftItem } from "./LoadingProgress";
 
 interface MappingReviewProps {
@@ -37,11 +38,16 @@ function groupByFile(items: MappingDraftItem[]): Record<string, MappingDraftItem
 
 export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps) {
   const sortedPool = [...draft.gl_account_pool].sort();
-  const reviewItems = draft.items.filter((item) => item.file_type !== "payroll");
+  const fileTotalItems = draft.items.filter(
+    (item) => item.mapping_mode === "file_total"
+  );
+  const reviewItems = draft.items.filter(
+    (item) => item.mapping_mode !== "file_total"
+  );
 
   const [selected, setSelected] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
-    for (const item of reviewItems) {
+    for (const item of [...reviewItems, ...fileTotalItems]) {
       const origin = originOf(item);
       if (origin === "conflict") continue;
       if (item.suggested_gl_account && (origin === "remembered" || item.confident)) {
@@ -60,7 +66,9 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
   const conflicts = reviewItems.filter((item) => originOf(item) === "conflict");
   const newcomers = reviewItems.filter((item) => originOf(item) === "new");
   const remembered = reviewItems.filter((item) => originOf(item) === "remembered");
-  const allResolved = reviewItems.every((item) => !!selected[rowKeyFor(item)]);
+  const allResolved =
+    reviewItems.every((item) => !!selected[rowKeyFor(item)]) &&
+    fileTotalItems.every((item) => !!selected[rowKeyFor(item)]);
 
   function applyAccountToItems(items: MappingDraftItem[], account: string): number {
     let updates = 0;
@@ -118,6 +126,7 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
     setNotice(null);
     try {
       const decisions: Record<string, string> = {};
+      const fileTotalDecisions: Record<string, string> = {};
       const clashes = new Set<string>();
       for (const item of reviewItems) {
         const chosen = selected[rowKeyFor(item)];
@@ -128,6 +137,11 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
           continue;
         }
         decisions[item.source_pattern] = chosen;
+      }
+      for (const item of fileTotalItems) {
+        const chosen = selected[rowKeyFor(item)];
+        if (!chosen) continue;
+        fileTotalDecisions[item.source_file] = chosen;
       }
 
       if (clashes.size > 0) {
@@ -141,7 +155,10 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
       await apiFetch(`/runs/${runId}/confirm-mappings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decisions }),
+        body: JSON.stringify({
+          decisions,
+          file_total_decisions: fileTotalDecisions,
+        }),
       });
       onConfirmed();
     } catch (err) {
@@ -182,17 +199,81 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
         <div className="max-w-2xl mx-auto space-y-6">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold text-text-primary">
-            Vendor and expense names
+            Confirm source-to-GL mapping
           </h2>
           <p className="text-sm text-text-secondary">
-            Confirm where each supplier or expense item should land. Payroll
-            totals and sub-lines are already in the close. You can revise saved
-            names later on Data → Saved names.
+            Confirm where each supporting file or line should land before we
+            compare it to the general ledger. File totals and payroll roles are
+            not saved as vendor names.
           </p>
           <p className="text-xs text-text-secondary">
             {conflicts.length} need a choice · {newcomers.length} new · {remembered.length} already saved
           </p>
         </div>
+
+        {fileTotalItems.length > 0 && (
+          <section className="space-y-3" aria-labelledby="map-file-total">
+            <div>
+              <h3
+                id="map-file-total"
+                className="text-sm font-semibold text-text-primary"
+              >
+                File totals
+              </h3>
+              <p className="text-xs text-text-secondary">
+                This file’s amount for the period will be compared to one GL
+                account. Confirm or correct the target before we run the control.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {fileTotalItems.map((item) => {
+                const key = rowKeyFor(item);
+                return (
+                  <div
+                    key={key}
+                    className="rounded-md border border-border p-3 space-y-2"
+                  >
+                    <p className="text-sm font-medium text-text-primary">
+                      {item.source_file}
+                    </p>
+                    <p className="text-xs text-text-secondary">
+                      Period {item.period ?? "this close month"}
+                      {item.amount_scope ? ` · ${item.amount_scope}` : ""}
+                      {item.source_amount != null
+                        ? ` · ${formatCurrency(item.source_amount)}`
+                        : ""}
+                    </p>
+                    <label className="block text-xs text-text-secondary">
+                      GL account
+                      <select
+                        value={selected[key] ?? ""}
+                        onChange={(e) =>
+                          setSelected((prev) => ({
+                            ...prev,
+                            [key]: e.target.value,
+                          }))
+                        }
+                        disabled={isSubmitting}
+                        className={cn(
+                          "mt-1 w-full rounded-md border border-border bg-surface px-2 py-1.5",
+                          "text-sm text-text-primary",
+                          "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
+                        )}
+                      >
+                        <option value="">Select a GL account</option>
+                        {sortedPool.map((account) => (
+                          <option key={account} value={account}>
+                            {account}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {sections.map((section) => {
           if (section.items.length === 0) return null;

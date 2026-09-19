@@ -19,11 +19,21 @@ from backend.api.deps import (
     get_source_mappings_repo,
 )
 from backend.agents.account_mapper import AccountMapper
-from backend.domain.contracts import DEFAULT_GL_CATEGORIES, DiscoveryPlan, MappingDraft
-from backend.domain.errors import DiscoveryLowConfidence
+from backend.domain.contracts import (
+    DEFAULT_GL_CATEGORIES,
+    DiscoveryPlan,
+    MappingDraft,
+    MappingDraftItem,
+)
+from backend.domain.errors import DiscoveryLowConfidence, MappingAmbiguous
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
 from backend.tools.file_type import FILE_TYPE_PATTERNS, detect_file_type
+from backend.tools.mapping_grain import (
+    FILE_TOTAL_PATTERN,
+    proposed_contracts_gl,
+    should_file_total_after_parse,
+)
 from backend.tools.source_mapping import (
     annotate_draft_items,
     auto_map_payroll,
@@ -836,6 +846,16 @@ def run_multi_file_parser_with_mapping(
                         "trace_id": get_trace_id(),
                     },
                 )
+            except MappingAmbiguous:
+                _fail_if_not_terminal(
+                    run_id,
+                    (
+                        messages.CONTROL_CONTRACT_SCHEMA
+                        if file_type == "contracts"
+                        else messages.MAPPING_FAILED
+                    ),
+                )
+                return
             except Exception as exc:
                 logger.error(
                     "multi_file_parse_error",
@@ -854,7 +874,8 @@ def run_multi_file_parser_with_mapping(
             gl_pool = list(DEFAULT_GL_CATEGORIES)
 
         # Run AccountMapper for persistable / reviewable non-GL files.
-        # Payroll is identity-mapped and never sent to Haiku or the review UI.
+        # Payroll GL names stay identity-mapped. Payroll roles and file totals
+        # pause for confirmation and are never sent to Haiku.
         file_keys = {}
         for entry, key in zip(per_file_data, sorted_keys):
             file_keys[entry[0]] = key
@@ -865,23 +886,75 @@ def run_multi_file_parser_with_mapping(
         auto_decisions: dict[str, str] = {}
         all_draft_items = []
 
-        for label, preview_rows, _, _, is_gl, file_type, *_ in per_file_data:
+        for (
+            label,
+            preview_rows,
+            source_column,
+            detailed,
+            is_gl,
+            file_type,
+            _sidecar,
+        ) in (
+            (e[0], e[1], e[2], e[3], e[4], e[5], e[6] if len(e) > 6 else None)
+            for e in per_file_data
+        ):
             if is_gl:
                 continue
             unique_values = sorted(
                 {row["account"] for row in preview_rows if row.get("account")}
             )
-            if is_payroll(file_type):
-                auto_decisions.update(auto_map_payroll(unique_values))
-                logger.info(
-                    "payroll_identity_mapped",
-                    extra={
-                        "run_id": run_id,
-                        "file": label,
-                        "lines": len(unique_values),
-                        "trace_id": get_trace_id(),
-                    },
+            source_amount = round(
+                sum(float(row.get("amount") or 0) for row in preview_rows), 2
+            )
+            if should_file_total_after_parse(
+                file_type,
+                unique_values,
+                gl_pool,
+                validated_file_total=detailed.attrs.get("file_total_candidate") is True,
+            ):
+                suggested = (
+                    proposed_contracts_gl(gl_pool) if file_type == "contracts" else None
                 )
+                all_draft_items.append(
+                    MappingDraftItem(
+                        source_pattern=FILE_TOTAL_PATTERN,
+                        source_file=label,
+                        file_type=file_type,
+                        suggested_gl_account=suggested,
+                        confident=bool(suggested),
+                        mapping_mode="file_total",
+                        amount_scope=source_column or "amount",
+                        source_amount=source_amount,
+                        period=period,
+                    )
+                )
+                continue
+            if is_payroll(file_type):
+                if unique_values and all(v in gl_pool for v in unique_values):
+                    auto_decisions.update(auto_map_payroll(unique_values))
+                    logger.info(
+                        "payroll_identity_mapped",
+                        extra={
+                            "run_id": run_id,
+                            "file": label,
+                            "lines": len(unique_values),
+                            "trace_id": get_trace_id(),
+                        },
+                    )
+                    continue
+                for value in unique_values:
+                    all_draft_items.append(
+                        MappingDraftItem(
+                            source_pattern=value,
+                            source_file=label,
+                            file_type=file_type,
+                            suggested_gl_account=None,
+                            confident=False,
+                            mapping_mode="row",
+                            amount_scope=source_column or "amount",
+                            period=period,
+                        )
+                    )
                 continue
             _, draft = mapper.build_draft(
                 unique_values=unique_values,
@@ -1013,6 +1086,9 @@ def apply_mapping_and_consolidate(
         file_keys: dict[str, str] = parse_preview.get("file_keys", {})
         auto_decisions: dict[str, str] = parse_preview.get("auto_decisions") or {}
         merged_decisions = {**auto_decisions, **(user_decisions or {})}
+        file_total_decisions: dict[str, str] = dict(
+            parse_preview.get("file_total_decisions") or {}
+        )
 
         if not file_keys:
             logger.error(
@@ -1026,7 +1102,10 @@ def apply_mapping_and_consolidate(
         for label, storage_key in file_keys.items():
             is_gl = _is_gl_label(label)
             file_type = "general_ledger" if is_gl else _detect_file_type(label)
-            account_name_map = None if is_gl else (merged_decisions or None)
+            file_total_account = None if is_gl else file_total_decisions.get(label)
+            account_name_map = (
+                None if is_gl or file_total_account else (merged_decisions or None)
+            )
             try:
                 preview_rows, source_column, raw_df, sidecar = _unpack_parse(
                     parser.parse_file_silently(
@@ -1036,6 +1115,7 @@ def apply_mapping_and_consolidate(
                         run_id=run_id,
                         account_name_map=account_name_map,
                         file_type=file_type,
+                        file_total_account=file_total_account,
                     )
                 )
                 per_file_data.append(
@@ -1150,6 +1230,40 @@ def _run_consolidation(
 
     reconciliations_payload = [item.model_dump(mode="json") for item in recon_items]
 
+    try:
+        existing_preview = runs_repo.get_by_id(run_id).get("parse_preview") or {}
+    except Exception:
+        existing_preview = {}
+
+    gl_amounts: dict[str, float] = {}
+    amount_scopes: dict[str, str] = {}
+    empty_files: list[str] = []
+    mapping_modes: dict[str, str] = {}
+    file_total = dict(existing_preview.get("file_total_decisions") or {})
+    per_file_rows: dict[str, list] = {}
+    source_files: list[str] = []
+    from backend.agents.consolidator import _is_gl_label as is_gl_name
+
+    for entry in per_file_data:
+        label = entry[0]
+        preview_rows = entry[1]
+        source_column = entry[2]
+        is_gl = bool(entry[4]) if len(entry) > 4 else is_gl_name(label)
+        source_files.append(label)
+        per_file_rows[label] = list(preview_rows or [])
+        amount_scopes[label] = str(source_column or "amount")
+        if not preview_rows:
+            empty_files.append(label)
+        if is_gl or is_gl_name(label):
+            for row in preview_rows or []:
+                name = str(row.get("account") or "").strip()
+                if name:
+                    gl_amounts[name] = float(row.get("amount") or 0)
+        elif label in file_total:
+            mapping_modes[label] = "file_total"
+        else:
+            mapping_modes[label] = "row"
+
     parse_preview = {
         "rows": rows,
         "source_column": "Consolidated",
@@ -1157,6 +1271,15 @@ def _run_consolidation(
         "source_breakdown_by_account": source_breakdown_by_account,
         "reconciliations": reconciliations_payload,
         "is_multi_file": True,
+        "file_total_decisions": file_total,
+        "control_source_files": source_files,
+        "control_per_file_rows": per_file_rows,
+        "control_gl_amounts": gl_amounts,
+        "control_amount_scopes": amount_scopes,
+        "control_empty_files": empty_files,
+        "control_mapping_modes": mapping_modes,
+        "control_mapping_pending": [],
+        "control_period": period.isoformat(),
     }
 
     runs_repo.set_parse_preview(run_id, parse_preview)

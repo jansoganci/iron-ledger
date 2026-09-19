@@ -368,10 +368,12 @@ export function ReportSummary({
         <TieOutSummaryCard
           summary={
             tieOutSummary ?? {
-              groups: [],
+              controls: [],
               compared: 0,
-              with_gap: 0,
-              not_compared: 0,
+              with_exceptions: 0,
+              not_evaluated: 0,
+              coverage_account_count: 0,
+              scope_note: "",
             }
           }
         />

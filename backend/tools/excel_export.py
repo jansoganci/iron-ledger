@@ -18,7 +18,6 @@ from backend import messages
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
 
 # ---------------------------------------------------------------------------
 # Palette
@@ -47,6 +46,7 @@ def build_close_package(
     reconciliations: list[dict] | None,
     period: date,
     company_name: str,
+    control_summary: dict | None = None,
 ) -> bytes:
     """Return raw .xlsx bytes for the close package workbook.
 
@@ -60,7 +60,7 @@ def build_close_package(
     wb.remove(wb.active)  # remove default Sheet
 
     _build_pl_sheet(wb, entries, period, company_name)
-    _build_reconciliation_sheet(wb, reconciliations or [], period)
+    _build_reconciliation_sheet(wb, reconciliations or [], period, control_summary)
     _build_source_breakdown_sheet(wb, entries, period)
 
     buf = io.BytesIO()
@@ -149,6 +149,7 @@ def _build_reconciliation_sheet(
     wb: openpyxl.Workbook,
     reconciliations: list[dict],
     period: date,
+    control_summary: dict | None = None,
 ) -> None:
     ws = wb.create_sheet("Reconciliations")
 
@@ -159,6 +160,98 @@ def _build_reconciliation_sheet(
     ws.append([messages.BANK_OUTSIDE_ATTESTATION])
     _style_row(ws, 2, font=Font(italic=True, size=10, color="5A5853"))
     ws.merge_cells("A2:G2")
+
+    ws.append([messages.CONTROL_SCOPE_INSTALL_FUEL])
+    _style_row(ws, 3, font=Font(italic=True, size=10, color="5A5853"))
+    ws.merge_cells("A3:G3")
+
+    row_num = 4
+    for column, width in {
+        "A": 28,
+        "B": 18,
+        "C": 32,
+        "D": 22,
+        "E": 24,
+        "F": 14,
+        "G": 40,
+        "H": 48,
+    }.items():
+        ws.column_dimensions[column].width = width
+    if control_summary:
+        compared = control_summary.get("compared", 0)
+        with_exc = control_summary.get("with_exceptions", 0)
+        not_eval = control_summary.get("not_evaluated", 0)
+        coverage = control_summary.get("coverage_account_count", 0)
+        ws.append(
+            [
+                "Control summary",
+                f"{compared} compared",
+                f"{with_exc} with exceptions",
+                f"{not_eval} not evaluated",
+                f"{coverage} GL accounts not compared",
+                "",
+                "",
+            ]
+        )
+        _style_row(ws, row_num, font=Font(bold=True, size=10))
+        row_num += 1
+        ws.append(
+            [
+                "Control",
+                "Status",
+                "Source file",
+                "Amount scope",
+                "GL target",
+                "Difference ($)",
+                "Next action",
+                "Why not compared",
+            ]
+        )
+        _style_header_row(ws, row_num)
+        row_num += 1
+        for control in control_summary.get("controls") or []:
+            targets = ", ".join(control.get("gl_targets") or [])
+            comps = control.get("comparisons") or []
+            differences = [
+                c.get("difference") for c in comps if c.get("difference") is not None
+            ]
+            diff_value = differences[0] if len(differences) == 1 else None
+            status = str(control.get("status") or "").replace("_", " ")
+            ws.append(
+                [
+                    control.get("label"),
+                    status,
+                    control.get("source_file") or "",
+                    control.get("amount_scope") or "",
+                    targets,
+                    diff_value,
+                    control.get("next_action") or "",
+                    control.get("incomplete_reason") or "",
+                ]
+            )
+            for col in (7, 8):
+                ws.cell(row=row_num, column=col).alignment = Alignment(wrap_text=True)
+            if diff_value is not None:
+                ws.cell(row=row_num, column=6).number_format = _CURRENCY_FMT
+            row_num += 1
+            for comp in comps:
+                ws.append(
+                    [
+                        "",
+                        "evidence" if comp.get("complete") else "incomplete",
+                        comp.get("gl_account") or "",
+                        comp.get("supporting_amount"),
+                        comp.get("gl_amount"),
+                        comp.get("difference"),
+                        (comp.get("classification") or "").replace("_", " ").title()
+                        or (comp.get("incomplete_reason") or ""),
+                    ]
+                )
+                for col in (4, 5, 6):
+                    ws.cell(row=row_num, column=col).number_format = _CURRENCY_FMT
+                row_num += 1
+        ws.append([])
+        row_num += 1
 
     if not reconciliations:
         ws.append(["No cross-source discrepancies detected for this period."])
@@ -174,18 +267,21 @@ def _build_reconciliation_sheet(
         "Classification",
     ]
     ws.append(headers)
-    _style_header_row(ws, 3)
+    header_row = row_num if control_summary else 4
+    if control_summary:
+        header_row = row_num
+    _style_header_row(ws, header_row)
 
     ws.column_dimensions["A"].width = 28
     ws.column_dimensions["B"].width = 16
-    ws.column_dimensions["C"].width = 16
-    ws.column_dimensions["D"].width = 20
-    ws.column_dimensions["E"].width = 14
-    ws.column_dimensions["F"].width = 12
-    ws.column_dimensions["G"].width = 28
+    ws.column_dimensions["C"].width = 32
+    ws.column_dimensions["D"].width = 22
+    ws.column_dimensions["E"].width = 16
+    ws.column_dimensions["F"].width = 14
+    ws.column_dimensions["G"].width = 40
 
-    row_num = 4
-    for item in sorted(reconciliations, key=lambda x: -abs(x.get("delta", 0))):
+    row_num = header_row + 1
+    for item in sorted(reconciliations, key=lambda x: -abs(x.get("delta", 0) or 0)):
         coverage = _is_coverage_item(item)
         severity = item.get("severity", "low")
         row = [
