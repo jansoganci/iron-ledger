@@ -1,6 +1,10 @@
 # Month Proof — API Contract
 *Version 1.0 — Hackathon MVP*
 
+> **Güncel durum (1 Ekim 2026).** Bu sayfa hackathon sözleşmesidir; ayrıntılı bölümler 1–13
+> o günkü gövdelerdir. Sonradan eklenen uçlar "Sonradan eklenen uçlar" ve bölüm 14–16'dadır.
+> Şüphede `backend/api/routers/` doğrudur.
+
 Base URL (local): `http://localhost:8000`
 Base URL (production): `https://your-app.railway.app`
 
@@ -36,7 +40,10 @@ Upload one or more financial files for a given company and period.
 ```
 files:  File[]  — one or more .xlsx / .csv / .xls / .xlsm files
 period: string  — ISO date, first day of month (e.g. "2026-03-01" for March 2026)
+regenerate: bool — optional; true = the user agreed to replace this period's existing report
 ```
+
+A closed period (see §14) returns **409** `PERIOD_CLOSED` before any run is created.
 
 `company_id` is derived from the JWT — do not send it.
 
@@ -434,6 +441,80 @@ Forget a saved name. Missing or another company's row → 404.
 
 ---
 
+### 14. GET /periods/{period}/close
+Close state of a month for the authenticated company. `period` is the first day of a month
+(`2026-03-01`); anything else → 422. `company_id` comes from the JWT.
+
+**Response 200**
+```json
+{
+  "closed": true,
+  "close": {
+    "closed_at": "2026-10-01T19:26:00+00:00",
+    "closed_by_email": "demo@redhawkdemo.com",
+    "closed_by_you": true
+  },
+  "log": [
+    { "event": "closed",   "actor_email": "demo@redhawkdemo.com", "created_at": "..." },
+    { "event": "reopened", "actor_email": "demo@redhawkdemo.com", "created_at": "..." }
+  ]
+}
+```
+Open month: `"closed": false, "close": null`. `log` is the full history, oldest first.
+
+**Rate limit:** 60/min per user.
+
+---
+
+### 15. POST /periods/{period}/close
+A person's sign-off on a finished monthly report. Body must be `{ "confirm": true }`.
+
+| Case | Status | Message key |
+|---|---|---|
+| Missing or false `confirm` | 422 | `PERIOD_CLOSE_CONFIRM_REQUIRED` |
+| No finished monthly report for the period | 409 | `PERIOD_CLOSE_NEEDS_REPORT` |
+| Already closed | 409 | `PERIOD_ALREADY_CLOSED` |
+| Saved | 200 | state as in §14 |
+
+"Numbers verified" never closes a month; nothing closes it automatically.
+**Rate limit:** 20/hour per user.
+
+---
+
+### 16. POST /periods/{period}/reopen
+Reopens a closed month. Body must be `{ "confirm": true }` (a separate confirmation).
+The close row is kept (`reopened_*` is stamped) and a `reopened` log row is written; a new
+analysis is allowed again. Not closed → 409 `PERIOD_NOT_CLOSED`. Missing `confirm` → 422
+`PERIOD_REOPEN_CONFIRM_REQUIRED`.
+
+**Rate limit:** 20/hour per user.
+
+**Lock effect.** While a month is closed, `POST /upload`, `POST /runs/{id}/confirm` (Replace)
+and `POST /runs/{id}/retry` return **409** `PERIOD_CLOSED` and write nothing; a run already in
+flight and the Opus upgrade stop without touching the month. Reading the report, exporting
+Excel and the quarterly report are not affected. If the lock cannot be read, writes are
+refused with 503 rather than allowed.
+
+---
+
+## Sonradan eklenen uçlar (özet)
+
+Ayrıntı için ilgili router dosyası.
+
+| Uç | Ne için | Router |
+|---|---|---|
+| `POST /runs/{id}/confirm` | Önizlemeyi onayla, aylık satırları yaz, karşılaştırma + rapor başlat. Raporu olan ay için `regenerate` onayı ister, yoksa 409 `REGENERATE_REQUIRED` | `uploads.py` |
+| `POST /runs/{id}/confirm-mappings` | Kaynak → GL eşleme taslağını onayla (dosya toplamı ve satır eşlemesi; bordro rolleri dahil, her rol için hesap seçilmeli) | `uploads.py` |
+| `POST /runs/{id}/confirm-discovery`, `reject-discovery` | Yapı keşfi onayı / reddi | `uploads.py` |
+| `GET /runs/{id}/raw` | `guardrail_failed` run'ının ham verisi | `uploads.py` |
+| `GET /report/{company_id}/{period}/export.xlsx` | Kapanış paketi (Excel); bayat rapor için 409 | `reports.py` |
+| `GET /data` | Aylık satırlar (Data sayfası) | `reports.py` |
+| `POST /report/{company_id}/quarterly/{year}/{quarter}/generate` ve `status`, `GET`, `DELETE` | Kalıcı çeyrek raporu | `quarterly.py` |
+| `POST /companies`, `PATCH /companies/me` | Şirket oluştur / güncelle | `companies.py` |
+| `GET /health` | Sağlık kontrolü, auth yok | `health.py` |
+
+---
+
 ## Error Codes Reference
 
 | error | meaning | HTTP status |
@@ -450,6 +531,9 @@ Forget a saved name. Missing or another company's row → 404.
 | not_found | Report or anomaly not found | 404 |
 | mail_failed | Resend API error | 500 |
 | rate_limited | Endpoint rate limit exceeded | 429 |
+| regenerate_required | Period already has a report and the run has no replace consent | 409 |
+| period_closed | Period is closed; upload / Replace / retry refused | 409 |
+| period_already_closed / period_not_closed | Close on a closed month / reopen on an open month | 409 |
 
 ---
 

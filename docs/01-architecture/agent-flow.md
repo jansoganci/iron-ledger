@@ -2,6 +2,18 @@
 *Built with Opus 4.7 Hackathon — April 2026*
 *v2 — Numeric guardrail and file-format edge cases added*
 
+
+> **Güncel durum (1 Ekim 2026).** Bu sayfa Nisan hackathon akışıdır ve baştan yazılmadı. Sonradan
+> eklenenler: yapı keşfi (zorunlu) ve isteğe bağlı kullanıcı onayı; çok dosyalı konsolidasyon ve
+> mutabakat; kaynak → GL eşleme taslağı (bordro rolleri dahil, her rol için hesap kullanıcıdan);
+> kalıcı kaynak eşlemeleri; aynı dönemi yeniden üretme (açık onay); isimli kapanış kontrolleri
+> (bordro, tedarikçi, sözleşme; kâr tablosu GL varsa GL tutarını kullanır, destek dosyasını üstüne
+> eklemez); anlatı–kart tutarlılık kontrolü (`narrative_check.py`: destek dosyası olmayan bir GL
+> hesabına "missing journal entry" diyen anlatı bir kez yeniden denenir, ikinci denemede rapor
+> yazılmaz); çeyrek raporu; Opus yükseltmesi; **dönem kilidi** (Dil 3, `period_closes`; kapalı ay
+> salt okunur, `RunStatus` değişmedi). Güncel akış için `backend/agents/orchestrator.py` ve
+> `docs/04-status/REMAINING_WORK.md`.
+
 ---
 
 ## Golden Rule

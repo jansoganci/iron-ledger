@@ -16,7 +16,7 @@ Date: 2026-09-16.
 Parent: `docs/02-planning/close-flow-contract.md`;
 `docs/06-reports/close-process-by-sector.md` §5;
 `docs/06-reports/pending-decisions-audit.md` §1.1;
-`docs/sprint/field-service-close-triage.md` Bucket 1 item 6–7.
+`docs/archive/sprint-complete/field-service-close-triage.md` Bucket 1 item 6–7.
 Checkout: `main`.
 
 Process: (1) this pre-analysis → approval, (2) implementation as **two
@@ -697,7 +697,7 @@ taşımıyor (`ReportPage.tsx`); kanıt satırları kontrol başlıklarının al
 yanlış düşüyor ve GL hedefi sütunu taşyor (`excel_export.py`); çoklu dosyada
 kaynak adları yazılmıyor (`close_controls.py`); stale export P&L güncel
 `monthly_entries` kullanıyor (`reports.py`). Kanıt:
-`docs/qa/slice2-acceptance-2026-09-19/`.
+`docs/archive/qa/slice2-acceptance-2026-09-19/`.
 
 ### 11.13. 19 Eylül 2026 — Dört kabul düzeltmesinin kapsamı
 
@@ -752,5 +752,5 @@ ayrı Control summary / Comparison evidence; Redhawk 3,825 / 3,540 / 285;
 Canlı oturum, indirme düğmesi, stale-upload regenerasyonu **blok**.
 Tarayıcı otomasyonu bu oturumda yok. Kabul **hazır değil**.
 
-Kanıt: `docs/qa/slice2-acceptance-2026-09-19-workbook/` (önceki klasör
+Kanıt: `docs/archive/qa/slice2-acceptance-2026-09-19-workbook/` (önceki klasör
 silinmedi).

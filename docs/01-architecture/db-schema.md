@@ -1,6 +1,11 @@
 # Month Proof — Database Schema
 *Built with Opus 4.7 Hackathon — April 2026*
 
+> **Güncel durum (1 Ekim 2026).** Aşağıdaki tablo gövdeleri `0001` şemasıdır. Sonraki
+> migrasyonlar (`0002`–`0012`) kolonları ve iki tabloyu ekledi; özetleri "Migrasyonlarla
+> eklenenler" bölümünde. Şüphede `supabase/migrations/` ve kod doğrudur. `runs.status`
+> değerlerinin tam listesi `backend/domain/run_state_machine.py` içindedir.
+
 ---
 
 ## Tables
@@ -197,6 +202,59 @@ CREATE TABLE source_account_mappings (
 
 ---
 
+### 9. period_closes
+Dönem kilidi (migrasyon `0012`, Dil 3). Kullanıcı bitmiş bir aylık raporu "kapattım" der;
+kim ve ne zaman burada saklanır. Bir `(company_id, period)` için aynı anda tek aktif kilit
+vardır (`reopened_at IS NULL`, kısmi unique index). Yeniden açmak satırı silmez,
+`reopened_*` alanlarını damgalar; DELETE politikası yoktur. `period` ayın ilk günüdür.
+
+```sql
+CREATE TABLE period_closes (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id        UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  period            DATE NOT NULL,          -- ayın ilk günü (CHECK)
+  closed_by         UUID NOT NULL REFERENCES auth.users(id),
+  closed_by_email   TEXT,                   -- kapanış anındaki anlık görüntü
+  closed_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reopened_by       UUID REFERENCES auth.users(id),
+  reopened_by_email TEXT,
+  reopened_at       TIMESTAMPTZ             -- NULL = kilit aktif
+);
+-- UNIQUE INDEX uq_period_closes_active ON (company_id, period) WHERE reopened_at IS NULL
+```
+
+---
+
+### 10. period_close_log
+Yalnız ekleme günlüğü: her kapatma ve yeniden açma bir satır (`event` = `closed` | `reopened`,
+`actor_id`, `actor_email`, `created_at`). RLS yalnız SELECT ve INSERT'e izin verir. Log yazımı
+başarısız olursa kapanış bozulmaz; asıl kayıt `period_closes` satırıdır.
+
+---
+
+## Migrasyonlarla eklenenler (`0002`–`0012`)
+
+| Migrasyon | Ne ekledi |
+|---|---|
+| `0002` | `runs.pandas_summary` (JSONB) |
+| `0003` | `monthly_entries.source_column` |
+| `0004` | `runs.storage_key` |
+| `0005` | `runs.parse_preview` (JSONB; önizleme, eşleme taslağı, `_regenerate` bayrağı) |
+| `0006` | `runs.discovery_plan`, `runs.discovery_approval_mode` |
+| `0007` | `monthly_entries.source_breakdown`, `reports.reconciliations` (JSONB), `runs.file_count` |
+| `0008` | `runs.opus_status`, `reports.opus_upgraded` |
+| `0009` | `reports.report_type` (`monthly` / `quarterly`), `quarter`, `year`, `is_stale`, `quarterly_data`; aylık ve çeyrek için kısmi unique index; `anomalies.is_recurring` |
+| `0010` | `companies.monthly_revenue_band` |
+| `0011` | `source_account_mappings` tablosu (bölüm 8) |
+| `0012` | `period_closes` ve `period_close_log` tabloları (bölüm 9 ve 10) |
+
+`runs.status` artık `discovering`, `awaiting_discovery_confirmation`,
+`awaiting_mapping_confirmation`, `applying_mapping`, `awaiting_confirmation` ve
+`report_failed` değerlerini de taşır. `closed` bir run durumu **değildir**; dönem kilidi
+`period_closes` tablosundadır.
+
+---
+
 ## Indexes
 
 ```sql
@@ -210,7 +268,7 @@ CREATE INDEX idx_runs_company_period ON runs(company_id, period);
 ## Relationship Diagram
 
 ```
-7 tables + Supabase Storage bucket
+10 tables + Supabase Storage bucket
 
 companies
     │
@@ -225,7 +283,10 @@ companies
     │
     ├── runs (company_id, report_id)
     │
-    └── source_account_mappings (company_id)
+    ├── source_account_mappings (company_id)
+    │
+    └── period_closes (company_id)
+            └── period_close_log (close_id)
 
 supabase-storage/
 └── financial-uploads/{company_id}/{period}/{filename}

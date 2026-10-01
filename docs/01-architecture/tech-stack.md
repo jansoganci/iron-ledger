@@ -2,6 +2,13 @@
 *Built with Opus 4.7 Hackathon — April 2026*
 *v2 — Updated with Deep Search findings*
 
+
+> **Güncel durum (1 Ekim 2026).** Bu sayfa Nisan hackathon yığınıdır ve baştan yazılmadı. Yığın
+> aynı (FastAPI, pandas, pandera, Anthropic SDK, Supabase, React/Vite); değişenler: dil modelleri
+> `claude-haiku-4-5-20251001` (keşif, eşleme) ve `claude-opus-4-7` (anlatı, çeyrek, yükseltme),
+> migrasyonlar `0001`–`0012`, `backend/` altında `domain/`, `adapters/`, `agents/`, `tools/`
+> katmanları ve `api/period_lock.py` (dönem kilidi). Şüphede `requirements.txt`, `CLAUDE.md` ve kod.
+
 ---
 
 ## Stack Summary

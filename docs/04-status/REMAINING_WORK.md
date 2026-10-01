@@ -23,16 +23,15 @@ Destek dosyası kırılımda ve kontrol kartında kalır. Kayıtlı eski rapor e
 toplamı gösterir; yeni bir analiz güncel tutarı yazar.
 
 Açık kenar: eksik dosya senaryoları, stale-export, Excel'in görsel kontrolü.
-Install/fuel ve `closed` ayrı durur. `0011` demo projede uygulandı.
+Install/fuel ayrı durur. `0011` demo projede uygulandı. Dönem kilidi (`closed`) aşağıda: yapıldı.
 
 Güncel karar, UX ve uygulama kaydı:
 [Close checklist pre-analysis §11](../sprint/pre-analysis-close-checklist.md#11-17-eylül-2026--dil-2-ürün-kararı-ve-rapor-ux-tasarımı).
 
-### Close checklist Dil 3 — dönem kilidi
+### Close checklist Dil 3 — dönem kilidi: yapıldı (`96cf24e`, 1 Ekim 2026)
 
-Kod hazır, canlıya basılmadı (1 Ekim 2026). Migrasyon `0012_add_period_closes.sql`
-**henüz hiçbir Supabase projesine uygulanmadı**. Uygulanmadan backend yükleme,
-Replace ve retry isteklerini 503 ile reddeder (kilit okunamıyorsa yazma yok).
+Migrasyon `0012_add_period_closes.sql` demo projede uygulandı. Canlıda denendi: kapat,
+yeniden aç (log: closed → reopened), düzeltilmiş raporla tekrar kapat.
 
 - `RunStatus` değişmedi; kapanış bir run durumu değil, `period_closes` satırı
   (aktif kilit: `reopened_at IS NULL`, `(şirket, ay)` başına tek). Yeniden açma
@@ -42,8 +41,17 @@ Replace ve retry isteklerini 503 ile reddeder (kilit okunamıyorsa yazma yok).
 - Kapalı ayda `/upload`, `/runs/{id}/confirm` (Replace) ve `/runs/{id}/retry` 409
   (`PERIOD_CLOSED`); uçuştaki run ve Opus yükseltmesi de dokunmadan durur.
 - Çeyrek rapor kilidin parçası değil. Banka, kurulum/yakıt, yaşlandırma, e-posta yok.
-- Açık: Opus yükseltmesi ve karşılaştırma kontrolü iki ayrı okuma; kapatma tam o
-  aralıkta olursa küçük bir yarış penceresi kalır.
+
+**Kalan canlı iş:** kapalı ayda sunucunun 409 vermesini canlıda denemek (yalnız testlerde var).
+Açık kenar: Opus yükseltmesi ve karşılaştırma kontrolü iki ayrı okuma; kapatma tam o
+aralıkta olursa küçük bir yarış penceresi kalır.
+
+### Anlatı–kart tutarlılığı: yapıldı (1 Ekim 2026)
+
+Destek dosyası olmayan (coverage / `is_gl_only`) bir GL hesabına "missing journal entry" veya
+yüksek/orta önem diyen anlatı bir kez yeniden denenir; ikinci denemede rapor yazılmaz
+(`NarrativeContradictionError`, `narrative_check.py`). Opus yükseltmesi çelişkiliyse yayınlanmaz.
+Sınır: kural kelime tabanlıdır; hesap adı anmayan genel cümleler yakalanmaz.
 
 ---
 
@@ -66,7 +74,6 @@ Claude matematik yapmaz; bunları “rapor düzeltmesi” sanma.
 | Konu | Ne var | Ne eksik |
 |---|---|---|
 | Migrasyon `0010` | `monthly_revenue_band` kolonu `IF NOT EXISTS` | `ADD CONSTRAINT` ikinci çalışmada kırılır |
-| Migrasyon `0011` | Kaynak eşleme tablosu dosyada | Canlı Supabase’e henüz uygulanmadı |
 | `500k_plus` bandı | Dört bant var | Üst sınır yok; $500k ile $5M aynı kapı |
 | Flux yüzde kapıları | Dolar kapıları banda göre | `_TIER1_PCT` / `_TIER2_PCT` sabit |
 | Processor fee bandı | `_is_processor_fee_gap` %3–8 | Dosya / hesap / yön yok; herhangi iki taraflı fark `structural_explained` olabilir |

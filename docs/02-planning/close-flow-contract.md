@@ -3,7 +3,9 @@
 *Araştırma ([close-process-by-sector.md](../06-reports/close-process-by-sector.md)) ile kod dilimleri arasındaki köprü.*  
 *Kilit: 24 Ağustos 2026.*
 
-**Durum 17 Eylül 2026.** Kilit tablo değişmedi. Dil 1 `main`’de. Dil 2 ilk uygulaması ve dört inceleme düzeltmesi working tree'de: bordro, tedarikçi ve sözleşme kontrolleri + run-scoped file-total eşleme. Kontrol başına tek destek dosyası; file-total yalnız doğrulanmış aylık ücret roster'ında. Kurulum/yakıt çalışan kontrol değildir. Güncel kayıt: [pre-analysis §11.12](../sprint/pre-analysis-close-checklist.md#1112-17-eylül-2026--inceleme-sonrası-dört-düzeltme-kararı). Kullanıcı yürüyüşü açık; commit/deploy yok. `closed` sonraki dilim.
+**Durum 1 Ekim 2026.** Dil 1, Dil 2 ve **Dil 3 (dönem kilidi) yapıldı** (`main`, `96cf24e`; `0012` demo projede uygulandı). Kilit tablo değişmedi. Dil 3 kaydı en altta. Aşağıdaki 17 Eylül notu tarihsel:
+
+*17 Eylül 2026.* Kilit tablo değişmedi. Dil 1 `main`’de. Dil 2 ilk uygulaması ve dört inceleme düzeltmesi working tree'de: bordro, tedarikçi ve sözleşme kontrolleri + run-scoped file-total eşleme. Kontrol başına tek destek dosyası; file-total yalnız doğrulanmış aylık ücret roster'ında. Kurulum/yakıt çalışan kontrol değildir. Güncel kayıt: [pre-analysis §11.12](../sprint/pre-analysis-close-checklist.md#1112-17-eylül-2026--inceleme-sonrası-dört-düzeltme-kararı). Kullanıcı yürüyüşü o gün açıktı. (`closed` o gün sonraki dilimdi; artık yapıldı.)
 
 Ürünü pivot etmiyoruz. Direkt “checklist ekranı / closed status / yeni ajan” yazmıyoruz. Önce bu sözleşmeyi kilitle, sonra Sentinel’i kâğıt üzerinde yürüt, en son en küçük dilimi kodla.
 
@@ -37,7 +39,7 @@ Gerçek sıra (kullanıcının gördüğü):
 6. Comparison + Interpreter (arka plan)
 7. `/report/:period` — anlatı, anomali kartları, recon kartları, mail, Excel
 
-Run makinesi: `pending → parsing → discovering → mapping → awaiting_confirmation → comparing → generating → complete`. Terminal: `upload_failed`, `parsing_failed`, `guardrail_failed`. **`closed` yok.**
+Run makinesi: `pending → parsing → discovering → mapping → awaiting_confirmation → comparing → generating → complete`. Terminal: `upload_failed`, `parsing_failed`, `guardrail_failed`. **`closed` bir run durumu değildir**; dönem kilidi ayrı tabloda tutulur (`period_closes`, Dil 3).
 
 Rapor sayfası sırası (kod: `frontend/src/pages/ReportPage.tsx`): özet anlatı → anomaliler (geçen aya varyans) → recon bulguları (dosyalar arası). Recon, severity’ye göre yığılmış **bulgu listesi**; “5 kontrolden 3 temiz” değil.
 
@@ -56,7 +58,7 @@ Kullanıcının yaşaması gereken close, araştırma dokümanındaki günlerle 
 | 2 Tie-out | 5 kontrol, her biri geçti/kaldı + istisna | Recon kart yığını | Evet — **asıl dilim** |
 | 3 Açık madde | Önceki aydan dönmeyen timing / hâlâ açık missing JE | Yok | Hayır — tie-out durunca |
 | 4 Flux | Tie-out’tan sonra, SMB eşiği | Var, erken ve $50k eşiği | Kısmen — raporda alta al, eşiği sonra |
-| 5 Kilit | Sign-off → `closed`, Excel checklist + open items | `complete` + mail | Hayır — üçüncü dilim |
+| 5 Kilit | Sign-off, dönem kilidi, Excel checklist + open items | `period_closes` ile kapat/yeniden aç + kilit (Dil 3 **yapıldı**); Excel'e yeni sayfa ve open items yok | Kilit evet, yapıldı; checklist sayfası ve open items hayır |
 
 Bilinçli kesik: banka matching yok, ama “yapılmadı” da gizlenmez.
 
@@ -106,7 +108,7 @@ Kapsam:
 
 Dışarıda (bilerek):
 
-- `closed` state, sign-off, dönem kilidi
+- Run durumu olarak `closed` (kilit `period_closes` tablosunda; Dil 3 yapıldı)
 - Beklenen dosya manifesti / Gün 0
 - Önceki aydan open-item yaşlandırma
 - Banka CSV
@@ -126,3 +128,16 @@ Sıra:
 4. Ancak ondan sonra dilim 1’i kodla.
 
 Yapılmayacak: yeni sektör, quarterly’ye dokunmak, prompt’u “daha CFO” yapmak, banka recon motoru.
+
+---
+
+## Dil 3 — dönem kilidi (yapıldı, 1 Ekim 2026)
+
+Kullanıcı bitmiş aylık raporda “Close this period” der; kim ve ne zaman saklanır, ay kilitlenir.
+“Numbers verified” kapanış değildir, ay kendiliğinden kapanmaz.
+
+- Tablolar: `period_closes` (bir `(şirket, ay)` için tek aktif kilit) ve `period_close_log` (yalnız ekleme). `RunStatus` değişmedi.
+- Kapalı ayda `/upload`, `/runs/{id}/confirm` (Replace) ve `/runs/{id}/retry` 409 döner (`PERIOD_CLOSED`); uçuştaki run ve Opus yükseltmesi ay kapalıysa durur.
+- Yeniden açmak ayrı onaydır; kapanış satırı silinmez, `reopened_*` damgalanır ve log satırı yazılır. Açılınca yeni analiz yapılabilir.
+- Çeyrek rapor kilidin parçası değildir. Banka eşleştirme, kurulum/yakıt, open item yaşlandırma, yeni Excel sayfası ve e-posta bu dilimde yok.
+- Canlıda denenen: kapat, yeniden aç, düzeltilmiş raporla tekrar kapat. Denenmeyen: kapalı ayda sunucunun 409'u.
