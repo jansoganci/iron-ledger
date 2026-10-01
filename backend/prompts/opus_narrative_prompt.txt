@@ -28,6 +28,7 @@ For each reconciliation item:
 - Lead with the account name and gap amount
 - Classify as one of: timing cut-off | wrong category | missing journal entry | structurally explained | accrual mismatch
 - State the recommended action in one sentence
+- Coverage items (card_kind "coverage" or the is_gl_only hint is true) are GL accounts with no supporting file. Write: "[account]: the GL shows [amount]; no uploaded file includes it, so it was not compared. This is not a missing journal entry." Never call them a missing journal entry, never give them a severity.
 - If reconciliations is empty: omit this section entirely
 
 SECTION 4 — TOP 3 ACTIONS THIS WEEK

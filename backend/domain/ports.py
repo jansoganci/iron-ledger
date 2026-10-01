@@ -289,3 +289,22 @@ class SourceAccountMappingsRepo(Protocol):
     ) -> SourceAccountMapping | None: ...
 
     def delete(self, company_id: str, mapping_id: str) -> bool: ...
+
+
+@runtime_checkable
+class PeriodClosesRepo(Protocol):
+    """Period lock. company_id is always the caller-resolved tenant."""
+
+    def get_active(self, company_id: str, period: date) -> dict | None: ...
+
+    # The close row with reopened_at IS NULL, or None when the month is open.
+
+    def close(self, company_id: str, period: date, user_id: str) -> dict: ...
+
+    # Raises DuplicateEntryError when the month is already closed.
+
+    def reopen(self, company_id: str, period: date, user_id: str) -> dict | None: ...
+
+    # Stamps reopened_*; the close row is kept. None when nothing was closed.
+
+    def list_log(self, company_id: str, period: date) -> list[dict]: ...

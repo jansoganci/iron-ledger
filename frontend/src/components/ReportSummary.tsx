@@ -47,6 +47,7 @@ interface ReportSummaryProps {
   tieOutSummary?: TieOutSummary | null;
   companyId?: string;
   excelDownloadUrl?: string;
+  periodClosed?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +267,7 @@ export function ReportSummary({
   tieOutSummary,
   companyId,
   excelDownloadUrl,
+  periodClosed = false,
 }: ReportSummaryProps) {
   const periodLabel = formatPeriod(period);
   const [excelDownloading, setExcelDownloading] = useState(false);
@@ -446,9 +448,11 @@ export function ReportSummary({
       {/* Footer actions */}
       <div className="px-8 py-4 border-t border-border bg-canvas flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-text-secondary">
-          {status === "verified"
-            ? "These numbers match your uploaded files. This does not mean the month is closed."
-            : "Source data has changed since this report was generated."}
+          {status !== "verified"
+            ? "Source data has changed since this report was generated."
+            : periodClosed
+              ? "These numbers match your uploaded files. This period is closed."
+              : "These numbers match your uploaded files. This does not mean the month is closed."}
         </p>
         {excelDownloadUrl && (
           <div className="flex flex-col items-end gap-1">

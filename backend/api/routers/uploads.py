@@ -18,6 +18,7 @@ from pydantic import BaseModel, ValidationError
 
 from backend import messages
 from backend.agents.opus_upgrade import run_opus_upgrade
+from backend.api.period_lock import ensure_period_open
 from backend.agents.orchestrator import (
     apply_mapping_and_consolidate,
     run_comparison_and_report,
@@ -149,6 +150,8 @@ async def upload(
                 status_code=422,
                 detail=messages.UNSUPPORTED_FORMAT.format(filename=f.filename),
             )
+
+    ensure_period_open(company_id, period_date)
 
     storage = get_file_storage()
     runs_repo = get_runs_repo()
@@ -402,6 +405,8 @@ async def run_retry(
             detail=messages.INVALID_PERIOD.format(period=period_value),
         ) from exc
 
+    ensure_period_open(company_id, period_date)
+
     # Create fresh run row; inherit storage_key for downstream retries if this one also fails
     new_run = runs_repo.create(company_id=company_id, period=period_date)
     new_run_id = new_run["id"]
@@ -551,6 +556,8 @@ async def confirm_run(
             status_code=422,
             detail=messages.INVALID_PERIOD.format(period=period_value),
         ) from exc
+
+    ensure_period_open(company_id, period_date)
 
     existing_report = get_reports_repo().get(company_id, period_date)
     wants_regenerate = bool(body.regenerate) or run_wants_regenerate(run)

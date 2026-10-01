@@ -34,6 +34,7 @@ from backend.tools.mapping_grain import (
     proposed_contracts_gl,
     should_file_total_after_parse,
 )
+from backend.api.period_lock import is_period_closed
 from backend.tools.source_mapping import (
     annotate_draft_items,
     index_stored,
@@ -374,6 +375,15 @@ def run_comparison_and_report(
     The run is already in COMPARING when this fires.
     """
     try:
+        # A month closed while this run was in flight stays untouched: no
+        # anomalies replaced, no report deleted or written.
+        if is_period_closed(company_id, period):
+            logger.warning(
+                "run stopped: period is closed",
+                extra={"run_id": run_id, "trace_id": get_trace_id()},
+            )
+            _fail_if_not_terminal(run_id, messages.PERIOD_CLOSED)
+            return
         comparison = ComparisonAgent(
             entries_repo=get_entries_repo(),
             anomalies_repo=get_anomalies_repo(),

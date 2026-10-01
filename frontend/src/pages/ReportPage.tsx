@@ -1,12 +1,13 @@
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, Database, TrendingUp, X } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, getPeriodClose, type PeriodCloseState } from "../lib/api";
 import { useCompany } from "../hooks/useCompany";
 import { ReportSummary } from "../components/ReportSummary";
 import type { OpusStatus } from "../components/ReportSummary";
 import { AnomalyCard, AnomalyCardData, AnomalyCardSkeleton } from "../components/AnomalyCard";
 import { MailButton } from "../components/MailButton";
+import { PeriodClosePanel } from "../components/PeriodClosePanel";
 import {
   MappingConfirmPanel,
   LowConfidenceColumn,
@@ -97,6 +98,13 @@ export default function ReportPage() {
     queryFn: () =>
       apiFetch<ReportResponse>(`/report/${company!.id}/${period}`),
     enabled: !!company?.id && !!period,
+  });
+
+  // Shares its cache key with PeriodClosePanel, so closing there updates this page.
+  const { data: closeState } = useQuery<PeriodCloseState>({
+    queryKey: ["period-close", report?.period],
+    queryFn: () => getPeriodClose(report!.period),
+    enabled: !!report?.period,
   });
 
   // Poll opus_status while run_id is known and upgrade is in flight.
@@ -301,13 +309,22 @@ export default function ReportPage() {
             opusStatus={opusStatus}
             opusUpgraded={report.opus_upgraded}
             financials={report.financials}
-            onRegenerate={() => navigate(`/upload?period=${report.period}`)}
+            onRegenerate={
+              closeState?.closed
+                ? undefined
+                : () => navigate(`/upload?period=${report.period}`)
+            }
+            periodClosed={closeState?.closed ?? false}
             reconciliations={report.reconciliations}
             tieOutSummary={report.tie_out_summary}
             companyId={report.company_id}
             excelDownloadUrl={`/report/${report.company_id}/${report.period}/export.xlsx`}
           />
         ) : null}
+
+        {report && !isLoading && !report.is_stale && (
+          <PeriodClosePanel period={report.period} />
+        )}
 
         {/* Anomaly cards — grouped by category, 2-col on xl, 1-col below */}
         {isLoading ? (

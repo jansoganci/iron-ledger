@@ -175,3 +175,41 @@ export async function apiFetchBlob(
   const parsed = parseBody(await res.text());
   return throwForErrorStatus(res, parsed);
 }
+
+// ---------------------------------------------------------------------------
+// Period lock (Dil 3). company_id is never sent; the backend resolves it.
+// ---------------------------------------------------------------------------
+
+export interface PeriodCloseLogEntry {
+  event: "closed" | "reopened";
+  actor_email: string | null;
+  created_at: string;
+}
+
+export interface PeriodCloseState {
+  closed: boolean;
+  close: {
+    closed_at: string;
+    closed_by_email: string | null;
+    closed_by_you: boolean;
+  } | null;
+  log: PeriodCloseLogEntry[];
+}
+
+export function getPeriodClose(period: string): Promise<PeriodCloseState> {
+  return apiFetch<PeriodCloseState>(`/periods/${period}/close`);
+}
+
+export function closePeriod(period: string): Promise<PeriodCloseState> {
+  return apiFetch<PeriodCloseState>(`/periods/${period}/close`, {
+    method: "POST",
+    json: { confirm: true },
+  });
+}
+
+export function reopenPeriod(period: string): Promise<PeriodCloseState> {
+  return apiFetch<PeriodCloseState>(`/periods/${period}/reopen`, {
+    method: "POST",
+    json: { confirm: true },
+  });
+}

@@ -11,6 +11,7 @@ from backend.adapters.supabase_repos import (
     SupabaseAnomaliesRepo,
     SupabaseCompaniesRepo,
     SupabaseEntriesRepo,
+    SupabasePeriodClosesRepo,
     SupabaseReportsRepo,
     SupabaseRunsRepo,
     SupabaseSourceAccountMappingsRepo,
@@ -51,6 +52,10 @@ def get_accounts_repo() -> SupabaseAccountsRepo:
 
 def get_source_mappings_repo() -> SupabaseSourceAccountMappingsRepo:
     return SupabaseSourceAccountMappingsRepo(_supabase_client())
+
+
+def get_period_closes_repo() -> SupabasePeriodClosesRepo:
+    return SupabasePeriodClosesRepo(_supabase_client())
 
 
 def get_file_storage() -> SupabaseFileStorage:

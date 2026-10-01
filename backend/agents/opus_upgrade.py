@@ -3,9 +3,15 @@ from __future__ import annotations
 from datetime import date
 
 from backend.api.deps import get_llm_client, get_reports_repo, get_runs_repo
+from backend.api.period_lock import is_period_closed
 from backend.domain.contracts import NarrativeJSON
 from backend.logger import get_logger, get_trace_id
 from backend.tools.close_controls import unpack_report_reconciliations
+from backend.tools.narrative_check import (
+    coverage_accounts,
+    find_coverage_contradictions,
+    known_accounts,
+)
 from backend.tools.guardrail import (
     collect_reconciliation_reference_values,
     verify_guardrail,
@@ -56,6 +62,11 @@ def run_opus_upgrade(run_id: str, company_id: str, period: date) -> None:
     if anything goes wrong.
     """
     try:
+        # A closed month's report is not rewritten, not even by the upgrade.
+        if is_period_closed(company_id, period):
+            logger.info("opus_upgrade skipped: period is closed")
+            return
+
         runs_repo = get_runs_repo()
         reports_repo = get_reports_repo()
         llm_client = get_llm_client()
@@ -159,6 +170,26 @@ def run_opus_upgrade(run_id: str, company_id: str, period: date) -> None:
             logger.warning(
                 "opus_upgrade guardrail failed",
                 extra={"run_id": run_id, "reason": reason, "trace_id": get_trace_id()},
+            )
+            runs_repo.set_opus_status(run_id, "failed")
+            return
+
+        # The words must also agree with the control cards. A narrative that
+        # calls a no-supporting-file account a missing JE is not published; the
+        # existing report stays.
+        contradictions = find_coverage_contradictions(
+            result.narrative,
+            coverage_accounts(reconciliations),
+            known_accounts(reconciliations, current_summary.get("accounts")),
+        )
+        if contradictions:
+            logger.warning(
+                "opus_upgrade contradicts coverage cards",
+                extra={
+                    "run_id": run_id,
+                    "sentence_count": len(contradictions),
+                    "trace_id": get_trace_id(),
+                },
             )
             runs_repo.set_opus_status(run_id, "failed")
             return

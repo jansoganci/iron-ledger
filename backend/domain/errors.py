@@ -26,6 +26,15 @@ class NarrativeSchemaError(Exception):
     """
 
 
+class NarrativeContradictionError(Exception):
+    """Narrative called a coverage (no supporting file) account a missing journal
+    entry or high severity, against the control cards, after the semantic retry.
+
+    The numbers were never marked verified. Surfaces as guardrail_failed with
+    NARRATIVE_CONTRADICTION_FAILED so Retry Analysis still works.
+    """
+
+
 class InvalidRunTransition(Exception):
     """RunStateMachine.transition() called with an illegal state move."""
 

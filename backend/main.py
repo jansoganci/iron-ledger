@@ -14,6 +14,7 @@ from backend.api.routers import (
     companies,
     health,
     mail,
+    periods,
     quarterly,
     reports,
     source_mappings,
@@ -186,6 +187,7 @@ def create_app() -> FastAPI:
     app.include_router(reports.router)
     app.include_router(quarterly.router)
     app.include_router(uploads.router)
+    app.include_router(periods.router)
     app.include_router(source_mappings.router)
     return app
 

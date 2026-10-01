@@ -31,6 +31,9 @@ NARRATIVE_SCHEMA_FAILED = (
     "We couldn't write the report from the model's output after two attempts. "
     "Your data is safe — please try again."
 )
+NARRATIVE_CONTRADICTION_FAILED = (
+    "We couldn't write this report. Your data is saved. Please try again."
+)
 REPORT_WRITE_FAILED = (
     "We verified your numbers but couldn't save the report. "
     "Please try running this period again."
@@ -135,3 +138,16 @@ DISCOVERY_REJECTED = (
 
 COMPANY_CREATE_FAILED = "We couldn't create your workspace. Please try again."
 COMPANY_UPDATE_FAILED = "We couldn't save your company details. Please try again."
+
+PERIOD_CLOSED = (
+    "This period is closed, so it can't be uploaded or replaced. "
+    "Reopen it first if you need to make changes."
+)
+PERIOD_ALREADY_CLOSED = "This period is already closed."
+PERIOD_NOT_CLOSED = "This period isn't closed, so there is nothing to reopen."
+PERIOD_CLOSE_NEEDS_REPORT = (
+    "There is no finished report for this period yet, so it can't be closed."
+)
+PERIOD_CLOSE_CONFIRM_REQUIRED = "Please confirm that you want to close this period."
+PERIOD_REOPEN_CONFIRM_REQUIRED = "Please confirm that you want to reopen this period."
+PERIOD_CLOSE_FAILED = "We couldn't save the change to this period. Please try again."

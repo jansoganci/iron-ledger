@@ -1357,3 +1357,125 @@ def _report_to_row(r: Report) -> dict:
     if r.quarterly_data is not None:
         row["quarterly_data"] = _sanitize_for_json(r.quarterly_data)
     return row
+
+
+# ---------------------------------------------------------------------------
+# Period closes (Dil 3)
+# ---------------------------------------------------------------------------
+
+
+class SupabasePeriodClosesRepo:
+    def __init__(self, client: Client) -> None:
+        self._db = client
+
+    def _email(self, user_id: str) -> str | None:
+        try:
+            user = self._db.auth.admin.get_user_by_id(user_id)
+            return getattr(getattr(user, "user", None), "email", None)
+        except Exception as exc:  # display-only; never block a close
+            logger.warning(
+                "period close: could not resolve user email",
+                extra={"error": str(exc)},
+            )
+            return None
+
+    def _log(self, row: dict, event: str, actor_id: str, actor_email: str | None):
+        # The close row already carries who/when; the log is the audit trail.
+        try:
+            _with_retry(
+                lambda: self._db.table("period_close_log")
+                .insert(
+                    {
+                        "company_id": row["company_id"],
+                        "period": row["period"],
+                        "close_id": row["id"],
+                        "event": event,
+                        "actor_id": actor_id,
+                        "actor_email": actor_email,
+                    }
+                )
+                .execute()
+            )
+        except Exception as exc:
+            logger.error(
+                "period close log write failed",
+                extra={"close_id": row.get("id"), "event": event, "error": str(exc)},
+            )
+
+    def get_active(self, company_id: str, period: date) -> dict | None:
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("period_closes")
+                .select("*")
+                .eq("company_id", company_id)
+                .eq("period", str(period))
+                .is_("reopened_at", "null")
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        rows = resp.data or []
+        return rows[0] if rows else None
+
+    def close(self, company_id: str, period: date, user_id: str) -> dict:
+        email = self._email(user_id)
+        try:
+            resp = (
+                self._db.table("period_closes")
+                .insert(
+                    {
+                        "company_id": company_id,
+                        "period": str(period),
+                        "closed_by": user_id,
+                        "closed_by_email": email,
+                    }
+                )
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        rows = resp.data or []
+        if not rows:
+            raise TransientIOError("period close insert returned no row")
+        self._log(rows[0], "closed", user_id, email)
+        return rows[0]
+
+    def reopen(self, company_id: str, period: date, user_id: str) -> dict | None:
+        email = self._email(user_id)
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("period_closes")
+                .update(
+                    {
+                        "reopened_by": user_id,
+                        "reopened_by_email": email,
+                        "reopened_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("company_id", company_id)
+                .eq("period", str(period))
+                .is_("reopened_at", "null")
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        rows = resp.data or []
+        if not rows:
+            return None
+        self._log(rows[0], "reopened", user_id, email)
+        return rows[0]
+
+    def list_log(self, company_id: str, period: date) -> list[dict]:
+        try:
+            resp = _with_retry(
+                lambda: self._db.table("period_close_log")
+                .select("event, actor_email, created_at")
+                .eq("company_id", company_id)
+                .eq("period", str(period))
+                .order("created_at")
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        return list(resp.data or [])

@@ -11,6 +11,7 @@ from backend.domain.entities import Anomaly, Report
 from backend.domain.errors import (
     DuplicateEntryError,
     GuardrailError,
+    NarrativeContradictionError,
     NarrativeSchemaError,
 )
 from backend.domain.ports import FileStorage, LLMClient, ReportsRepo, RunsRepo
@@ -20,6 +21,11 @@ from backend.logger import get_logger, get_trace_id
 from backend.tools.close_controls import (
     pack_report_reconciliations,
     summary_from_parse_preview,
+)
+from backend.tools.narrative_check import (
+    coverage_accounts,
+    find_coverage_contradictions,
+    known_accounts,
 )
 from backend.tools.guardrail import (
     collect_reconciliation_reference_values,
@@ -294,6 +300,26 @@ class InterpreterAgent:
                     extra={"run_id": run_id, "inner_error": str(inner)},
                 )
             return False
+        except NarrativeContradictionError as exc:
+            logger.warning(
+                "narrative_contradiction_failed",
+                extra={"run_id": run_id, "error": str(exc), "trace_id": get_trace_id()},
+            )
+            try:
+                fail_status = RunStateMachine.transition(
+                    RunStatus.GENERATING, RunStatus.GUARDRAIL_FAILED
+                )
+                self._runs.update_status(
+                    run_id,
+                    fail_status,
+                    extra={"error_message": messages.NARRATIVE_CONTRADICTION_FAILED},
+                )
+            except Exception as inner:
+                logger.error(
+                    "failed to set guardrail_failed status",
+                    extra={"run_id": run_id, "inner_error": str(inner)},
+                )
+            return False
         except NarrativeSchemaError as exc:
             logger.warning(
                 "narrative_schema_failed",
@@ -484,8 +510,11 @@ class InterpreterAgent:
         # that number lives on the reconciliation, not in the P&L total.
         recon_values = collect_reconciliation_reference_values(reconciliations)
 
+        covered = coverage_accounts(reconciliations)
+        known = known_accounts(reconciliations, summary_dict.get("accounts"))
         last_message = ""
         last_was_schema = False
+        last_was_contradiction = False
         for attempt in range(max_retries):
             # Keep users informed during longer LLM/guardrail work.
             if attempt > 0:
@@ -521,6 +550,7 @@ class InterpreterAgent:
                 )
                 continue
             last_was_schema = False
+            last_was_contradiction = False
             success, message = verify_guardrail(
                 result.model_dump(),
                 summary_dict,
@@ -540,9 +570,46 @@ class InterpreterAgent:
                 },
             )
             if success:
-                return result
+                # Numbers match; now the words must match the control cards.
+                # Python decides which accounts are coverage; Claude is only
+                # told which sentences to fix on the one retry.
+                contradictions = find_coverage_contradictions(
+                    result.narrative, covered, known
+                )
+                if not contradictions:
+                    return result
+                last_was_contradiction = True
+                last_message = "; ".join(contradictions)
+                logger.warning(
+                    "narrative contradicts coverage cards",
+                    extra={
+                        "event": "narrative_contradiction",
+                        "run_id": run_id,
+                        "attempt": attempt + 1,
+                        "sentence_count": len(contradictions),
+                        "trace_id": get_trace_id(),
+                    },
+                )
+                context = {
+                    **context,
+                    "narrative_corrections": [
+                        "Accounts with no supporting file (coverage): "
+                        + ", ".join(sorted(covered))
+                        + ". Rewrite each sentence below as coverage: the GL "
+                        "shows the amount, no uploaded file includes the "
+                        "account, so it was not compared, this is not a missing "
+                        "journal entry, and no severity. Sentence: " + s
+                        for s in contradictions
+                    ],
+                }
+                continue
             last_message = message
 
+        if last_was_contradiction:
+            raise NarrativeContradictionError(
+                f"Narrative contradicted the coverage cards after {max_retries} "
+                f"attempts. Sentences: {last_message}"
+            )
         if last_was_schema:
             raise NarrativeSchemaError(
                 f"Narrative schema invalid after {max_retries} attempts. "

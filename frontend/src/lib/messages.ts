@@ -36,6 +36,12 @@ export const CLIENT_MESSAGES = {
   BANK_OUTSIDE_ATTESTATION:
     "Bank and card reconciliation is done outside Month Proof. This report does not confirm it.",
 
+  // Period lock — mirrors backend/messages.py
+  PERIOD_CLOSED:
+    "This period is closed, so it can't be uploaded or replaced. Reopen it first if you need to make changes.",
+  PERIOD_CLOSE_FAILED:
+    "We couldn't save the change to this period. Please try again.",
+
   EXCEL_DOWNLOAD_FAILED:
     "We couldn't download the Excel package. Please try again.",
 } as const;

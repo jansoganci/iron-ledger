@@ -30,7 +30,20 @@ Güncel karar, UX ve uygulama kaydı:
 
 ### Close checklist Dil 3 — dönem kilidi
 
-`closed` / sign-off / `RunStateMachine` + migrasyon. Dil 2’den ayrı. SQL’siz başlamaz.
+Kod hazır, canlıya basılmadı (1 Ekim 2026). Migrasyon `0012_add_period_closes.sql`
+**henüz hiçbir Supabase projesine uygulanmadı**. Uygulanmadan backend yükleme,
+Replace ve retry isteklerini 503 ile reddeder (kilit okunamıyorsa yazma yok).
+
+- `RunStatus` değişmedi; kapanış bir run durumu değil, `period_closes` satırı
+  (aktif kilit: `reopened_at IS NULL`, `(şirket, ay)` başına tek). Yeniden açma
+  satırı silmez, `reopened_*` damgalar; `period_close_log` yalnız ekleme.
+- `POST /periods/{ay}/close` ve `/reopen` ayrı açık onay ister (`{"confirm": true}`);
+  kapatmak için bitmiş aylık rapor şart. `GET /periods/{ay}/close` durum + log.
+- Kapalı ayda `/upload`, `/runs/{id}/confirm` (Replace) ve `/runs/{id}/retry` 409
+  (`PERIOD_CLOSED`); uçuştaki run ve Opus yükseltmesi de dokunmadan durur.
+- Çeyrek rapor kilidin parçası değil. Banka, kurulum/yakıt, yaşlandırma, e-posta yok.
+- Açık: Opus yükseltmesi ve karşılaştırma kontrolü iki ayrı okuma; kapatma tam o
+  aralıkta olursa küçük bir yarış penceresi kalır.
 
 ---
 

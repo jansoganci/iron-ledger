@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
-import { apiFetch, ApiError, RateLimitedError } from "../lib/api";
+import { apiFetch, ApiError, RateLimitedError, getPeriodClose } from "../lib/api";
+import { CLIENT_MESSAGES } from "../lib/messages";
 import { formatPeriod, monthsAgo } from "../lib/formatters";
 import { FileUpload } from "../components/FileUpload";
 import { PeriodSelector } from "../components/PeriodSelector";
@@ -157,6 +158,12 @@ export default function UploadPage() {
     setIsUploading(true);
     setUploadError(null);
     try {
+      const lock = await getPeriodClose(period).catch(() => null);
+      if (lock?.closed) {
+        setUploadError(CLIENT_MESSAGES.PERIOD_CLOSED);
+        setIsUploading(false);
+        return;
+      }
       const exists = await periodHasVerifiedReport();
       if (exists) {
         setIsUploading(false);
