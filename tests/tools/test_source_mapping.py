@@ -6,7 +6,7 @@ from backend.domain.contracts import MappingDraftItem
 from backend.domain.entities import SourceAccountMapping
 from backend.tools.source_mapping import (
     annotate_draft_items,
-    auto_map_payroll,
+    payroll_draft_items,
     index_stored,
     is_payroll,
     is_persistable,
@@ -35,14 +35,23 @@ def test_payroll_is_not_persistable() -> None:
     assert not is_persistable("contracts")
 
 
-def test_auto_map_payroll_keeps_sub_lines() -> None:
-    mapping = auto_map_payroll(["Meals", "Office Rent", "Salary", "Bonus", ""])
-    assert mapping == {
-        "Meals": "Meals",
-        "Office Rent": "Office Rent",
-        "Salary": "Salary",
-        "Bonus": "Bonus",
-    }
+def test_payroll_roles_become_unselected_review_rows() -> None:
+    from datetime import date
+
+    items = payroll_draft_items(
+        ["Owner / Operations", "Install Technician", ""],
+        source_file="p.xlsx",
+        amount_scope="Base Compensation",
+        period=date(2026, 3, 1),
+    )
+    assert [i.source_pattern for i in items] == [
+        "Owner / Operations",
+        "Install Technician",
+    ]
+    assert all(i.origin == "new" and i.suggested_gl_account is None for i in items)
+    assert all(not i.confident and i.mapping_mode == "row" for i in items)
+    assert needs_user_review(items)
+    assert persistable_upserts(items, {i.source_pattern: "X" for i in items}) == []
 
 
 def test_new_row_needs_review() -> None:

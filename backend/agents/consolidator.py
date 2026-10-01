@@ -10,8 +10,10 @@ Pipeline:
                "Payroll" / "Wages & Salaries" collapse to one canonical name.
                Ambiguous matches (<90%) keep their original name (treated as new
                accounts — the low-confidence flow is the caller's responsibility).
-  3. Roll-up — group by canonical account name; compute per-source sub-totals
-               and a consolidated total.
+  3. Roll-up — group by canonical account name and keep per-source
+               sub-totals. The P&L amount is the GL amount when the GL has
+               the account. Supporting files stay in the breakdown and in
+               the reconciliation delta. They are not added on top of the GL.
   4. Delta   — for each account that appears in ≥2 sources, compute delta.
                Flag if |delta| > $100 AND |delta_pct| > 5%, OR if |delta| > $500.
                Severity: high >$5000, medium $500–$5000, low <$500.
@@ -157,6 +159,9 @@ def _build_canonical_map(df: pd.DataFrame) -> dict[str, str]:
 def _roll_up(tagged: pd.DataFrame) -> pd.DataFrame:
     """Aggregate to one row per canonical account with source_breakdown JSONB.
 
+    ``amount`` is the GL total when a GL file contains the account. Otherwise
+    it is the supporting total. Both sides remain in ``source_breakdown``.
+
     Guarantees exactly one output row per canonical account name. When different
     source files disagree on category (e.g. GL says OPEX, dept file says OTHER),
     the GL-sourced category wins; if no GL source is present, the first observed
@@ -188,10 +193,15 @@ def _roll_up(tagged: pd.DataFrame) -> pd.DataFrame:
         entry = per_account[canonical]
 
         # GL category wins over any other source category.
+        # The book amount is the GL. A supporting file for the same account
+        # is evidence, not a second copy of the money.
         if _is_gl_label(source_file):
             entry["category"] = category
+            entry["has_gl"] = True
+            entry["gl_amount"] = round(entry.get("gl_amount", 0.0) + amount, 2)
+        else:
+            entry["non_gl_amount"] = round(entry.get("non_gl_amount", 0.0) + amount, 2)
 
-        entry["amount"] = round(entry["amount"] + amount, 2)
         entry["source_breakdown"].append(
             {
                 "source_file": source_file,
@@ -207,7 +217,15 @@ def _roll_up(tagged: pd.DataFrame) -> pd.DataFrame:
             }
         )
 
-    return pd.DataFrame(list(per_account.values()))
+    rows = []
+    for entry in per_account.values():
+        has_gl = entry.pop("has_gl", False)
+        gl_amount = entry.pop("gl_amount", 0.0)
+        non_gl_amount = entry.pop("non_gl_amount", 0.0)
+        entry["amount"] = gl_amount if has_gl else non_gl_amount
+        rows.append(entry)
+
+    return pd.DataFrame(rows)
 
 
 # ---------------------------------------------------------------------------

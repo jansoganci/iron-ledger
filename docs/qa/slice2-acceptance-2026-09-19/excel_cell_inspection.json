@@ -1,0 +1,1032 @@
+[
+  {
+    "file": "redhawk_close_package.xlsx",
+    "sheet": "Reconciliations",
+    "widths": {
+      "A": 24.0,
+      "B": 36.0,
+      "C": 28.0,
+      "D": 22.0,
+      "E": 28.0,
+      "F": 16.0,
+      "G": 42.0,
+      "H": 48.0
+    },
+    "rows": [
+      {
+        "row": 1,
+        "height": null,
+        "values": [
+          "Cross-Source Reconciliation \u2014 March 2026",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 2,
+        "height": 19.0,
+        "values": [
+          "Bank and card reconciliation is done outside Month Proof. This report does not confirm it.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 3,
+        "height": 19.0,
+        "values": [
+          "Installation and fuel were not evaluated in this delivery.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 4,
+        "height": null,
+        "values": [
+          "Control summary",
+          "3 compared",
+          "1 with exceptions",
+          "0 not evaluated",
+          "1 GL accounts not compared",
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 5,
+        "height": 22.0,
+        "values": [
+          "Control",
+          "Status",
+          "Source file",
+          "Amount scope",
+          "GL target",
+          "Difference ($)",
+          "Next action",
+          "Why not compared"
+        ]
+      },
+      {
+        "row": 6,
+        "height": 34.0,
+        "values": [
+          "Payroll",
+          "tied out",
+          "redhawk_payroll_mar_2026.xlsx",
+          "Base Compensation",
+          "Admin Wages, Owner Salary, Technician Wages",
+          null,
+          "Review the comparison evidence.",
+          null
+        ]
+      },
+      {
+        "row": 7,
+        "height": 64.0,
+        "values": [
+          "Vendors",
+          "tied out",
+          "redhawk_vendor_invoices_mar_2026.xlsx",
+          "Amount",
+          "Central Station Monitoring, Equipment & Parts, Insurance, Marketing & Advertising, Vehicle & Fuel",
+          null,
+          "Review the comparison evidence.",
+          null
+        ]
+      },
+      {
+        "row": 8,
+        "height": 34.0,
+        "values": [
+          "Contracts",
+          "has exceptions",
+          "redhawk_contracts_mar_2026.xlsx",
+          "Monthly Fee",
+          "Service Revenue",
+          285,
+          "Review this exception against the source file and the GL account.",
+          null
+        ]
+      },
+      {
+        "row": 9,
+        "height": null,
+        "values": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 10,
+        "height": null,
+        "values": [
+          "Comparison evidence",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 11,
+        "height": 22.0,
+        "values": [
+          "Control",
+          "Source file",
+          "GL account",
+          "Supporting amount ($)",
+          "GL amount ($)",
+          "Difference ($)",
+          "Classification / incomplete reason",
+          null
+        ]
+      },
+      {
+        "row": 12,
+        "height": 19.0,
+        "values": [
+          "Payroll",
+          "redhawk_payroll_mar_2026.xlsx",
+          "Admin Wages",
+          1400,
+          1400,
+          0,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 13,
+        "height": 19.0,
+        "values": [
+          "Payroll",
+          "redhawk_payroll_mar_2026.xlsx",
+          "Owner Salary",
+          5500,
+          5500,
+          0,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 14,
+        "height": 19.0,
+        "values": [
+          "Payroll",
+          "redhawk_payroll_mar_2026.xlsx",
+          "Technician Wages",
+          6200,
+          6200,
+          0,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 15,
+        "height": 34.0,
+        "values": [
+          "Vendors",
+          "redhawk_vendor_invoices_mar_2026.xlsx",
+          "Central Station Monitoring",
+          1105,
+          1105,
+          0,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 16,
+        "height": 34.0,
+        "values": [
+          "Vendors",
+          "redhawk_vendor_invoices_mar_2026.xlsx",
+          "Equipment & Parts",
+          7200,
+          7200,
+          0,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 17,
+        "height": 34.0,
+        "values": [
+          "Vendors",
+          "redhawk_vendor_invoices_mar_2026.xlsx",
+          "Insurance",
+          1180,
+          1180,
+          0,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 18,
+        "height": 34.0,
+        "values": [
+          "Vendors",
+          "redhawk_vendor_invoices_mar_2026.xlsx",
+          "Marketing & Advertising",
+          780,
+          780,
+          0,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 19,
+        "height": 34.0,
+        "values": [
+          "Vendors",
+          "redhawk_vendor_invoices_mar_2026.xlsx",
+          "Vehicle & Fuel",
+          1840,
+          1840,
+          0,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 20,
+        "height": 19.0,
+        "values": [
+          "Contracts",
+          "redhawk_contracts_mar_2026.xlsx",
+          "Service Revenue",
+          3825,
+          3540,
+          285,
+          "Stale Reference",
+          null
+        ]
+      },
+      {
+        "row": 21,
+        "height": null,
+        "values": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 22,
+        "height": 22.0,
+        "values": [
+          "Account",
+          "Category",
+          "GL Amount ($)",
+          "Dept/Source Total ($)",
+          "Delta ($)",
+          "Severity",
+          "Classification",
+          null
+        ]
+      },
+      {
+        "row": 23,
+        "height": 19.0,
+        "values": [
+          "Rent & Utilities",
+          "OPEX",
+          1650,
+          0,
+          -1650,
+          "INFO",
+          "Not compared",
+          null
+        ]
+      },
+      {
+        "row": 24,
+        "height": 19.0,
+        "values": [
+          "Service Revenue",
+          "REVENUE",
+          3540,
+          3825,
+          285,
+          "MEDIUM",
+          "Stale Reference",
+          null
+        ]
+      },
+      {
+        "row": 25,
+        "height": null,
+        "values": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 26,
+        "height": null,
+        "values": [
+          "Source Detail",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 27,
+        "height": null,
+        "values": [
+          "Account",
+          "Source File",
+          "Amount ($)",
+          "Row Count",
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 28,
+        "height": 19.0,
+        "values": [
+          "Service Revenue",
+          "redhawk_contracts_mar_2026.xlsx",
+          3825,
+          85,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 29,
+        "height": 19.0,
+        "values": [
+          "Service Revenue",
+          "redhawk_gl_mar_2026.xlsx",
+          3540,
+          1,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  {
+    "file": "synthetic_mixed_controls.xlsx",
+    "sheet": "Reconciliations",
+    "widths": {
+      "A": 24.0,
+      "B": 36.0,
+      "C": 28.0,
+      "D": 22.0,
+      "E": 28.0,
+      "F": 16.0,
+      "G": 42.0,
+      "H": 48.0
+    },
+    "rows": [
+      {
+        "row": 1,
+        "height": null,
+        "values": [
+          "Cross-Source Reconciliation \u2014 March 2026",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 2,
+        "height": 19.0,
+        "values": [
+          "Bank and card reconciliation is done outside Month Proof. This report does not confirm it.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 3,
+        "height": 19.0,
+        "values": [
+          "Installation and fuel were not evaluated in this delivery.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 4,
+        "height": null,
+        "values": [
+          "Control summary",
+          "1 compared",
+          "0 with exceptions",
+          "2 not evaluated",
+          "0 GL accounts not compared",
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 5,
+        "height": 22.0,
+        "values": [
+          "Control",
+          "Status",
+          "Source file",
+          "Amount scope",
+          "GL target",
+          "Difference ($)",
+          "Next action",
+          "Why not compared"
+        ]
+      },
+      {
+        "row": 6,
+        "height": 49.0,
+        "values": [
+          "Payroll",
+          "not compared",
+          "payroll_a.xlsx, payroll_b.xlsx",
+          null,
+          null,
+          null,
+          "Combine the supporting files for this control into one file, remove duplicate rows, and upload it in a new analysis.",
+          "This control supports one supporting file per analysis."
+        ]
+      },
+      {
+        "row": 7,
+        "height": 19.0,
+        "values": [
+          "Vendors",
+          "tied out",
+          "vendor.xlsx",
+          "Amount",
+          "Insurance",
+          0,
+          "Review the comparison evidence.",
+          null
+        ]
+      },
+      {
+        "row": 8,
+        "height": 34.0,
+        "values": [
+          "Contracts",
+          "not compared",
+          "contracts.xlsx",
+          "Monthly Fee",
+          "Monitoring Revenue",
+          null,
+          "Resolve the missing evidence shown for this control.",
+          "No matching general-ledger amount was found for this target."
+        ]
+      },
+      {
+        "row": 9,
+        "height": null,
+        "values": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 10,
+        "height": null,
+        "values": [
+          "Comparison evidence",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 11,
+        "height": 22.0,
+        "values": [
+          "Control",
+          "Source file",
+          "GL account",
+          "Supporting amount ($)",
+          "GL amount ($)",
+          "Difference ($)",
+          "Classification / incomplete reason",
+          null
+        ]
+      },
+      {
+        "row": 12,
+        "height": 19.0,
+        "values": [
+          "Vendors",
+          "vendor.xlsx",
+          "Insurance",
+          1180,
+          1180,
+          0,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 13,
+        "height": 34.0,
+        "values": [
+          "Contracts",
+          "contracts.xlsx",
+          "Monitoring Revenue",
+          100,
+          null,
+          null,
+          "No matching general-ledger amount was found for this target.",
+          null
+        ]
+      },
+      {
+        "row": 14,
+        "height": null,
+        "values": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 15,
+        "height": null,
+        "values": [
+          "No cross-source discrepancies detected for this period.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  {
+    "file": "missing_evidence_controls.xlsx",
+    "sheet": "Reconciliations",
+    "widths": {
+      "A": 24.0,
+      "B": 36.0,
+      "C": 28.0,
+      "D": 22.0,
+      "E": 28.0,
+      "F": 16.0,
+      "G": 42.0,
+      "H": 48.0
+    },
+    "rows": [
+      {
+        "row": 1,
+        "height": null,
+        "values": [
+          "Cross-Source Reconciliation \u2014 March 2026",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 2,
+        "height": 19.0,
+        "values": [
+          "Bank and card reconciliation is done outside Month Proof. This report does not confirm it.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 3,
+        "height": 19.0,
+        "values": [
+          "Installation and fuel were not evaluated in this delivery.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 4,
+        "height": null,
+        "values": [
+          "Control summary",
+          "0 compared",
+          "0 with exceptions",
+          "3 not evaluated",
+          "0 GL accounts not compared",
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 5,
+        "height": 22.0,
+        "values": [
+          "Control",
+          "Status",
+          "Source file",
+          "Amount scope",
+          "GL target",
+          "Difference ($)",
+          "Next action",
+          "Why not compared"
+        ]
+      },
+      {
+        "row": 6,
+        "height": 34.0,
+        "values": [
+          "Payroll",
+          "source missing",
+          null,
+          null,
+          null,
+          null,
+          "Add this supporting file in the next analysis.",
+          "No supporting file for this control was uploaded."
+        ]
+      },
+      {
+        "row": 7,
+        "height": 34.0,
+        "values": [
+          "Vendors",
+          "source missing",
+          null,
+          null,
+          null,
+          null,
+          "Add this supporting file in the next analysis.",
+          "No supporting file for this control was uploaded."
+        ]
+      },
+      {
+        "row": 8,
+        "height": 34.0,
+        "values": [
+          "Contracts",
+          "source missing",
+          null,
+          null,
+          null,
+          null,
+          "Add this supporting file in the next analysis.",
+          "No supporting file for this control was uploaded."
+        ]
+      },
+      {
+        "row": 9,
+        "height": null,
+        "values": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 10,
+        "height": null,
+        "values": [
+          "No cross-source discrepancies detected for this period.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  {
+    "file": "historical_legacy_controls.xlsx",
+    "sheet": "Reconciliations",
+    "widths": {
+      "A": 24.0,
+      "B": 36.0,
+      "C": 28.0,
+      "D": 22.0,
+      "E": 28.0,
+      "F": 16.0,
+      "G": 42.0,
+      "H": 48.0
+    },
+    "rows": [
+      {
+        "row": 1,
+        "height": null,
+        "values": [
+          "Cross-Source Reconciliation \u2014 March 2026",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 2,
+        "height": 19.0,
+        "values": [
+          "Bank and card reconciliation is done outside Month Proof. This report does not confirm it.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 3,
+        "height": 19.0,
+        "values": [
+          "Installation and fuel were not evaluated in this delivery.",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 4,
+        "height": null,
+        "values": [
+          "Control summary",
+          "1 compared",
+          "1 with exceptions",
+          "2 not evaluated",
+          "0 GL accounts not compared",
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 5,
+        "height": 22.0,
+        "values": [
+          "Control",
+          "Status",
+          "Source file",
+          "Amount scope",
+          "GL target",
+          "Difference ($)",
+          "Next action",
+          "Why not compared"
+        ]
+      },
+      {
+        "row": 6,
+        "height": 34.0,
+        "values": [
+          "Payroll",
+          "not compared",
+          null,
+          null,
+          null,
+          null,
+          "Resolve the missing evidence shown for this control.",
+          "This report does not include enough stored control evidence to mark a tie-out."
+        ]
+      },
+      {
+        "row": 7,
+        "height": 34.0,
+        "values": [
+          "Vendors",
+          "not compared",
+          null,
+          null,
+          null,
+          null,
+          "Resolve the missing evidence shown for this control.",
+          "This report does not include enough stored control evidence to mark a tie-out."
+        ]
+      },
+      {
+        "row": 8,
+        "height": 34.0,
+        "values": [
+          "Contracts",
+          "has exceptions",
+          null,
+          null,
+          null,
+          null,
+          "Review this exception against the source file and the GL account.",
+          null
+        ]
+      },
+      {
+        "row": 9,
+        "height": null,
+        "values": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 10,
+        "height": 22.0,
+        "values": [
+          "Account",
+          "Category",
+          "GL Amount ($)",
+          "Dept/Source Total ($)",
+          "Delta ($)",
+          "Severity",
+          "Classification",
+          null
+        ]
+      },
+      {
+        "row": 11,
+        "height": 19.0,
+        "values": [
+          "Service Revenue",
+          "REVENUE",
+          3540,
+          3825,
+          285,
+          "MEDIUM",
+          "Stale Reference",
+          null
+        ]
+      },
+      {
+        "row": 12,
+        "height": null,
+        "values": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 13,
+        "height": null,
+        "values": [
+          "Source Detail",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 14,
+        "height": null,
+        "values": [
+          "Account",
+          "Source File",
+          "Amount ($)",
+          "Row Count",
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row": 15,
+        "height": 19.0,
+        "values": [
+          "Service Revenue",
+          "redhawk_contracts_mar_2026.xlsx",
+          3825,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    ]
+  }
+]

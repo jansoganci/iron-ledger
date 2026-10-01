@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle,
@@ -14,6 +15,8 @@ import { BankAttestation } from "./BankAttestation";
 import { isCoverageItem, type ReconciliationItem } from "./ReconciliationCard";
 import { cn } from "../lib/utils";
 import type { TieOutSummary } from "../lib/tieOut";
+import { apiErrorDetail, apiFetchBlob } from "../lib/api";
+import { CLIENT_MESSAGES } from "../lib/messages";
 
 export type ReportStatus = "verified" | "stale" | "guardrail_failed";
 export type OpusStatus = "pending" | "running" | "done" | "failed";
@@ -265,6 +268,35 @@ export function ReportSummary({
   excelDownloadUrl,
 }: ReportSummaryProps) {
   const periodLabel = formatPeriod(period);
+  const [excelDownloading, setExcelDownloading] = useState(false);
+  const [excelError, setExcelError] = useState<string | null>(null);
+  const excelInFlight = useRef(false);
+
+  async function downloadExcel() {
+    if (!excelDownloadUrl || excelInFlight.current) return;
+    excelInFlight.current = true;
+    setExcelDownloading(true);
+    setExcelError(null);
+    let objectUrl: string | null = null;
+    try {
+      const { blob, filename } = await apiFetchBlob(excelDownloadUrl);
+      objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename ?? `monthproof_${period}_close_package.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      setExcelError(
+        apiErrorDetail(err, CLIENT_MESSAGES.EXCEL_DOWNLOAD_FAILED)
+      );
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      excelInFlight.current = false;
+      setExcelDownloading(false);
+    }
+  }
 
   if (status === "guardrail_failed") return null;
 
@@ -419,14 +451,27 @@ export function ReportSummary({
             : "Source data has changed since this report was generated."}
         </p>
         {excelDownloadUrl && (
-          <a
-            href={excelDownloadUrl}
-            download
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary hover:bg-canvas transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            <Download className="h-4 w-4" aria-hidden />
-            Download Excel
-          </a>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={downloadExcel}
+              disabled={excelDownloading}
+              aria-busy={excelDownloading}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary hover:bg-canvas transition-colors focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {excelDownloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <Download className="h-4 w-4" aria-hidden />
+              )}
+              {excelDownloading ? "Downloading…" : "Download Excel"}
+            </button>
+            {excelError && (
+              <p className="text-xs text-severity-high-fg max-w-sm text-right">
+                {excelError}
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>

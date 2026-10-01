@@ -167,6 +167,31 @@ def test_consolidate_source_breakdown_populated() -> None:
     assert "supplier_invoices.xlsx" in files
 
 
+def test_pl_amount_is_gl_when_supporting_file_matches_the_account() -> None:
+    """Supporting money is evidence. It must not be added onto the GL."""
+    consolidated, _ = consolidate(
+        [("gl_export.xlsx", _gl_df()), ("payroll_march.xlsx", _payroll_df())]
+    )
+    payroll = consolidated[consolidated["account"] == "Payroll"].iloc[0]
+    assert payroll["amount"] == pytest.approx(44900.0)
+    assert {b["source_file"] for b in payroll["source_breakdown"]} == {
+        "gl_export.xlsx",
+        "payroll_march.xlsx",
+    }
+
+    supplier_only = consolidate(
+        [("gl_export.xlsx", _gl_df()), ("supplier_invoices.xlsx", _supplier_df())]
+    )[0]
+    supplier = supplier_only[supplier_only["account"] == "Supplier Invoices"].iloc[0]
+    assert supplier["amount"] == pytest.approx(36100.0)
+
+
+def test_pl_amount_stays_supporting_total_when_the_account_is_not_on_the_gl() -> None:
+    consolidated, _ = consolidate([("payroll_march.xlsx", _payroll_df())])
+    contracts = consolidated[consolidated["account"] == "Service Contracts"].iloc[0]
+    assert contracts["amount"] == pytest.approx(3540.0)
+
+
 def test_consolidate_supplier_delta_flagged() -> None:
     """$1700 supplier gap must be flagged as a reconciliation item."""
     _, recon_items = consolidate(
@@ -205,9 +230,7 @@ def test_consolidate_single_source_no_reconciliations() -> None:
         (5000.0, 0.0, True),
     ],
 )
-def test_is_material(
-    delta: float, delta_pct: float | None, expected: bool
-) -> None:
+def test_is_material(delta: float, delta_pct: float | None, expected: bool) -> None:
     assert _is_material(delta, delta_pct) == expected
 
 
@@ -219,9 +242,7 @@ def test_and_gate_two_sided_100_on_10000_not_flagged() -> None:
     src = pd.DataFrame(
         {"account": ["Revenue"], "category": ["REVENUE"], "amount": [10_100.0]}
     )
-    _, items = consolidate(
-        [("gl_export.xlsx", gl), ("dept.xlsx", src)]
-    )
+    _, items = consolidate([("gl_export.xlsx", gl), ("dept.xlsx", src)])
     assert items == []
 
 
@@ -237,9 +258,7 @@ def test_and_gate_gl_only_rent_200_still_flagged() -> None:
     src = pd.DataFrame(
         {"account": ["Payroll"], "category": ["OPEX"], "amount": [10_000.0]}
     )
-    _, items = consolidate(
-        [("gl_export.xlsx", gl), ("payroll.xlsx", src)]
-    )
+    _, items = consolidate([("gl_export.xlsx", gl), ("payroll.xlsx", src)])
     rent = [i for i in items if i.account == "Rent"]
     assert len(rent) == 1
     assert rent[0].hints.is_gl_only
@@ -259,9 +278,7 @@ def test_and_gate_source_only_200_not_flagged() -> None:
             "amount": [10_000.0, 200.0],
         }
     )
-    _, items = consolidate(
-        [("gl_export.xlsx", gl), ("payroll.xlsx", src)]
-    )
+    _, items = consolidate([("gl_export.xlsx", gl), ("payroll.xlsx", src)])
     bonus = [i for i in items if "bonus" in i.account.lower()]
     assert bonus == []
 
@@ -273,9 +290,7 @@ def test_and_gate_two_sided_400_at_2pct_not_flagged() -> None:
     src = pd.DataFrame(
         {"account": ["Revenue"], "category": ["REVENUE"], "amount": [20_400.0]}
     )
-    _, items = consolidate(
-        [("gl_export.xlsx", gl), ("dept.xlsx", src)]
-    )
+    _, items = consolidate([("gl_export.xlsx", gl), ("dept.xlsx", src)])
     assert items == []
 
 
@@ -286,9 +301,7 @@ def test_and_gate_two_sided_400_at_20pct_flagged() -> None:
     src = pd.DataFrame(
         {"account": ["Revenue"], "category": ["REVENUE"], "amount": [2_400.0]}
     )
-    _, items = consolidate(
-        [("gl_export.xlsx", gl), ("dept.xlsx", src)]
-    )
+    _, items = consolidate([("gl_export.xlsx", gl), ("dept.xlsx", src)])
     assert len(items) == 1
     assert abs(items[0].delta) == pytest.approx(400.0)
 
@@ -300,9 +313,7 @@ def test_and_gate_hard_500_flags_despite_tiny_pct() -> None:
     src = pd.DataFrame(
         {"account": ["Revenue"], "category": ["REVENUE"], "amount": [500_500.0]}
     )
-    _, items = consolidate(
-        [("gl_export.xlsx", gl), ("dept.xlsx", src)]
-    )
+    _, items = consolidate([("gl_export.xlsx", gl), ("dept.xlsx", src)])
     assert len(items) == 1
     assert abs(items[0].delta) == pytest.approx(500.0)
 

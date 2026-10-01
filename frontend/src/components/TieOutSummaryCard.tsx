@@ -32,8 +32,15 @@ function StatusIcon({ status }: { status: ControlStatus }) {
   );
 }
 
+function sourceLabel(control: ControlResult): string {
+  const names = (control.source_files ?? []).filter(Boolean);
+  if (names.length > 0) return names.join(", ");
+  return control.source_file ?? "";
+}
+
 function ControlRow({ control }: { control: ControlResult }) {
   const statusLabel = CONTROL_STATUS_LABEL[control.status];
+  const files = sourceLabel(control);
   const tone =
     control.status === "tied_out"
       ? "text-favorable-fg"
@@ -53,9 +60,9 @@ function ControlRow({ control }: { control: ControlResult }) {
             <span className={cn("text-xs tabular-nums", tone)}>{statusLabel}</span>
           </div>
           <p className="text-xs text-text-secondary">{control.next_action}</p>
-          {control.source_file && (
+          {files && (
             <p className="text-xs text-text-secondary">
-              Source: {control.source_file}
+              Source: {files}
               {control.amount_scope ? ` · ${control.amount_scope}` : ""}
             </p>
           )}

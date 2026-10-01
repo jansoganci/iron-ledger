@@ -1,6 +1,8 @@
 # Kalan işler
 
-*17 Eylül 2026. Kaynak: güncel `main` kodu + kilitli ürün kararları.*
+*17 Eylül 2026 ürün kararı. Kaynak: güncel `main` kodu + kilitli ürün kararları.
+Kabul: 1 Ekim 2026 canlı Redhawk Mart yürüyüşü — üç kontrol geçti.
+Kâr tablosu tutarı, GL varsa GL'dir; destek dosyası üstüne eklenmez.*
 
 Tek canlı backlog burasıdır. Bitmiş planları buraya geri kopyalama. Yeni iş ancak kilit + onay sonrası.
 
@@ -10,17 +12,18 @@ Tek canlı backlog burasıdır. Bitmiş planları buraya geri kopyalama. Yeni i�
 
 ## Şimdi açık — ürün
 
-### Close checklist Dil 2 — dört kabul düzeltmesi uygulandı (2026-09-17)
+### Close checklist Dil 2 — ana yol geçti (2026-10-01)
 
-Bordro, tedarikçi ve sözleşme kontrolleri, run-scoped file-total eşleme ve
-rapor/Excel kanıtı working tree'de. §11.12'de onaylanan dört düzeltme uygulandı:
-kontrol başına tek destek dosyası; doğrulanmış roster için file-total; sunucuda
-eksiksiz mapping onayı; Excel'de eksiklik nedeni ve sonraki adım. 588 yerel
-backend testi, frontend typecheck ve build geçti. Commit veya canlıya çıkış yok.
+Redhawk Mart 2026 canlı yürüyüş: bordro Tied out (6.200 / 1.400 / 5.500),
+tedarikçi Tied out, sözleşme 3.825 vs 3.540, fark 285. Kanıt:
+`docs/qa/slice2-acceptance-2026-10-01-payroll-retest/`.
 
-Açık kalan: install/fuel named kontrolleri; bordro Bonus/Benefits dağıtımı;
-hedef kullanıcıyla 60 saniyelik okuma yürüyüşü ve Excel görsel kontrolü.
-Genel repo lint sorunları ayrıca sürüyor; `closed` yok.
+Kâr tablosu artık aynı hesabı iki kez toplamaz. GL satırı varsa tutar GL'dir.
+Destek dosyası kırılımda ve kontrol kartında kalır. Kayıtlı eski rapor eski
+toplamı gösterir; yeni bir analiz güncel tutarı yazar.
+
+Açık kenar: eksik dosya senaryoları, stale-export, Excel'in görsel kontrolü.
+Install/fuel ve `closed` ayrı durur. `0011` demo projede uygulandı.
 
 Güncel karar, UX ve uygulama kaydı:
 [Close checklist pre-analysis §11](../sprint/pre-analysis-close-checklist.md#11-17-eylül-2026--dil-2-ürün-kararı-ve-rapor-ux-tasarımı).
@@ -34,7 +37,7 @@ Güncel karar, UX ve uygulama kaydı:
 ## Yapıldı — listeye alma
 
 - Aynı dönemi yeniden üretme (açık onay, sessiz UPSERT yok)
-- Kalıcı kaynak eşlemeleri (`0011_add_source_account_mappings.sql` — dosya repoda; canlı DB’ye insan uygular)
+- Kalıcı kaynak eşlemeleri (`0011` demo projede uygulandı)
 - Uydurma classification token düşer, run ölmez
 - Guardrail Stage 1 enforce + quarterly/Opus `strict=True`
 - Close checklist Dil 1 (`tie_out_summary`)

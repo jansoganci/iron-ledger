@@ -237,3 +237,55 @@ def test_report_page_leads_with_tie_out_then_exceptions_then_narrative() -> None
     assert i_tie < i_exceptions < i_narrative < i_bank
     assert i_badge < i_tie
     assert i_footer > i_bank
+
+
+def test_excel_download_uses_authenticated_blob_not_a_naked_anchor() -> None:
+    root = Path(__file__).resolve().parents[2]
+    api = (root / "frontend" / "src" / "lib" / "api.ts").read_text(encoding="utf-8")
+    summary = (
+        root / "frontend" / "src" / "components" / "ReportSummary.tsx"
+    ).read_text(encoding="utf-8")
+    page = (root / "frontend" / "src" / "pages" / "ReportPage.tsx").read_text(
+        encoding="utf-8"
+    )
+    card = (
+        root / "frontend" / "src" / "components" / "TieOutSummaryCard.tsx"
+    ).read_text(encoding="utf-8")
+
+    assert "export async function apiFetchBlob" in api
+    assert "Authorization" in api
+    assert "await res.blob()" in api
+    assert "VITE_API_URL" in api
+    assert "res.status === 401" in api
+    assert "res.status === 403" in api
+    assert "res.status >= 500" in api
+
+    assert "href={excelDownloadUrl}" not in summary
+    assert "apiFetchBlob(excelDownloadUrl)" in summary
+    assert "revokeObjectURL" in summary
+    assert "disabled={excelDownloading}" in summary
+    assert "apiErrorDetail" in summary
+    assert "excelDownloading" in summary
+
+    assert (
+        "excelDownloadUrl={`/report/${report.company_id}/${report.period}/export.xlsx`}"
+        in page
+    )
+    assert "source_files" in card
+    assert "control.source_file &&" not in card
+
+
+def test_excel_download_failure_and_success_paths_are_both_handled() -> None:
+    root = Path(__file__).resolve().parents[2]
+    api = (root / "frontend" / "src" / "lib" / "api.ts").read_text(encoding="utf-8")
+    summary = (
+        root / "frontend" / "src" / "components" / "ReportSummary.tsx"
+    ).read_text(encoding="utf-8")
+    assert "export function apiErrorDetail" in api
+    assert "throw new UnauthorizedError" in api
+    assert "throw new ForbiddenError" in api
+    assert "throw new ServerError" in api
+    assert "setExcelError" in summary
+    assert "CLIENT_MESSAGES.EXCEL_DOWNLOAD_FAILED" in summary
+    assert "link.download" in summary
+    assert "excelInFlight.current" in summary

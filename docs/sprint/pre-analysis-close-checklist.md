@@ -6,6 +6,9 @@ remain outside this delivery. Slice 3 (`closed` / period lock) is still later.
 Update 2026-09-17: product direction and report UX recorded in
 [§11](#11-17-eylül-2026--dil-2-ürün-kararı-ve-rapor-ux-tasarımı); implementation
 result is in [§11.11](#1111-17-eylül-2026--ilk-teslim-uygulandı).
+Acceptance test 2026-09-19: **not ready** for first-delivery acceptance.
+See [§11.12](#1112-17-eylül-2026--i̇nceleme-sonrası-dört-düzeltme-kararı)
+verification dated 2026-09-19. Product-decision date remains 2026-09-17.
 Three supported controls first; install/fuel remain outside the first delivery.
 Earlier sections retain historical context. §11 is the design; §11.11 is what
 the code actually does.
@@ -671,6 +674,83 @@ ise mevcut repo biçim/unused-import sorunlarında başarısız; tüm repo lint'
 yeşil denmiyor. Code-auditor kontrolünde mevcut guardrail toleransları ve
 yetkilendirme korunmuştur; skill'in eski tolerans notu uygulanmamıştır.
 
-Tarayıcıda 60 saniyelik kullanıcı yürüyüşü ve Excel'in görsel incelemesi henüz
-yapılmadı; otomatik testler bunların yerine geçmiş sayılmaz. Canlı servis,
-ücretli LLM, SQL, deploy veya commit yapılmadı.
+17 Eylül notu: tarayıcı yürüyüşü ve Excel görsel incelemesi o gün
+yapılmamıştı. 19 Eylül kaydı aşağıdadır.
+
+**Doğrulama — 19 Eylül 2026:** İlk teslim kabulü **hazır değil**. Ürün kararı
+tarihi 17 Eylül 2026 olarak durur. Kod `main` üzerinde
+`4aaf7fd`. Yeni şirket, yükleme, ücretli LLM, SQL, deploy veya commit yok.
+
+Yerel tekrar: `pytest -q tests/tools tests/agents tests/api tests/domain`
+588 passed; frontend typecheck ve production build geçti. Redhawk fixture
+pandas: Monthly Fee 3,825.00 vs GL Service Revenue 3,540.00, fark 285.00;
+85 active / 82 billed / 3 delta.
+
+Dört düzeltmenin motoru testlerde duruyor: çoklu dosya Not compared + birleştir
+talimatı; file-total yalnız doğrulanmış aylık ücret roster'ı; eksik/boş/taslak
+dışı mapping 400 ve yan etkisiz; GET/Excel aynı saklanan `control_summary`.
+Canlı tarayıcıda mapping → rapor → indirme yürüyüşü yok. Yapılandırılmış
+Supabase uzak ve test ortamı olarak kilitlenmedi; yazılmadı.
+
+Kabulü tutan kusurlar: rapor Excel indirme bağlantısı API tabanı ve JWT
+taşımıyor (`ReportPage.tsx`); kanıt satırları kontrol başlıklarının altına
+yanlış düşüyor ve GL hedefi sütunu taşyor (`excel_export.py`); çoklu dosyada
+kaynak adları yazılmıyor (`close_controls.py`); stale export P&L güncel
+`monthly_entries` kullanıyor (`reports.py`). Kanıt:
+`docs/qa/slice2-acceptance-2026-09-19/`.
+
+### 11.13. 19 Eylül 2026 — Dört kabul düzeltmesinin kapsamı
+
+**Ürün kararı tarihi:** 17 Eylül 2026 (değişmez).
+**Uygulama / doğrulama tarihi:** 19 Eylül 2026.
+
+Kapsam yalnız 19 Eylül kabulünü tutan dört kusurdur. Yeni ajan, SQL, kontrol
+türü, `closed` veya banka eşleme yoktur.
+
+1. Rapor Excel indirmesi mevcut JWT’li API istemcisinden Blob olarak iner.
+2. Reconciliations sayfasında kontrol özeti ve karşılaştırma kanıtı ayrı
+   başlıklı bloklardır; sütun genişliği, satır yüksekliği ve kaydırma
+   sonraki blok tarafından silinmez.
+3. Bir kontrolde birden fazla destek dosyası varsa bütün dosya adları rapor
+   ve Excel’de görünür. Eski tek `source_file` kayıtları uydurulmaz.
+4. Dönem verisi rapordan sonra değiştiyse export 409 ile reddedilir; stale
+   etiket altında eski kontrollerle yeni P&L karışmaz. Tutarlı (stale
+   olmayan) export aynı kalır.
+
+Kurulum/yakıt kapsam notudur. Banka oturumluk kutudur. Kontrollerin geçmesi
+dönemin kapandığı anlamına gelmez.
+
+**Doğrulama — 19 Eylül 2026 (düzeltmeler uygulandı):** Dört kusur kodda
+kapatıldı. `tests/tools` + `tests/agents` + `tests/api` + `tests/domain`:
+594 passed (önceki kabul 588). Tam `pytest`: 614 passed, 5 skipped.
+Frontend typecheck ve production build geçti. Redhawk pandas aynı:
+3,825.00 / 3,540.00 / 285.00.
+
+Yerel / mock: JWT Blob indirme kaynak incelemesi + TestClient 200/401-yolu
+403/409; Excel HTML rekonstrüksiyonu (ayrı Control summary / Comparison
+evidence; çoklu dosya adları; genişlik sıfırlanmaz); stale export 409.
+Canlı yetkili ay: şirket oluşturma, yükleme, ücretli LLM yok. Uzak
+Supabase test ortamı olarak kilitlenmedi. İlk teslim kabulü **hazır değil**.
+
+### 11.14. 19 Eylül 2026 — Canlı yürüyüş hâlâ yetkisiz; Numbers ile kitap incelemesi
+
+**Ürün kararı tarihi:** 17 Eylül 2026 (değişmez).
+**Bu doğrulama:** 19 Eylül 2026 (canlı kabul turu; kod düzeltmesi yok).
+
+Yapılandırılmış Supabase uzak. MCP’de görünen projeler Month Proof test
+ortamı değil (`ornet-crm`, `RealDesk CRM`). Yazma, şirket, yükleme, LLM yok.
+
+Yerel tekrar: `tests/tools`+`agents`+`api`+`domain` 594 collected; tam
+`pytest` 614 passed, 5 skipped; frontend typecheck geçti. Pandas aynı:
+3,825.00 / 3,540.00 / 285.00.
+
+Asıl çalışma kitabı: Apple Numbers PDF. Excel otomasyonu parametre hatası.
+HTML rekonstrüksiyon bu turda kabul sayılmaz. Numbers Reconciliations:
+ayrı Control summary / Comparison evidence; Redhawk 3,825 / 3,540 / 285;
+çoklu dosya adları; banka ve kurulum cümleleri; “period closed” yok.
+
+Canlı oturum, indirme düğmesi, stale-upload regenerasyonu **blok**.
+Tarayıcı otomasyonu bu oturumda yok. Kabul **hazır değil**.
+
+Kanıt: `docs/qa/slice2-acceptance-2026-09-19-workbook/` (önceki klasör
+silinmedi).

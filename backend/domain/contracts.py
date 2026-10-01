@@ -196,6 +196,7 @@ class ControlResult(BaseModel):
     comparisons: list[ControlComparison] = Field(default_factory=list)
     next_action: str = ""
     incomplete_reason: str | None = None
+    source_files: list[str] = Field(default_factory=list)
 
 
 class ControlSummary(BaseModel):

@@ -1,0 +1,10 @@
+{
+  "period": "2026-03-01",
+  "computed_in": "pandas",
+  "contracts_n_active": 85,
+  "contracts_n_billed_in_period": 82,
+  "contracts_count_delta": 3,
+  "supporting_amount": 3825.0,
+  "gl_service_revenue": 3540.0,
+  "difference": 285.0
+}

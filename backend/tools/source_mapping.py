@@ -6,6 +6,8 @@ vendor/expense mappings and decides whether the user must review.
 
 from __future__ import annotations
 
+from datetime import date
+
 from backend import messages
 from backend.domain.contracts import MappingDraft, MappingDraftItem, SourceFileType
 from backend.domain.entities import SourceAccountMapping
@@ -45,9 +47,33 @@ def is_payroll(file_type: str) -> bool:
     return file_type == PAYROLL_FILE_TYPE
 
 
-def auto_map_payroll(unique_values: list[str]) -> dict[str, str]:
-    """Keep payroll lines as they are (total or meals/rent/salary/bonus)."""
-    return {value: value for value in unique_values if value and str(value).strip()}
+def payroll_draft_items(
+    unique_values: list[str],
+    *,
+    source_file: str,
+    amount_scope: str,
+    period: date | None,
+) -> list[MappingDraftItem]:
+    """One review row per payroll role. Never mapped to itself, never pre-picked.
+
+    The user chooses the GL wage account for every role; Python sums the roles
+    that share an account. Payroll is not persisted (see PERSISTABLE_FILE_TYPES).
+    """
+    return [
+        MappingDraftItem(
+            source_pattern=value,
+            source_file=source_file,
+            file_type=PAYROLL_FILE_TYPE,
+            suggested_gl_account=None,
+            confident=False,
+            origin="new",
+            mapping_mode="row",
+            amount_scope=amount_scope,
+            period=period,
+        )
+        for value in unique_values
+        if value and str(value).strip()
+    ]
 
 
 def index_stored(

@@ -43,6 +43,10 @@ REGENERATE_REQUIRED = (
     "This period already has a verified report. "
     "Confirm that you want to replace it before continuing."
 )
+REPORT_STALE_EXPORT = (
+    "This period's source data changed after the report was generated. "
+    "Run the analysis again to download a matching Excel package."
+)
 NOT_FOUND = "No verified report found for this company and period."
 
 MAIL_FAILED = (

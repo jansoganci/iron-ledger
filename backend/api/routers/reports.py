@@ -43,6 +43,27 @@ def _fmt_ts(val):
         return str(val)
 
 
+def period_data_changed_after_report(report, entries) -> bool:
+    """True when a monthly_entry was written after this report was generated."""
+    timestamps = [
+        entry.created_at
+        for entry in entries
+        if getattr(entry, "created_at", None) is not None
+    ]
+    return bool(
+        report.created_at and timestamps and max(timestamps) > report.created_at
+    )
+
+
+def export_mixes_incompatible_versions(report, entries) -> bool:
+    """True when stored controls must not pair with current entries."""
+    if report.created_at is None:
+        return True
+    if any(getattr(entry, "created_at", None) is None for entry in entries):
+        return True
+    return period_data_changed_after_report(report, entries)
+
+
 def _direction(variance_pct: float | None, category: str) -> str:
     """Backend-only direction rule — no frontend derivation.
 
@@ -153,12 +174,7 @@ async def get_report(
 
     # Staleness: true if any monthly_entry for this (company, period) was written
     # after the report was generated — i.e. user re-uploaded the source file.
-    entry_timestamps = [e.created_at for e in entries if e.created_at is not None]
-    is_stale = bool(
-        report.created_at
-        and entry_timestamps
-        and max(entry_timestamps) > report.created_at
-    )
+    is_stale = period_data_changed_after_report(report, entries)
 
     # P&L financials — computed from already-fetched entries + accounts_map.
     # No extra DB queries: both collections come from the asyncio.gather above.
@@ -252,6 +268,8 @@ async def export_report_xlsx(
         raise HTTPException(status_code=404, detail=messages.NOT_FOUND)
 
     entries = get_entries_repo().list_for_period(company_id, period_date)
+    if export_mixes_incompatible_versions(report, entries):
+        raise HTTPException(status_code=409, detail=messages.REPORT_STALE_EXPORT)
     accounts_map = get_accounts_repo().get_accounts_by_id(company_id)
 
     # get_by_owner takes an OWNER id. This passed jwt_company_id — a company

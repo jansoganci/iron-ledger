@@ -273,6 +273,7 @@ def build_control_summary(
                     label=label,
                     status="not_compared",
                     period=period,
+                    source_files=list(files),
                     mapping_mode="none",
                     next_action=messages.CONTROL_NEXT_COMBINE_SOURCES,
                     incomplete_reason=messages.CONTROL_MULTIPLE_SOURCES,
@@ -287,6 +288,7 @@ def build_control_summary(
                     label=label,
                     status="mapping_required",
                     source_file=source_file,
+                    source_files=list(files),
                     period=period,
                     amount_scope=amount_scopes.get(source_file),
                     mapping_mode=modes.get(source_file, "none"),  # type: ignore[arg-type]
@@ -303,6 +305,7 @@ def build_control_summary(
                     label=label,
                     status="not_compared",
                     source_file=source_file,
+                    source_files=list(files),
                     period=period,
                     amount_scope=amount_scopes.get(source_file),
                     mapping_mode=modes.get(source_file, "none"),  # type: ignore[arg-type]
@@ -332,6 +335,7 @@ def build_control_summary(
                     label=label,
                     status="not_compared",
                     source_file=source_file,
+                    source_files=list(files),
                     period=period,
                     amount_scope=amount_scopes.get(source_file),
                     mapping_mode=mapping_mode,  # type: ignore[arg-type]
@@ -417,6 +421,7 @@ def build_control_summary(
                 label=label,
                 status=status,  # type: ignore[arg-type]
                 source_file=source_file,
+                source_files=list(files),
                 period=period,
                 amount_scope=amount_scopes.get(source_file),
                 gl_targets=[c.gl_account for c in comparisons],

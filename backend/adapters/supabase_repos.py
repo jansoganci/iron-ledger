@@ -427,6 +427,21 @@ class SupabaseReportsRepo:
         tenant — never taken from a client-supplied report body.
         """
         try:
+            old = (
+                self._db.table("reports")
+                .select("id")
+                .eq("company_id", company_id)
+                .eq("report_type", "monthly")
+                .eq("period", str(period))
+                .execute()
+            )
+            old_ids = [r["id"] for r in (old.data or [])]
+            if old_ids:
+                # Earlier runs still point at the report; detach them first
+                # or the FK (runs_report_id_fkey) blocks the delete.
+                self._db.table("runs").update({"report_id": None}).eq(
+                    "company_id", company_id
+                ).in_("report_id", old_ids).execute()
             self._db.table("reports").delete().eq("company_id", company_id).eq(
                 "report_type", "monthly"
             ).eq("period", str(period)).execute()

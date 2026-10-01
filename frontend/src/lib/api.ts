@@ -52,11 +52,31 @@ type FetchOptions = Omit<RequestInit, "body"> & {
   body?: RequestInit["body"];
 };
 
-/** Centralized fetch with JWT attach + 401/403/429/5xx dispatch + trace_id logging. */
-export async function apiFetch<T>(
+export interface BlobDownload {
+  blob: Blob;
+  filename: string | null;
+}
+
+function filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (utf8) {
+    try {
+      return decodeURIComponent(utf8[1]);
+    } catch {
+      return utf8[1];
+    }
+  }
+  const quoted = /filename="([^"]+)"/i.exec(header);
+  if (quoted) return quoted[1];
+  const plain = /filename=([^;]+)/i.exec(header);
+  return plain ? plain[1].trim() : null;
+}
+
+async function authorizedResponse(
   path: string,
   opts: FetchOptions = {}
-): Promise<T> {
+): Promise<Response> {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
 
@@ -69,31 +89,28 @@ export async function apiFetch<T>(
     body = JSON.stringify(opts.json);
   }
 
-  let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${path}`, { ...opts, headers, body });
+    return await fetch(`${BASE_URL}${path}`, { ...opts, headers, body });
   } catch {
     throw new ApiError(0, null, CLIENT_MESSAGES.NETWORK_ERROR);
   }
+}
 
+function parseBody(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+async function throwForErrorStatus(res: Response, parsed: unknown): Promise<never> {
   const traceId =
     res.headers.get("X-Trace-Id") ??
     res.headers.get("x-trace-id") ??
     undefined;
 
-  let parsed: unknown = null;
-  const text = await res.text();
-  if (text) {
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      parsed = text;
-    }
-  }
-
-  if (res.ok) return parsed as T;
-
-  // Always log trace_id on non-2xx for dev debugging
   if (traceId) {
     // eslint-disable-next-line no-console
     console.error(`[API ${res.status}] trace_id=${traceId}`, parsed);
@@ -116,4 +133,45 @@ export async function apiFetch<T>(
   }
   if (res.status >= 500) throw new ServerError(res.status, parsed, traceId);
   throw new ApiError(res.status, parsed, undefined, traceId);
+}
+
+export function apiErrorDetail(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.body && typeof err.body === "object") {
+    const detail = (err.body as { detail?: unknown }).detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+  }
+  if (err instanceof ApiError && err.message && !err.message.startsWith("API ")) {
+    return err.message;
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
+/** Centralized fetch with JWT attach + 401/403/429/5xx dispatch + trace_id logging. */
+export async function apiFetch<T>(
+  path: string,
+  opts: FetchOptions = {}
+): Promise<T> {
+  const res = await authorizedResponse(path, opts);
+  const parsed = parseBody(await res.text());
+  if (res.ok) return parsed as T;
+  return throwForErrorStatus(res, parsed);
+}
+
+/** Same auth and error handling as apiFetch, for binary downloads. */
+export async function apiFetchBlob(
+  path: string,
+  opts: FetchOptions = {}
+): Promise<BlobDownload> {
+  const res = await authorizedResponse(path, opts);
+  if (res.ok) {
+    return {
+      blob: await res.blob(),
+      filename: filenameFromContentDisposition(
+        res.headers.get("Content-Disposition")
+      ),
+    };
+  }
+  const parsed = parseBody(await res.text());
+  return throwForErrorStatus(res, parsed);
 }

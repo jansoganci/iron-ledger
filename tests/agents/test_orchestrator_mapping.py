@@ -156,7 +156,7 @@ def test_pure_gl_upload_goes_to_awaiting_confirmation(
 
 
 # ---------------------------------------------------------------------------
-# Test: GL + payroll → skips mapping review (identity map, no Haiku)
+# Test: GL + payroll → pauses; roles are never silently mapped to themselves
 # ---------------------------------------------------------------------------
 
 
@@ -167,7 +167,7 @@ def test_pure_gl_upload_goes_to_awaiting_confirmation(
 @patch("backend.agents.orchestrator.get_runs_repo")
 @patch("backend.agents.orchestrator.ParserAgent")
 @patch("backend.agents.orchestrator.AccountMapper")
-def test_gl_plus_payroll_skips_mapping_review(
+def test_gl_plus_payroll_pauses_even_when_roles_are_company_accounts(
     mock_mapper_cls,
     mock_parser_cls,
     mock_get_runs,
@@ -176,85 +176,62 @@ def test_gl_plus_payroll_skips_mapping_review(
     mock_get_llm,
     mock_get_maps,
 ):
-    """Payroll is identity-mapped and never pauses for Haiku review."""
-    gl_preview = _mock_preview_rows(["Salaries & Wages", "Bonuses"])
-    payroll_preview = _mock_preview_rows(["Salaries & Wages", "Bonuses"])
-
-    def _parse(**kwargs):
-        key = kwargs.get("storage_key", "")
-        if "payroll" in key:
-            return (payroll_preview, "Gross Pay", pd.DataFrame())
-        return (gl_preview, "Amount", pd.DataFrame())
+    """Role names already in the accounts table (polluted by an earlier run) are
+    not GL targets and are not identity-mapped; every role lands on the screen."""
+    gl_preview = _mock_preview_rows(["Technician Wages", "Admin Wages", "Owner Salary"])
+    roles = ["Install Technician", "Service Technician", "Office Administrator"]
+    payroll_preview = _mock_preview_rows(roles)
 
     parser = MagicMock()
-    parser.parse_file_silently.side_effect = lambda **kw: _parse(**kw)
+    parser.parse_file_silently.side_effect = [
+        (gl_preview, "Amount", pd.DataFrame()),
+        (payroll_preview, "Base Compensation", pd.DataFrame()),
+    ]
     mock_parser_cls.return_value = parser
 
-    file_keys = {
-        "gl.xlsx": "user/2026-03-01/gl.xlsx",
-        "payroll.xlsx": "user/2026-03-01/payroll.xlsx",
-    }
-    runs_repo = _stub_runs_repo(
-        status=RunStatus.APPLYING_MAPPING.value,
-        parse_preview={
-            "file_keys": file_keys,
-            "auto_decisions": {
-                "Salaries & Wages": "Salaries & Wages",
-                "Bonuses": "Bonuses",
-            },
-            "is_multi_file": True,
-        },
-    )
+    runs_repo = _stub_runs_repo()
     mock_get_runs.return_value = runs_repo
     mock_get_maps.return_value = _stub_mappings_repo()
 
     accounts_repo = MagicMock()
     accounts_repo.list_for_company.return_value = {
-        "Salaries & Wages": "OPEX",
-        "Bonuses": "OPEX",
+        "Technician Wages": "OPEX",
+        "Admin Wages": "G&A",
+        "Owner Salary": "G&A",
+        **{r: "OPEX" for r in roles},
     }
     mock_get_accounts.return_value = accounts_repo
 
     mapper = MagicMock()
     mock_mapper_cls.return_value = mapper
 
-    with patch("backend.agents.orchestrator.consolidate") as mock_consolidate, patch(
-        "backend.tools.hint_computer.compute_hints",
-        side_effect=lambda **kw: kw["item"].hints,
-    ):
-        mock_consolidate.return_value = (
-            pd.DataFrame(
-                [
-                    {
-                        "account": "Salary",
-                        "amount": 50000.0,
-                        "category": "OPEX",
-                        "source_breakdown": [],
-                    }
-                ]
-            ),
-            [],
-        )
-        run_multi_file_parser_with_mapping(
-            run_id="run-2",
-            storage_keys=[
-                "user/2026-03-01/gl.xlsx",
-                "user/2026-03-01/payroll.xlsx",
-            ],
-            company_id="co-1",
-            period=__import__("datetime").date(2026, 3, 1),
-        )
+    run_multi_file_parser_with_mapping(
+        run_id="run-2",
+        storage_keys=[
+            "user/2026-03-01/gl.xlsx",
+            "user/2026-03-01/payroll.xlsx",
+        ],
+        company_id="co-1",
+        period=__import__("datetime").date(2026, 3, 1),
+    )
 
-    mapper.build_draft.assert_not_called()
+    mapper.build_draft.assert_not_called()  # payroll never goes to Haiku
     statuses_set = [
         call.args[1] if call.args else call.kwargs.get("status")
         for call in runs_repo.update_status.call_args_list
     ]
-    assert RunStatus.AWAITING_MAPPING_CONFIRMATION not in statuses_set
-    assert RunStatus.APPLYING_MAPPING in statuses_set
-    phase_a_preview = runs_repo.set_parse_preview.call_args_list[0][0][1]
-    assert phase_a_preview["auto_decisions"]["Salaries & Wages"] == "Salaries & Wages"
-    assert phase_a_preview["auto_decisions"]["Bonuses"] == "Bonuses"
+    assert RunStatus.AWAITING_MAPPING_CONFIRMATION in statuses_set
+    assert RunStatus.APPLYING_MAPPING not in statuses_set
+    preview = runs_repo.set_parse_preview.call_args_list[0][0][1]
+    assert preview["auto_decisions"] == {}
+    draft = preview["mapping_draft"]
+    assert sorted(i["source_pattern"] for i in draft["items"]) == sorted(roles)
+    assert all(i["suggested_gl_account"] is None for i in draft["items"])
+    assert sorted(draft["gl_account_pool"]) == [
+        "Admin Wages",
+        "Owner Salary",
+        "Technician Wages",
+    ]
 
 
 # ---------------------------------------------------------------------------

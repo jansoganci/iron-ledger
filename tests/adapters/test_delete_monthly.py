@@ -17,6 +17,19 @@ class _RecordingTable:
         self._resp = type("R", (), {"data": [dict(row)]})()
         return self
 
+    def select(self, *_):
+        self._log.append(("select",))
+        self._resp = type("R", (), {"data": [{"id": "old-report"}]})()
+        return self
+
+    def update(self, row):
+        self._log.append(("update", row))
+        return self
+
+    def in_(self, key, values):
+        self._log.append(("in", key, tuple(values)))
+        return self
+
     def delete(self):
         self._log.append(("delete",))
         return self
@@ -48,6 +61,12 @@ def test_delete_monthly_filters_company_period_and_monthly_type() -> None:
     assert ("eq", "report_type", "monthly") in client.ops
     assert ("eq", "period", "2026-03-01") in client.ops
     assert ("eq", "company_id", "co-b") not in client.ops
+    # runs referencing the old report are detached before the delete
+    assert ("update", {"report_id": None}) in client.ops
+    assert ("in", "report_id", ("old-report",)) in client.ops
+    assert client.ops.index(("update", {"report_id": None})) < client.ops.index(
+        ("delete",)
+    )
 
 
 def test_write_still_does_not_delete() -> None:

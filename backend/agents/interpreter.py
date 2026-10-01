@@ -479,10 +479,9 @@ class InterpreterAgent:
         }
 
         # Build supplemental valid values from reconciliation source amounts.
-        # Claude may mention individual source-level figures (e.g. "GL shows $5,420")
-        # which differ from the consolidated pandas_summary total ($10,920 = GL + dept).
-        # Passing these as extra reference values prevents false guardrail failures in
-        # multi-file runs without weakening the check for single-file variance analysis.
+        # The P&L total is the GL amount. Claude may still cite the supporting
+        # figure (for example the payroll file or the contract roster) because
+        # that number lives on the reconciliation, not in the P&L total.
         recon_values = collect_reconciliation_reference_values(reconciliations)
 
         last_message = ""

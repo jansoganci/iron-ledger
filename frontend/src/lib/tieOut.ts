@@ -28,6 +28,7 @@ export interface ControlResult {
   label: string;
   status: ControlStatus;
   source_file?: string | null;
+  source_files?: string[];
   period?: string | null;
   amount_scope?: string | null;
   gl_targets: string[];

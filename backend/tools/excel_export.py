@@ -12,12 +12,14 @@ Returns raw bytes; caller sets Content-Disposition header.
 from __future__ import annotations
 
 import io
+import math
 from datetime import date
 
 from backend import messages
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 # ---------------------------------------------------------------------------
 # Palette
@@ -34,6 +36,26 @@ _SEVERITY_FILLS = {
 _COVERAGE_FILL = PatternFill("solid", fgColor="F3F4F6")  # info / not an exception
 _CURRENCY_FMT = "#,##0.00"
 _PCT_FMT = "0.0%"
+_WRAP_ALIGN = Alignment(wrap_text=True, vertical="top")
+_CONTROL_HEADERS = [
+    "Control",
+    "Status",
+    "Source file",
+    "Amount scope",
+    "GL target",
+    "Difference ($)",
+    "Next action",
+    "Why not compared",
+]
+_EVIDENCE_HEADERS = [
+    "Control",
+    "Source file",
+    "GL account",
+    "Supporting amount ($)",
+    "GL amount ($)",
+    "Difference ($)",
+    "Classification / incomplete reason",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +112,7 @@ def _build_pl_sheet(
 
     # Header
     ws.append(["Account", "Category", "Amount ($)", "Sources"])
-    _style_header_row(ws, 2)
+    _style_header_row(ws, 2, 4)
     ws.column_dimensions["A"].width = 32
     ws.column_dimensions["B"].width = 18
     ws.column_dimensions["C"].width = 16
@@ -145,6 +167,13 @@ def _build_pl_sheet(
 # ---------------------------------------------------------------------------
 
 
+def _control_source_label(control: dict) -> str:
+    files = [str(name) for name in (control.get("source_files") or []) if name]
+    if files:
+        return ", ".join(files)
+    return str(control.get("source_file") or "")
+
+
 def _build_reconciliation_sheet(
     wb: openpyxl.Workbook,
     reconciliations: list[dict],
@@ -153,30 +182,33 @@ def _build_reconciliation_sheet(
 ) -> None:
     ws = wb.create_sheet("Reconciliations")
 
-    ws.append([f"Cross-Source Reconciliation — {period.strftime('%B %Y')}"])
-    _style_row(ws, 1, font=Font(bold=True, size=13))
-    ws.merge_cells("A1:G1")
-
-    ws.append([messages.BANK_OUTSIDE_ATTESTATION])
-    _style_row(ws, 2, font=Font(italic=True, size=10, color="5A5853"))
-    ws.merge_cells("A2:G2")
-
-    ws.append([messages.CONTROL_SCOPE_INSTALL_FUEL])
-    _style_row(ws, 3, font=Font(italic=True, size=10, color="5A5853"))
-    ws.merge_cells("A3:G3")
-
-    row_num = 4
     for column, width in {
-        "A": 28,
-        "B": 18,
-        "C": 32,
+        "A": 24,
+        "B": 36,
+        "C": 28,
         "D": 22,
-        "E": 24,
-        "F": 14,
-        "G": 40,
+        "E": 28,
+        "F": 16,
+        "G": 42,
         "H": 48,
     }.items():
         ws.column_dimensions[column].width = width
+
+    ws.append([f"Cross-Source Reconciliation — {period.strftime('%B %Y')}"])
+    _style_row(ws, 1, font=Font(bold=True, size=13))
+    ws.merge_cells("A1:H1")
+
+    ws.append([messages.BANK_OUTSIDE_ATTESTATION])
+    _style_row(ws, 2, font=Font(italic=True, size=10, color="5A5853"))
+    ws.merge_cells("A2:H2")
+    _fit_wrapped_row(ws, 2)
+
+    ws.append([messages.CONTROL_SCOPE_INSTALL_FUEL])
+    _style_row(ws, 3, font=Font(italic=True, size=10, color="5A5853"))
+    ws.merge_cells("A3:H3")
+    _fit_wrapped_row(ws, 3)
+
+    row_num = 4
     if control_summary:
         compared = control_summary.get("compared", 0)
         with_exc = control_summary.get("with_exceptions", 0)
@@ -189,28 +221,14 @@ def _build_reconciliation_sheet(
                 f"{with_exc} with exceptions",
                 f"{not_eval} not evaluated",
                 f"{coverage} GL accounts not compared",
-                "",
-                "",
             ]
         )
         _style_row(ws, row_num, font=Font(bold=True, size=10))
         row_num += 1
-        ws.append(
-            [
-                "Control",
-                "Status",
-                "Source file",
-                "Amount scope",
-                "GL target",
-                "Difference ($)",
-                "Next action",
-                "Why not compared",
-            ]
-        )
-        _style_header_row(ws, row_num)
+        ws.append(_CONTROL_HEADERS)
+        _style_header_row(ws, row_num, len(_CONTROL_HEADERS))
         row_num += 1
         for control in control_summary.get("controls") or []:
-            targets = ", ".join(control.get("gl_targets") or [])
             comps = control.get("comparisons") or []
             differences = [
                 c.get("difference") for c in comps if c.get("difference") is not None
@@ -221,40 +239,62 @@ def _build_reconciliation_sheet(
                 [
                     control.get("label"),
                     status,
-                    control.get("source_file") or "",
+                    _control_source_label(control),
                     control.get("amount_scope") or "",
-                    targets,
+                    ", ".join(control.get("gl_targets") or []),
                     diff_value,
                     control.get("next_action") or "",
                     control.get("incomplete_reason") or "",
                 ]
             )
-            for col in (7, 8):
-                ws.cell(row=row_num, column=col).alignment = Alignment(wrap_text=True)
+            for col in (3, 5, 7, 8):
+                ws.cell(row=row_num, column=col).alignment = _WRAP_ALIGN
             if diff_value is not None:
                 ws.cell(row=row_num, column=6).number_format = _CURRENCY_FMT
+            _fit_wrapped_row(ws, row_num)
             row_num += 1
-            for comp in comps:
+
+        evidence_rows = [
+            (control, comp)
+            for control in control_summary.get("controls") or []
+            for comp in (control.get("comparisons") or [])
+        ]
+        if evidence_rows:
+            ws.append([])
+            row_num += 1
+            ws.append(["Comparison evidence"])
+            _style_row(ws, row_num, font=Font(bold=True, size=10))
+            row_num += 1
+            ws.append(_EVIDENCE_HEADERS)
+            _style_header_row(ws, row_num, len(_EVIDENCE_HEADERS))
+            row_num += 1
+            for control, comp in evidence_rows:
+                reason = (comp.get("classification") or "").replace(
+                    "_", " "
+                ).title() or (comp.get("incomplete_reason") or "")
                 ws.append(
                     [
-                        "",
-                        "evidence" if comp.get("complete") else "incomplete",
+                        control.get("label"),
+                        _control_source_label(control),
                         comp.get("gl_account") or "",
                         comp.get("supporting_amount"),
                         comp.get("gl_amount"),
                         comp.get("difference"),
-                        (comp.get("classification") or "").replace("_", " ").title()
-                        or (comp.get("incomplete_reason") or ""),
+                        reason,
                     ]
                 )
+                for col in (2, 3, 7):
+                    ws.cell(row=row_num, column=col).alignment = _WRAP_ALIGN
                 for col in (4, 5, 6):
                     ws.cell(row=row_num, column=col).number_format = _CURRENCY_FMT
+                _fit_wrapped_row(ws, row_num)
                 row_num += 1
         ws.append([])
         row_num += 1
 
     if not reconciliations:
         ws.append(["No cross-source discrepancies detected for this period."])
+        ws.freeze_panes = "A4"
         return
 
     headers = [
@@ -267,20 +307,8 @@ def _build_reconciliation_sheet(
         "Classification",
     ]
     ws.append(headers)
-    header_row = row_num if control_summary else 4
-    if control_summary:
-        header_row = row_num
-    _style_header_row(ws, header_row)
-
-    ws.column_dimensions["A"].width = 28
-    ws.column_dimensions["B"].width = 16
-    ws.column_dimensions["C"].width = 32
-    ws.column_dimensions["D"].width = 22
-    ws.column_dimensions["E"].width = 16
-    ws.column_dimensions["F"].width = 14
-    ws.column_dimensions["G"].width = 40
-
-    row_num = header_row + 1
+    _style_header_row(ws, row_num, len(headers))
+    row_num += 1
     for item in sorted(reconciliations, key=lambda x: -abs(x.get("delta", 0) or 0)):
         coverage = _is_coverage_item(item)
         severity = item.get("severity", "low")
@@ -305,11 +333,11 @@ def _build_reconciliation_sheet(
                 cell.fill = fill
             if col in (3, 4, 5):
                 cell.number_format = _CURRENCY_FMT
+        _fit_wrapped_row(ws, row_num)
         row_num += 1
 
     ws.freeze_panes = "A4"
 
-    # Sources detail block below
     row_num += 1
     ws.cell(row=row_num, column=1).value = "Source Detail"
     ws.cell(row=row_num, column=1).font = Font(bold=True, size=11)
@@ -327,10 +355,12 @@ def _build_reconciliation_sheet(
         for src in item.get("sources", []):
             ws.cell(row=row_num, column=1).value = item.get("account", "")
             ws.cell(row=row_num, column=2).value = src.get("source_file", "")
+            ws.cell(row=row_num, column=2).alignment = _WRAP_ALIGN
             amt_cell = ws.cell(row=row_num, column=3)
             amt_cell.value = src.get("amount")
             amt_cell.number_format = _CURRENCY_FMT
             ws.cell(row=row_num, column=4).value = src.get("row_count")
+            _fit_wrapped_row(ws, row_num)
             row_num += 1
 
 
@@ -352,7 +382,7 @@ def _build_source_breakdown_sheet(
 
     headers = ["Account", "Category", "Source File", "Amount ($)", "Row Count"]
     ws.append(headers)
-    _style_header_row(ws, 2)
+    _style_header_row(ws, 2, 5)
 
     ws.column_dimensions["A"].width = 28
     ws.column_dimensions["B"].width = 16
@@ -409,13 +439,32 @@ def _is_coverage_item(item: dict) -> bool:
     return False
 
 
-def _style_header_row(ws, row_num: int) -> None:
-    for col in range(1, ws.max_column + 2):
+def _style_header_row(ws, row_num: int, columns: int) -> None:
+    for col in range(1, columns + 1):
         cell = ws.cell(row=row_num, column=col)
-        if cell.value is not None or col <= 7:
-            cell.font = _HEADER_FONT
-            cell.fill = _HEADER_FILL
-            cell.alignment = Alignment(horizontal="center")
+        cell.font = _HEADER_FONT
+        cell.fill = _HEADER_FILL
+        cell.alignment = Alignment(
+            horizontal="center", wrap_text=True, vertical="center"
+        )
+    ws.row_dimensions[row_num].height = 22
+
+
+def _fit_wrapped_row(ws, row_num: int) -> None:
+    max_lines = 1
+    for cell in ws[row_num]:
+        if cell.value is None:
+            continue
+        text = str(cell.value)
+        width = ws.column_dimensions[get_column_letter(cell.column)].width or 12
+        chars = max(int(width), 8)
+        lines = 0
+        for paragraph in text.splitlines() or [""]:
+            lines += max(1, math.ceil(len(paragraph) / chars))
+        wrap = bool(cell.alignment and cell.alignment.wrap_text)
+        if wrap or "\n" in text:
+            max_lines = max(max_lines, lines)
+    ws.row_dimensions[row_num].height = min(15 * max_lines + 4, 75)
 
 
 def _style_row(ws, row_num: int, font: Font | None = None) -> None:

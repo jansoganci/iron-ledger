@@ -1,0 +1,23 @@
+{
+  "period": "2026-03-01",
+  "contracts_n_active": 85,
+  "contracts_n_billed_in_period": 82,
+  "contracts_count_delta": 3,
+  "supporting_amount": 3825.0,
+  "gl_service_revenue": 3540.0,
+  "difference": 285.0,
+  "payroll_by_role": {
+    "Install Technician": 2100.0,
+    "Lead Install Technician": 2400.0,
+    "Office Administrator": 1400.0,
+    "Owner / Operations": 5500.0,
+    "Service Technician": 1700.0
+  },
+  "vendor_by_line": {
+    "Central Station": 1105.0,
+    "Equipment": 7200.0,
+    "Insurance": 1180.0,
+    "Marketing": 780.0,
+    "Vehicle": 1840.0
+  }
+}

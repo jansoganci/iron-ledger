@@ -36,9 +36,9 @@ from backend.tools.mapping_grain import (
 )
 from backend.tools.source_mapping import (
     annotate_draft_items,
-    auto_map_payroll,
     index_stored,
     is_payroll,
+    payroll_draft_items,
     needs_user_review,
     remembered_decisions,
 )
@@ -833,7 +833,11 @@ def run_multi_file_parser_with_mapping(
                 # Capture the GL pool right after the GL file is parsed so it
                 # contains only chart-of-accounts names, not source-file values.
                 if is_gl and not gl_pool:
-                    gl_pool = list(accounts_repo.list_for_company(company_id).keys())
+                    # Targets are this period's GL accounts only. The company
+                    # accounts table can hold role/vendor names from earlier runs.
+                    gl_pool = sorted(
+                        {r["account"] for r in preview_rows if r.get("account")}
+                    ) or list(accounts_repo.list_for_company(company_id).keys())
                 logger.info(
                     "multi_file_parsed_with_mapping",
                     extra={
@@ -874,8 +878,8 @@ def run_multi_file_parser_with_mapping(
             gl_pool = list(DEFAULT_GL_CATEGORIES)
 
         # Run AccountMapper for persistable / reviewable non-GL files.
-        # Payroll GL names stay identity-mapped. Payroll roles and file totals
-        # pause for confirmation and are never sent to Haiku.
+        # Payroll roles and file totals pause for confirmation and are never
+        # sent to Haiku. No role is ever mapped to itself silently.
         file_keys = {}
         for entry, key in zip(per_file_data, sorted_keys):
             file_keys[entry[0]] = key
@@ -930,31 +934,14 @@ def run_multi_file_parser_with_mapping(
                 )
                 continue
             if is_payroll(file_type):
-                if unique_values and all(v in gl_pool for v in unique_values):
-                    auto_decisions.update(auto_map_payroll(unique_values))
-                    logger.info(
-                        "payroll_identity_mapped",
-                        extra={
-                            "run_id": run_id,
-                            "file": label,
-                            "lines": len(unique_values),
-                            "trace_id": get_trace_id(),
-                        },
+                all_draft_items.extend(
+                    payroll_draft_items(
+                        unique_values,
+                        source_file=label,
+                        amount_scope=source_column or "amount",
+                        period=period,
                     )
-                    continue
-                for value in unique_values:
-                    all_draft_items.append(
-                        MappingDraftItem(
-                            source_pattern=value,
-                            source_file=label,
-                            file_type=file_type,
-                            suggested_gl_account=None,
-                            confident=False,
-                            mapping_mode="row",
-                            amount_scope=source_column or "amount",
-                            period=period,
-                        )
-                    )
+                )
                 continue
             _, draft = mapper.build_draft(
                 unique_values=unique_values,

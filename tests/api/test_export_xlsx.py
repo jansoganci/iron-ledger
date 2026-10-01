@@ -13,13 +13,14 @@ directly and never reach the route. These tests go through the route.
 from __future__ import annotations
 
 import io
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import openpyxl
 import pytest
 from fastapi.testclient import TestClient
 
+from backend import messages
 from backend.api.auth import (
     _company_cache,
     get_cached_company,
@@ -32,6 +33,7 @@ from backend.main import app
 USER_ID = "user-export-1"
 COMPANY_ID = "co-export-1"
 PERIOD = date(2026, 3, 1)
+GENERATED_AT = datetime(2026, 3, 20, 12, 0, tzinfo=timezone.utc)
 
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -67,14 +69,15 @@ def _override_auth():
     _company_cache.pop(USER_ID, None)
 
 
-def _report() -> Report:
-    return Report(
+def _report(**kwargs) -> Report:
+    payload = dict(
         id="report-1",
         company_id=COMPANY_ID,
         period=PERIOD,
         summary="Service Revenue shows a gap of 3 accounts totaling 285.00.",
         anomaly_count=1,
         error_count=0,
+        created_at=GENERATED_AT,
         reconciliations=[
             {
                 "account": "Service Revenue",
@@ -96,36 +99,52 @@ def _report() -> Report:
             }
         ],
     )
+    payload.update(kwargs)
+    return Report(**payload)
+
+
+_UNSET = object()
 
 
 class _Entry:
-    account_id = "acct-1"
-    actual_amount = 3540.0
-    source_file = "redhawk_gl_mar_2026.xlsx"
-    source_breakdown = [
-        {
-            "source_file": "redhawk_gl_mar_2026.xlsx",
-            "amount": 3540.0,
-            "row_count": 1,
-        }
-    ]
+    def __init__(
+        self,
+        *,
+        created_at: datetime | None | object = _UNSET,
+        actual_amount: float = 3540.0,
+    ):
+        self.account_id = "acct-1"
+        self.actual_amount = actual_amount
+        self.source_file = "redhawk_gl_mar_2026.xlsx"
+        self.source_breakdown = [
+            {
+                "source_file": "redhawk_gl_mar_2026.xlsx",
+                "amount": actual_amount,
+                "row_count": 1,
+            }
+        ]
+        self.created_at = (
+            GENERATED_AT - timedelta(hours=1) if created_at is _UNSET else created_at
+        )
 
 
-def _patched_repos():
+def _patched_repos(
+    *, report: Report | None = None, entries: list[_Entry] | None = None
+):
     reports = MagicMock()
-    reports.get.return_value = _report()
-    entries = MagicMock()
-    entries.list_for_period.return_value = [_Entry()]
+    reports.get.return_value = _report() if report is None else report
+    entries_repo = MagicMock()
+    entries_repo.list_for_period.return_value = (
+        [_Entry()] if entries is None else entries
+    )
     accounts = MagicMock()
     accounts.get_accounts_by_id.return_value = {
         "acct-1": {"name": "Service Revenue", "category": "REVENUE"}
     }
-    return reports, entries, accounts
+    return reports, entries_repo, accounts
 
 
-def test_export_returns_a_real_workbook_not_403() -> None:
-    """The bug in one assertion: this returned 403 for every user."""
-    reports, entries, accounts = _patched_repos()
+def _get_export(reports, entries, accounts):
     with patch(
         "backend.api.routers.reports.get_reports_repo", return_value=reports
     ), patch(
@@ -133,7 +152,13 @@ def test_export_returns_a_real_workbook_not_403() -> None:
     ), patch(
         "backend.api.routers.reports.get_accounts_repo", return_value=accounts
     ):
-        resp = client.get(f"/report/{COMPANY_ID}/2026-03-01/export.xlsx")
+        return client.get(f"/report/{COMPANY_ID}/2026-03-01/export.xlsx")
+
+
+def test_export_returns_a_real_workbook_not_403() -> None:
+    """The bug in one assertion: this returned 403 for every user."""
+    reports, entries, accounts = _patched_repos()
+    resp = _get_export(reports, entries, accounts)
 
     assert resp.status_code == 200, f"expected 200, got {resp.status_code}"
     assert "spreadsheetml" in resp.headers["content-type"]
@@ -141,6 +166,13 @@ def test_export_returns_a_real_workbook_not_403() -> None:
 
     wb = openpyxl.load_workbook(io.BytesIO(resp.content))
     assert len(wb.sheetnames) == 3, f"expected 3 sheets, got {wb.sheetnames}"
+    pl = wb["Consolidated P&L"]
+    amounts = [
+        pl.cell(row=r, column=3).value
+        for r in range(1, pl.max_row + 1)
+        if pl.cell(row=r, column=1).value == "Service Revenue"
+    ]
+    assert amounts == [3540.0]
 
 
 def test_export_never_looks_a_company_up_by_its_own_id_as_an_owner() -> None:
@@ -153,14 +185,7 @@ def test_export_never_looks_a_company_up_by_its_own_id_as_an_owner() -> None:
     there is nothing left to call it the wrong way with.
     """
     reports, entries, accounts = _patched_repos()
-    with patch(
-        "backend.api.routers.reports.get_reports_repo", return_value=reports
-    ), patch(
-        "backend.api.routers.reports.get_entries_repo", return_value=entries
-    ), patch(
-        "backend.api.routers.reports.get_accounts_repo", return_value=accounts
-    ):
-        resp = client.get(f"/report/{COMPANY_ID}/2026-03-01/export.xlsx")
+    resp = _get_export(reports, entries, accounts)
 
     assert resp.status_code == 200
 
@@ -183,13 +208,48 @@ def test_export_still_forbids_another_companys_report() -> None:
 def test_export_404s_when_the_period_has_no_report() -> None:
     reports, entries, accounts = _patched_repos()
     reports.get.return_value = None
-    with patch(
-        "backend.api.routers.reports.get_reports_repo", return_value=reports
-    ), patch(
-        "backend.api.routers.reports.get_entries_repo", return_value=entries
-    ), patch(
-        "backend.api.routers.reports.get_accounts_repo", return_value=accounts
-    ):
-        resp = client.get(f"/report/{COMPANY_ID}/2026-03-01/export.xlsx")
+    resp = _get_export(reports, entries, accounts)
 
     assert resp.status_code == 404
+
+
+def test_export_rejects_when_monthly_data_changes_after_report() -> None:
+    reports, entries, accounts = _patched_repos(
+        entries=[
+            _Entry(
+                created_at=GENERATED_AT + timedelta(hours=3),
+                actual_amount=9999.0,
+            )
+        ]
+    )
+    resp = _get_export(reports, entries, accounts)
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == messages.REPORT_STALE_EXPORT
+    assert "spreadsheetml" not in (resp.headers.get("content-type") or "")
+    accounts.get_accounts_by_id.assert_not_called()
+
+
+def test_export_allows_unchanged_period_data() -> None:
+    reports, entries, accounts = _patched_repos(
+        entries=[_Entry(created_at=GENERATED_AT - timedelta(minutes=5))]
+    )
+    resp = _get_export(reports, entries, accounts)
+
+    assert resp.status_code == 200
+    wb = openpyxl.load_workbook(io.BytesIO(resp.content))
+    pl = wb["Consolidated P&L"]
+    amounts = [
+        pl.cell(row=r, column=3).value
+        for r in range(1, pl.max_row + 1)
+        if pl.cell(row=r, column=1).value == "Service Revenue"
+    ]
+    assert amounts == [3540.0]
+
+
+def test_export_rejects_when_entry_timestamps_are_missing() -> None:
+    reports, entries, accounts = _patched_repos(entries=[_Entry(created_at=None)])
+    resp = _get_export(reports, entries, accounts)
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == messages.REPORT_STALE_EXPORT

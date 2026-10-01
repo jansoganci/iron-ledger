@@ -341,6 +341,9 @@ def test_pack_unpack_round_trip_and_historical_list() -> None:
     legacy_items, legacy_summary = unpack_report_reconciliations(items)
     assert legacy_items == items
     assert legacy_summary is None
+    for control in summary.controls:
+        assert control.source_file is None
+        assert control.source_files == []
 
 
 def test_contracts_proposal_is_service_revenue() -> None:
@@ -367,6 +370,11 @@ def test_multiple_files_in_one_control_cannot_pass(second_rows) -> None:
     assert control.next_action == messages.CONTROL_NEXT_COMBINE_SOURCES
     assert control.comparisons == []
     assert summary.compared == 0
+    assert control.source_files == ["payroll_a.xlsx", "payroll_b.xlsx"]
+    assert control.source_file is None
+    dumped = control.model_dump(mode="json")
+    assert dumped["source_files"] == ["payroll_a.xlsx", "payroll_b.xlsx"]
+    assert dumped.get("source_file") is None
 
 
 @pytest.mark.parametrize(

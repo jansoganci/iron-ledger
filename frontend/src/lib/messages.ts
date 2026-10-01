@@ -35,4 +35,7 @@ export const CLIENT_MESSAGES = {
 
   BANK_OUTSIDE_ATTESTATION:
     "Bank and card reconciliation is done outside Month Proof. This report does not confirm it.",
+
+  EXCEL_DOWNLOAD_FAILED:
+    "We couldn't download the Excel package. Please try again.",
 } as const;
