@@ -38,6 +38,53 @@ type PageView =
 
 type ProcessingMode = "default" | "post-discovery";
 
+// The run id lives in page memory, so a refresh would lose a run that is still
+// waiting for the user. Remember it per company; every mount re-checks the run
+// with the server before using it.
+const ACTIVE_RUN_KEY = (companyId: string) => `monthproof.activeRun:${companyId}`;
+const RESUMABLE_STATUSES = new Set([
+  "pending",
+  "parsing",
+  "discovering",
+  "awaiting_discovery_confirmation",
+  "mapping",
+  "awaiting_mapping_confirmation",
+  "applying_mapping",
+  "awaiting_confirmation",
+  "comparing",
+  "generating",
+]);
+
+function saveActiveRun(companyId: string | undefined, runId: string, period: string) {
+  if (!companyId) return;
+  try {
+    localStorage.setItem(ACTIVE_RUN_KEY(companyId), JSON.stringify({ runId, period }));
+  } catch {
+    /* storage blocked — resume is a convenience, not required */
+  }
+}
+
+function readActiveRun(companyId: string): { runId: string; period: string } | null {
+  try {
+    const raw = localStorage.getItem(ACTIVE_RUN_KEY(companyId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.runId === "string" && typeof parsed?.period === "string"
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearActiveRun(companyId: string) {
+  try {
+    localStorage.removeItem(ACTIVE_RUN_KEY(companyId));
+  } catch {
+    /* ignore */
+  }
+}
+
 interface GuardrailState {
   runId: string;
   rawDataUrl: string | null;
@@ -105,6 +152,35 @@ export default function UploadPage() {
     return () => clearInterval(id);
   }, [cooldownUntil]);
 
+  // After a refresh, return to a run that is still in progress or waiting for
+  // the user. LoadingProgress then shows the right screen (mapping, preview...).
+  useEffect(() => {
+    if (!company?.id || currentRunId || view !== "upload") return;
+    const saved = readActiveRun(company.id);
+    if (!saved) return;
+    let cancelled = false;
+    apiFetch<{ status: string }>(`/runs/${saved.runId}/status`)
+      .then((run) => {
+        if (cancelled) return;
+        if (RESUMABLE_STATUSES.has(run.status)) {
+          setPeriod(saved.period);
+          setCurrentRunId(saved.runId);
+          setProcessingMode("default");
+          setView("processing");
+        } else {
+          clearActiveRun(company.id);
+        }
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+          clearActiveRun(company.id);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company?.id]);
+
   const cooldownActive = cooldownLeft > 0;
   const canSubmit = selectedFiles.length > 0 && !!period && !isUploading && !cooldownActive;
 
@@ -135,6 +211,7 @@ export default function UploadPage() {
         body: fd,
       });
       setCurrentRunId(res.run_id);
+      saveActiveRun(company?.id, res.run_id, period);
       setProcessingMode("default");
       setView("processing");
     } catch (err) {
@@ -275,6 +352,7 @@ export default function UploadPage() {
 
   function handleRetry(newRunId: string) {
     setCurrentRunId(newRunId);
+    saveActiveRun(company?.id, newRunId, period);
     setProcessingMode("default");
     setGuardrailState(null);
     setParsePreview(null);

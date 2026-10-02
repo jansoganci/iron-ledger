@@ -22,7 +22,9 @@ Kâr tablosu artık aynı hesabı iki kez toplamaz. GL satırı varsa tutar GL'd
 Destek dosyası kırılımda ve kontrol kartında kalır. Kayıtlı eski rapor eski
 toplamı gösterir; yeni bir analiz güncel tutarı yazar.
 
-Açık kenar: eksik dosya senaryoları, stale-export, Excel'in görsel kontrolü.
+Dil 2 kenarları canlıda denendi (1 Ekim 2026): `docs/qa/slice2-acceptance-2026-10-01-final/README.md`.
+Geçenler: eksik kaynak, iki dosyalı kontrol (kart), iki GL hedefli sözleşme, belirsiz sözleşme, geçersiz mapping, stale-export, Excel görsel.
+**Açık hatalar:** (1) boş bordro dosyası `KeyError: 'amount'` ile çöküyor (consolidator), (2) bir kontrol için iki dosya yüklenince istisna listesi ve anlatı yine toplanmış tutarı fark gibi gösteriyor, (3) kapalı ayda Replace'te kullanıcı ham "API 409" görüyor (ParsePreviewPanel'in hata gösterimi).
 Install/fuel ayrı durur. `0011` demo projede uygulandı. Dönem kilidi (`closed`) aşağıda: yapıldı.
 
 Güncel karar, UX ve uygulama kaydı:
@@ -42,9 +44,15 @@ yeniden aç (log: closed → reopened), düzeltilmiş raporla tekrar kapat.
   (`PERIOD_CLOSED`); uçuştaki run ve Opus yükseltmesi de dokunmadan durur.
 - Çeyrek rapor kilidin parçası değil. Banka, kurulum/yakıt, yaşlandırma, e-posta yok.
 
-**Kalan canlı iş:** kapalı ayda sunucunun 409 vermesini canlıda denemek (yalnız testlerde var).
+Canlıda denendi: `/upload` ve Replace (`/runs/{id}/confirm`) kapalı ayda 409. Retry yalnız birim testte (`guardrail_failed` run üretilemedi).
 Açık kenar: Opus yükseltmesi ve karşılaştırma kontrolü iki ayrı okuma; kapatma tam o
 aralıkta olursa küçük bir yarış penceresi kalır.
+
+### Arayüz: yapıldı (1 Ekim 2026)
+
+- Sekme gizliyken yoklama sürer (`refetchIntervalInBackground`, `LoadingProgress.tsx`).
+- Yenilemede bekleyen run'a dönülür: run kimliği tarayıcıda saklanır, açılışta sunucuyla doğrulanır (`UploadPage.tsx`). Tarayıcıya bağlı.
+- Excel: "Sources" sütunu kesilmiyor, "GL amount wins; other files are evidence" başlığı (`excel_export.py`).
 
 ### Anlatı–kart tutarlılığı: yapıldı (1 Ekim 2026)
 

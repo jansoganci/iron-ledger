@@ -111,12 +111,19 @@ def _build_pl_sheet(
     ws.merge_cells("A1:D1")
 
     # Header
-    ws.append(["Account", "Category", "Amount ($)", "Sources"])
+    ws.append(
+        [
+            "Account",
+            "Category",
+            "Amount ($)",
+            "Sources (GL amount wins; other files are evidence)",
+        ]
+    )
     _style_header_row(ws, 2, 4)
     ws.column_dimensions["A"].width = 32
     ws.column_dimensions["B"].width = 18
     ws.column_dimensions["C"].width = 16
-    ws.column_dimensions["D"].width = 40
+    ws.column_dimensions["D"].width = 70
 
     # Group by category in prescribed order
     by_cat: dict[str, list[dict]] = {}
@@ -149,6 +156,13 @@ def _build_pl_sheet(
             ws.append([e["account"], cat, amount, source_labels])
             amt_cell = ws.cell(row=row_num, column=3)
             amt_cell.number_format = _CURRENCY_FMT
+            # File names are long; wrap them instead of cutting them off.
+            for col in range(1, 4):
+                ws.cell(row=row_num, column=col).alignment = Alignment(vertical="top")
+            ws.cell(row=row_num, column=4).alignment = Alignment(
+                wrap_text=True, vertical="top"
+            )
+            _fit_wrapped_row(ws, row_num)
             row_num += 1
 
         # Category total
@@ -376,7 +390,12 @@ def _build_source_breakdown_sheet(
 ) -> None:
     ws = wb.create_sheet("Source Breakdown")
 
-    ws.append([f"Source Breakdown — {period.strftime('%B %Y')}"])
+    ws.append(
+        [
+            f"Source Breakdown — {period.strftime('%B %Y')} "
+            "(supporting files are evidence, not added)"
+        ]
+    )
     _style_row(ws, 1, font=Font(bold=True, size=13))
     ws.merge_cells("A1:E1")
 

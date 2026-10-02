@@ -234,3 +234,41 @@ def test_recon_rows_do_not_reset_control_column_widths() -> None:
     assert ws.cell(row=evidence, column=5).value == 3540.0
     assert ws.cell(row=evidence, column=6).value == 285.0
     assert ws.cell(row=evidence, column=2).value == "redhawk_contracts_mar_2026.xlsx"
+
+
+def test_pl_sheet_uses_entry_amounts_and_labels_supporting_files_as_evidence() -> None:
+    """The P&L amount is the stored entry (GL when present). Supporting files in
+    the Sources column are evidence and are never added to a category total."""
+    entries = [
+        {
+            "account": "Technician Wages",
+            "category": "OPEX",
+            "amount": 6200.0,
+            "source_breakdown": [
+                {"source_file": "gl.xlsx", "amount": 6200.0, "row_count": 1},
+                {"source_file": "payroll.xlsx", "amount": 6200.0, "row_count": 3},
+            ],
+        },
+        {
+            "account": "Rent",
+            "category": "OPEX",
+            "amount": 1650.0,
+            "source_breakdown": [],
+        },
+    ]
+    raw = build_close_package(
+        entries=entries,
+        reconciliations=[],
+        period=date(2026, 3, 1),
+        company_name="Redhawk",
+    )
+    wb = openpyxl.load_workbook(BytesIO(raw))
+    pl = wb["Consolidated P&L"]
+    rows = {r[0]: r for r in pl.iter_rows(values_only=True) if r[0]}
+    assert rows["Technician Wages"][2] == 6200.0  # not 12,400
+    assert "payroll.xlsx $6,200" in rows["Technician Wages"][3]
+    totals = [r for r in pl.iter_rows(values_only=True) if r[1] == "Total OPEX"]
+    assert totals[0][2] == 7850.0
+    header = next(r for r in pl.iter_rows(values_only=True) if r[0] == "Account")
+    assert "evidence" in header[3]
+    assert "evidence" in wb["Source Breakdown"]["A1"].value

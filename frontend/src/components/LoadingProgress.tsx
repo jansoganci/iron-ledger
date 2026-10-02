@@ -172,6 +172,8 @@ export function LoadingProgress({
   const { data, error, isFetchedAfterMount } = useQuery<RunStatusResponse>({
     queryKey: ["run-status", runId],
     queryFn: () => apiFetch<RunStatusResponse>(`/runs/${runId}/status`),
+    // Keep polling while the tab is hidden, so the next screen is ready on return.
+    refetchIntervalInBackground: true,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       if (!status || isTerminal(status)) return false;
