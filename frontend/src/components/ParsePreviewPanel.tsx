@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiFetch } from "../lib/api";
+import { apiErrorDetail, apiFetch } from "../lib/api";
 import { cn } from "../lib/utils";
 import { formatCurrency } from "../lib/formatters";
 import type { ParsePreview, PreviewRow } from "./LoadingProgress";
@@ -116,7 +116,7 @@ export function ParsePreviewPanel({
       });
       onConfirmed();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setError(apiErrorDetail(err, "Something went wrong. Please try again."));
     } finally {
       setIsSubmitting(false);
     }

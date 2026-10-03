@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -317,7 +317,7 @@ def test_confirm_mappings_file_total_validates_gl_and_is_not_persisted(
 @patch("backend.api.routers.uploads.get_source_mappings_repo")
 @patch("backend.api.routers.uploads.apply_mapping_and_consolidate")
 @patch("backend.api.routers.uploads.get_runs_repo")
-def test_confirm_mappings_does_not_persist_payroll(mock_repo, mock_apply, mock_maps):
+def test_confirm_mappings_persists_payroll_roles(mock_repo, mock_apply, mock_maps):
     preview = _preview_with_pool(["Equipment COGS", "Salaries & Wages"])
     preview["mapping_draft"]["items"].append(
         {
@@ -348,6 +348,7 @@ def test_confirm_mappings_does_not_persist_payroll(mock_repo, mock_apply, mock_m
         },
     )
     assert resp.status_code == 200
-    maps_repo.upsert.assert_called_once_with(
-        "co-1", "supplier_invoices", "AlarmTech", "Equipment COGS"
-    )
+    assert maps_repo.upsert.call_args_list == [
+        call("co-1", "supplier_invoices", "AlarmTech", "Equipment COGS"),
+        call("co-1", "payroll", "Alice Johnson", "Salaries & Wages"),
+    ]

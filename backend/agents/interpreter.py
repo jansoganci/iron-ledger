@@ -19,6 +19,7 @@ from backend.domain.regenerate import run_wants_regenerate
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
 from backend.tools.close_controls import (
+    filter_reconciliations_for_control_summary,
     pack_report_reconciliations,
     summary_from_parse_preview,
 )
@@ -249,6 +250,12 @@ class InterpreterAgent:
         """
         # comparing → generating
         run = self._runs.get_by_id(run_id)
+        control_summary = summary_from_parse_preview(
+            run.get("parse_preview") or {}, list(reconciliations or [])
+        )
+        reconciliations = filter_reconciliations_for_control_summary(
+            reconciliations, control_summary
+        )
         try:
             gen_status = RunStateMachine.transition(run["status"], RunStatus.GENERATING)
         except Exception as exc:

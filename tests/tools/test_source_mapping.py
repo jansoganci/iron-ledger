@@ -7,6 +7,7 @@ from backend.domain.entities import SourceAccountMapping
 from backend.tools.source_mapping import (
     annotate_draft_items,
     payroll_draft_items,
+    remember_payroll_items,
     index_stored,
     is_payroll,
     is_persistable,
@@ -28,9 +29,9 @@ def _item(**kwargs) -> MappingDraftItem:
     return MappingDraftItem.model_validate(payload)
 
 
-def test_payroll_is_not_persistable() -> None:
+def test_payroll_choices_are_saved_like_vendor_names() -> None:
     assert is_payroll("payroll")
-    assert not is_persistable("payroll")
+    assert is_persistable("payroll")
     assert is_persistable("supplier_invoices")
     assert not is_persistable("contracts")
 
@@ -51,7 +52,16 @@ def test_payroll_roles_become_unselected_review_rows() -> None:
     assert all(i.origin == "new" and i.suggested_gl_account is None for i in items)
     assert all(not i.confident and i.mapping_mode == "row" for i in items)
     assert needs_user_review(items)
-    assert persistable_upserts(items, {i.source_pattern: "X" for i in items}) == []
+    assert persistable_upserts(
+        items,
+        {
+            "Owner / Operations": "Owner Salary",
+            "Install Technician": "Technician Wages",
+        },
+    ) == [
+        ("payroll", "Owner / Operations", "Owner Salary"),
+        ("payroll", "Install Technician", "Technician Wages"),
+    ]
 
 
 def test_new_row_needs_review() -> None:
@@ -97,7 +107,44 @@ def test_haiku_disagreement_is_conflict() -> None:
     assert needs_user_review(items)
 
 
-def test_persistable_upserts_skip_payroll() -> None:
+def test_saved_payroll_role_is_reused_when_the_wage_account_is_on_the_gl() -> None:
+    from datetime import date
+
+    draft = payroll_draft_items(
+        ["Owner / Operations", "New Role"],
+        source_file="payroll.xlsx",
+        amount_scope="Base Compensation",
+        period=date(2026, 3, 1),
+    )
+    stored = {("payroll", "Owner / Operations"): "Owner Salary"}
+    items = remember_payroll_items(
+        draft, stored, ["Owner Salary", "Technician Wages"]
+    )
+    by_role = {item.source_pattern: item for item in items}
+    assert by_role["Owner / Operations"].origin == "remembered"
+    assert by_role["Owner / Operations"].suggested_gl_account == "Owner Salary"
+    assert by_role["New Role"].origin == "new"
+    assert needs_user_review(items)
+    assert remembered_decisions(items) == {"Owner / Operations": "Owner Salary"}
+
+
+def test_saved_payroll_role_is_asked_again_when_the_wage_account_is_gone() -> None:
+    from datetime import date
+
+    draft = payroll_draft_items(
+        ["Owner / Operations"],
+        source_file="payroll.xlsx",
+        amount_scope="Base Compensation",
+        period=date(2026, 3, 1),
+    )
+    stored = {("payroll", "Owner / Operations"): "Owner Salary"}
+    items = remember_payroll_items(draft, stored, ["Technician Wages"])
+    assert items[0].origin == "new"
+    assert items[0].suggested_gl_account is None
+    assert needs_user_review(items)
+
+
+def test_persistable_upserts_keep_payroll() -> None:
     items = [
         _item(),
         _item(
@@ -114,7 +161,10 @@ def test_persistable_upserts_skip_payroll() -> None:
             "Alice Johnson": "Salaries & Wages",
         },
     )
-    assert rows == [("supplier_invoices", "AlarmTech Industries", "Equipment COGS")]
+    assert rows == [
+        ("supplier_invoices", "AlarmTech Industries", "Equipment COGS"),
+        ("payroll", "Alice Johnson", "Salaries & Wages"),
+    ]
 
 
 def test_persistable_upserts_skip_file_total() -> None:

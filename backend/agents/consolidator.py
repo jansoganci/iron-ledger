@@ -89,9 +89,16 @@ def _union(sources: list[tuple[str, pd.DataFrame]]) -> pd.DataFrame:
     frames = []
     for label, df in sources:
         df = df.copy()
+        if df.empty:
+            # An empty parsed source may not have an amount column at all.
+            # Keep it in the close-control metadata, but it contributes no
+            # rows to the consolidated financial data.
+            continue
         df["source_file"] = label
         df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0.0)
         frames.append(df[["account", "category", "amount", "source_file"]])
+    if not frames:
+        return pd.DataFrame(columns=["account", "category", "amount", "source_file"])
     return pd.concat(frames, ignore_index=True)
 
 
@@ -239,6 +246,9 @@ def _detect_deltas(
     sources: list[tuple[str, pd.DataFrame]],
 ) -> list[ReconciliationItem]:
     """Produce one ReconciliationItem per account that has a material cross-source delta."""
+    if tagged.empty:
+        return []
+
     items: list[ReconciliationItem] = []
 
     # Determine which source label is the GL (if any)

@@ -13,6 +13,7 @@ from backend.tools.close_controls import (
     REPORT_RECON_SCHEMA,
     build_control_summary,
     build_legacy_control_summary,
+    filter_reconciliations_for_control_summary,
     pack_report_reconciliations,
     unpack_report_reconciliations,
 )
@@ -375,6 +376,31 @@ def test_multiple_files_in_one_control_cannot_pass(second_rows) -> None:
     dumped = control.model_dump(mode="json")
     assert dumped["source_files"] == ["payroll_a.xlsx", "payroll_b.xlsx"]
     assert dumped.get("source_file") is None
+
+
+def test_multiple_files_in_one_control_do_not_create_report_findings() -> None:
+    summary = _summary(
+        source_files=["gl.xlsx", "payroll_a.xlsx", "payroll_b.xlsx"],
+        per_file_rows={
+            "payroll_a.xlsx": [{"account": "Wages", "amount": 1900}],
+            "payroll_b.xlsx": [{"account": "Wages", "amount": 500}],
+        },
+        gl_amounts={"Wages": 1000},
+        recon_items=[],
+    )
+    findings = [
+        {
+            "account": "Wages",
+            "delta": 1400,
+            "sources": [
+                {"source_file": "gl.xlsx", "amount": 1000},
+                {"source_file": "payroll_a.xlsx", "amount": 1900},
+                {"source_file": "payroll_b.xlsx", "amount": 500},
+            ],
+        }
+    ]
+
+    assert filter_reconciliations_for_control_summary(findings, summary) == []
 
 
 @pytest.mark.parametrize(

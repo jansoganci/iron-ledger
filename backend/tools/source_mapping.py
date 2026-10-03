@@ -12,7 +12,9 @@ from backend import messages
 from backend.domain.contracts import MappingDraft, MappingDraftItem, SourceFileType
 from backend.domain.entities import SourceAccountMapping
 
-PERSISTABLE_FILE_TYPES: frozenset[str] = frozenset({"supplier_invoices"})
+PERSISTABLE_FILE_TYPES: frozenset[str] = frozenset(
+    {"supplier_invoices", "payroll"}
+)
 PAYROLL_FILE_TYPE: SourceFileType = "payroll"
 
 
@@ -54,10 +56,10 @@ def payroll_draft_items(
     amount_scope: str,
     period: date | None,
 ) -> list[MappingDraftItem]:
-    """One review row per payroll role. Never mapped to itself, never pre-picked.
+    """One review row per payroll role. Never mapped to itself.
 
-    The user chooses the GL wage account for every role; Python sums the roles
-    that share an account. Payroll is not persisted (see PERSISTABLE_FILE_TYPES).
+    Saved choices are applied later. A new role stays unselected until the
+    user picks a wage account. Python sums the roles that share an account.
     """
     return [
         MappingDraftItem(
@@ -126,6 +128,35 @@ def annotate_draft_items(
             )
         )
     return annotated
+
+
+def remember_payroll_items(
+    items: list[MappingDraftItem],
+    stored: dict[tuple[str, str], str],
+    gl_pool: list[str],
+) -> list[MappingDraftItem]:
+    """Reuse a saved role → wage account when that account is on this GL.
+
+    A saved account that is not on this period's GL is asked again. The user
+    is not shown a choice the books no longer contain.
+    """
+    pool = set(gl_pool)
+    ready: list[MappingDraftItem] = []
+    for item in annotate_draft_items(items, stored):
+        if (
+            item.origin == "remembered"
+            and item.suggested_gl_account
+            and item.suggested_gl_account not in pool
+        ):
+            item = item.model_copy(
+                update={
+                    "origin": "new",
+                    "suggested_gl_account": None,
+                    "confident": False,
+                }
+            )
+        ready.append(item)
+    return ready
 
 
 def needs_user_review(items: list[MappingDraftItem]) -> bool:

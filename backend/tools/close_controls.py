@@ -156,6 +156,38 @@ def _summarize_counts(controls: list[ControlResult], coverage: int) -> ControlSu
     )
 
 
+def filter_reconciliations_for_control_summary(
+    recon_items: list[dict] | None,
+    control_summary: ControlSummary,
+) -> list[dict]:
+    """Exclude findings belonging to controls that were not compared.
+
+    In particular, multiple supporting files for one named control are an
+    incomplete scope, not two amounts that can be reconciled independently.
+    """
+    blocked_sources = {
+        source_file
+        for control in control_summary.controls
+        if control.status == "not_compared"
+        and control.incomplete_reason == messages.CONTROL_MULTIPLE_SOURCES
+        for source_file in control.source_files
+    }
+    if not blocked_sources:
+        return list(recon_items or [])
+
+    filtered: list[dict] = []
+    for item in recon_items or []:
+        sources = (item.get("sources") or []) if isinstance(item, dict) else []
+        item_sources = {
+            str(source.get("source_file"))
+            for source in sources
+            if isinstance(source, dict) and source.get("source_file")
+        }
+        if not item_sources.intersection(blocked_sources):
+            filtered.append(item)
+    return filtered
+
+
 def build_legacy_control_summary(recon_items: list[dict] | None) -> ControlSummary:
     """Historical reports: never invent Tied out from file-presence + no card."""
     items = [i for i in (recon_items or []) if isinstance(i, dict)]

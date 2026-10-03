@@ -203,8 +203,8 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
           </h2>
           <p className="text-sm text-text-secondary">
             Confirm where each supporting file or line should land before we
-            compare it to the general ledger. File totals and payroll roles are
-            not saved as vendor names.
+            compare it to the general ledger. Saved choices are reused next
+            time. You only see a name that is new or no longer matches.
           </p>
           <p className="text-xs text-text-secondary">
             {conflicts.length} need a choice · {newcomers.length} new · {remembered.length} already saved

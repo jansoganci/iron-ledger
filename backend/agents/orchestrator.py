@@ -40,6 +40,7 @@ from backend.tools.source_mapping import (
     index_stored,
     is_payroll,
     payroll_draft_items,
+    remember_payroll_items,
     needs_user_review,
     remembered_decisions,
 )
@@ -944,14 +945,18 @@ def run_multi_file_parser_with_mapping(
                 )
                 continue
             if is_payroll(file_type):
-                all_draft_items.extend(
+                roles = remember_payroll_items(
                     payroll_draft_items(
                         unique_values,
                         source_file=label,
                         amount_scope=source_column or "amount",
                         period=period,
-                    )
+                    ),
+                    stored_index,
+                    gl_pool,
                 )
+                all_draft_items.extend(roles)
+                auto_decisions.update(remembered_decisions(roles))
                 continue
             _, draft = mapper.build_draft(
                 unique_values=unique_values,

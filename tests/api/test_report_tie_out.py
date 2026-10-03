@@ -289,3 +289,16 @@ def test_excel_download_failure_and_success_paths_are_both_handled() -> None:
     assert "CLIENT_MESSAGES.EXCEL_DOWNLOAD_FAILED" in summary
     assert "link.download" in summary
     assert "excelInFlight.current" in summary
+
+
+def test_parse_preview_uses_api_error_detail_for_period_lock() -> None:
+    root = Path(__file__).resolve().parents[2]
+    panel = (
+        root / "frontend" / "src" / "components" / "ParsePreviewPanel.tsx"
+    ).read_text(encoding="utf-8")
+
+    assert 'import { apiErrorDetail, apiFetch } from "../lib/api";' in panel
+    assert (
+        'setError(apiErrorDetail(err, "Something went wrong. Please try again."));'
+        in panel
+    )

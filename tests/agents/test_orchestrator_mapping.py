@@ -234,6 +234,80 @@ def test_gl_plus_payroll_pauses_even_when_roles_are_company_accounts(
     ]
 
 
+@patch("backend.agents.orchestrator.get_source_mappings_repo")
+@patch("backend.agents.orchestrator.get_llm_client")
+@patch("backend.agents.orchestrator.get_file_storage")
+@patch("backend.agents.orchestrator.get_accounts_repo")
+@patch("backend.agents.orchestrator.get_runs_repo")
+@patch("backend.agents.orchestrator.ParserAgent")
+@patch("backend.agents.orchestrator.AccountMapper")
+def test_saved_payroll_roles_skip_the_mapping_screen(
+    mock_mapper_cls,
+    mock_parser_cls,
+    mock_get_runs,
+    mock_get_accounts,
+    mock_get_storage,
+    mock_get_llm,
+    mock_get_maps,
+):
+    """Once each role has a saved wage account on this GL, the user is not asked."""
+    from backend.domain.entities import SourceAccountMapping
+
+    gl_preview = _mock_preview_rows(["Technician Wages", "Admin Wages", "Owner Salary"])
+    roles = {
+        "Install Technician": "Technician Wages",
+        "Office Administrator": "Admin Wages",
+    }
+    payroll_preview = _mock_preview_rows(list(roles))
+
+    parser = MagicMock()
+    parser.parse_file_silently.side_effect = [
+        (gl_preview, "Amount", pd.DataFrame()),
+        (payroll_preview, "Base Compensation", pd.DataFrame()),
+    ]
+    mock_parser_cls.return_value = parser
+    runs_repo = _stub_runs_repo()
+    mock_get_runs.return_value = runs_repo
+    mock_get_maps.return_value = _stub_mappings_repo(
+        [
+            SourceAccountMapping(
+                id="m1",
+                company_id="co-1",
+                file_type="payroll",
+                source_pattern=role,
+                gl_account=account,
+            )
+            for role, account in roles.items()
+        ]
+    )
+    accounts_repo = MagicMock()
+    accounts_repo.list_for_company.return_value = {}
+    mock_get_accounts.return_value = accounts_repo
+    mock_mapper_cls.return_value = MagicMock()
+
+    with patch(
+        "backend.agents.orchestrator.apply_mapping_and_consolidate"
+    ) as apply:
+        run_multi_file_parser_with_mapping(
+            run_id="run-saved",
+            storage_keys=[
+                "user/2026-03-01/gl.xlsx",
+                "user/2026-03-01/payroll.xlsx",
+            ],
+            company_id="co-1",
+            period=__import__("datetime").date(2026, 3, 1),
+        )
+    apply.assert_called_once()
+    assert apply.call_args.kwargs["user_decisions"] == roles
+
+    statuses_set = [
+        call.args[1] if call.args else call.kwargs.get("status")
+        for call in runs_repo.update_status.call_args_list
+    ]
+    assert RunStatus.AWAITING_MAPPING_CONFIRMATION not in statuses_set
+    assert RunStatus.APPLYING_MAPPING in statuses_set
+
+
 # ---------------------------------------------------------------------------
 # Test: GL + vendor → still pauses for review when names are new
 # ---------------------------------------------------------------------------

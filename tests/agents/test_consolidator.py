@@ -208,6 +208,20 @@ def test_consolidate_single_source_no_reconciliations() -> None:
     assert recon_items == []
 
 
+def test_consolidate_ignores_empty_source_without_amount_column() -> None:
+    empty_payroll = pd.DataFrame()
+
+    consolidated, recon_items = consolidate(
+        [("gl_export.xlsx", _gl_df()), ("payroll_empty.xlsx", empty_payroll)]
+    )
+
+    assert len(consolidated) == len(_gl_df())
+    assert all(
+        "payroll_empty.xlsx" not in {source.source_file for source in item.sources}
+        for item in recon_items
+    )
+
+
 # ---------------------------------------------------------------------------
 # Materiality helpers
 # ---------------------------------------------------------------------------
