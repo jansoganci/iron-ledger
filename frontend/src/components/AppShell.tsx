@@ -3,6 +3,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   BarChart3,
   Database,
+  ArrowLeftRight,
   FileText,
   LogOut,
   Menu,
@@ -48,6 +49,12 @@ const NAV_ITEMS: NavItem[] = [
     to: "/data",
     label: "Data",
     icon: Database,
+    enabled: true,
+  },
+  {
+    to: "/mapping",
+    label: "Mapping",
+    icon: ArrowLeftRight,
     enabled: true,
   },
   {

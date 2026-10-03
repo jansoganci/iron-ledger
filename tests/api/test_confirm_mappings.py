@@ -257,7 +257,7 @@ def test_confirm_mappings_foreign_company_returns_403(mock_repo):
 @patch("backend.api.routers.uploads.get_source_mappings_repo")
 @patch("backend.api.routers.uploads.apply_mapping_and_consolidate")
 @patch("backend.api.routers.uploads.get_runs_repo")
-def test_confirm_mappings_file_total_validates_gl_and_is_not_persisted(
+def test_confirm_mappings_file_total_validates_gl_and_is_persisted(
     mock_repo, mock_apply, mock_maps
 ):
     preview = _preview_with_pool(["Service Revenue", "Equipment COGS"])
@@ -307,9 +307,10 @@ def test_confirm_mappings_file_total_validates_gl_and_is_not_persisted(
         },
     )
     assert ok.status_code == 200
-    maps_repo.upsert.assert_called_once_with(
-        "co-1", "supplier_invoices", "AlarmTech", "Equipment COGS"
-    )
+    assert maps_repo.upsert.call_args_list == [
+        call("co-1", "supplier_invoices", "AlarmTech", "Equipment COGS"),
+        call("co-1", "contracts", "(entire file)", "Service Revenue"),
+    ]
     stored_preview = runs_repo.set_parse_preview.call_args[0][1]
     assert stored_preview["file_total_decisions"]["contracts.xlsx"] == "Service Revenue"
 

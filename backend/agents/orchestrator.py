@@ -40,8 +40,10 @@ from backend.tools.source_mapping import (
     index_stored,
     is_payroll,
     payroll_draft_items,
+    remember_file_total_item,
     remember_payroll_items,
     needs_user_review,
+    remembered_file_total_decisions,
     remembered_decisions,
 )
 
@@ -899,6 +901,7 @@ def run_multi_file_parser_with_mapping(
             get_source_mappings_repo().list_for_company(company_id)
         )
         auto_decisions: dict[str, str] = {}
+        auto_file_total_decisions: dict[str, str] = {}
         all_draft_items = []
 
         for (
@@ -930,18 +933,23 @@ def run_multi_file_parser_with_mapping(
                 suggested = (
                     proposed_contracts_gl(gl_pool) if file_type == "contracts" else None
                 )
-                all_draft_items.append(
-                    MappingDraftItem(
-                        source_pattern=FILE_TOTAL_PATTERN,
-                        source_file=label,
-                        file_type=file_type,
-                        suggested_gl_account=suggested,
-                        confident=bool(suggested),
-                        mapping_mode="file_total",
-                        amount_scope=source_column or "amount",
-                        source_amount=source_amount,
-                        period=period,
-                    )
+                file_total_item = MappingDraftItem(
+                    source_pattern=FILE_TOTAL_PATTERN,
+                    source_file=label,
+                    file_type=file_type,
+                    suggested_gl_account=suggested,
+                    confident=bool(suggested),
+                    mapping_mode="file_total",
+                    amount_scope=source_column or "amount",
+                    source_amount=source_amount,
+                    period=period,
+                )
+                file_total_item = remember_file_total_item(
+                    file_total_item, stored_index, gl_pool
+                )
+                all_draft_items.append(file_total_item)
+                auto_file_total_decisions.update(
+                    remembered_file_total_decisions([file_total_item])
                 )
                 continue
             if is_payroll(file_type):
@@ -987,6 +995,7 @@ def run_multi_file_parser_with_mapping(
             "file_keys": file_keys,
             "is_multi_file": True,
             "auto_decisions": auto_decisions,
+            "auto_file_total_decisions": auto_file_total_decisions,
         }
         runs_repo.set_parse_preview(run_id, parse_preview)
         runs_repo.set_file_count(run_id, len(sorted_keys))
@@ -1088,9 +1097,10 @@ def apply_mapping_and_consolidate(
         file_keys: dict[str, str] = parse_preview.get("file_keys", {})
         auto_decisions: dict[str, str] = parse_preview.get("auto_decisions") or {}
         merged_decisions = {**auto_decisions, **(user_decisions or {})}
-        file_total_decisions: dict[str, str] = dict(
-            parse_preview.get("file_total_decisions") or {}
-        )
+        file_total_decisions: dict[str, str] = {
+            **(parse_preview.get("auto_file_total_decisions") or {}),
+            **(parse_preview.get("file_total_decisions") or {}),
+        }
 
         if not file_keys:
             logger.error(

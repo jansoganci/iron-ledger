@@ -146,7 +146,7 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
 
       if (clashes.size > 0) {
         setError(
-          `Conflicting selections found for: ${Array.from(clashes).join(", ")}. Please choose one GL account per source value.`
+          `Conflicting selections found for: ${Array.from(clashes).join(", ")}. Please choose one account in your books for each name.`
         );
         setIsSubmitting(false);
         return;
@@ -244,7 +244,7 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
                         : ""}
                     </p>
                     <label className="block text-xs text-text-secondary">
-                      GL account
+                      Account in your books
                       <select
                         value={selected[key] ?? ""}
                         onChange={(e) =>
@@ -260,7 +260,7 @@ export function MappingReview({ runId, draft, onConfirmed }: MappingReviewProps)
                           "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
                         )}
                       >
-                        <option value="">Select a GL account</option>
+                        <option value="">Select an account</option>
                         {sortedPool.map((account) => (
                           <option key={account} value={account}>
                             {account}
@@ -462,7 +462,7 @@ function FileMappingTable({
         <thead>
           <tr className="border-b border-border">
             <th className="text-left px-4 py-2 font-medium text-text-secondary text-xs">
-              Source Value
+              Name in your file
             </th>
             <th className="text-left px-4 py-2 font-medium text-text-secondary text-xs">
               GL Account
@@ -498,7 +498,7 @@ function FileMappingTable({
                 </td>
                 <td className="px-4 py-2">
                   <select
-                    aria-label={`GL account for ${item.source_pattern}`}
+                    aria-label={`Account in your books for ${item.source_pattern === "(entire file)" ? "All contracts" : item.source_pattern}`}
                     className={cn(
                       "w-full rounded border px-2 py-1 text-sm bg-surface text-text-primary",
                       "focus:outline-none focus:ring-2 focus:ring-accent",

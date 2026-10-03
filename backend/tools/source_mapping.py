@@ -11,9 +11,10 @@ from datetime import date
 from backend import messages
 from backend.domain.contracts import MappingDraft, MappingDraftItem, SourceFileType
 from backend.domain.entities import SourceAccountMapping
+from backend.tools.mapping_grain import FILE_TOTAL_PATTERN
 
 PERSISTABLE_FILE_TYPES: frozenset[str] = frozenset(
-    {"supplier_invoices", "payroll"}
+    {"supplier_invoices", "payroll", "contracts"}
 )
 PAYROLL_FILE_TYPE: SourceFileType = "payroll"
 
@@ -159,6 +160,34 @@ def remember_payroll_items(
     return ready
 
 
+def remember_file_total_item(
+    item: MappingDraftItem,
+    stored: dict[tuple[str, str], str],
+    gl_pool: list[str],
+) -> MappingDraftItem:
+    """Reuse a saved whole-file mapping independently of the filename."""
+    remembered = stored.get((item.file_type, FILE_TOTAL_PATTERN))
+    if remembered is None:
+        return item
+    if remembered not in set(gl_pool):
+        return item.model_copy(
+            update={
+                "origin": "new",
+                "suggested_gl_account": None,
+                "confident": False,
+                "remembered_gl_account": None,
+            }
+        )
+    return item.model_copy(
+        update={
+            "origin": "remembered",
+            "suggested_gl_account": remembered,
+            "confident": True,
+            "remembered_gl_account": remembered,
+        }
+    )
+
+
 def needs_user_review(items: list[MappingDraftItem]) -> bool:
     return any(item.origin in ("new", "conflict") for item in items)
 
@@ -171,22 +200,39 @@ def remembered_decisions(items: list[MappingDraftItem]) -> dict[str, str]:
     return decisions
 
 
+def remembered_file_total_decisions(items: list[MappingDraftItem]) -> dict[str, str]:
+    """Return saved whole-file accounts under the current filename."""
+    return {
+        item.source_file: item.suggested_gl_account
+        for item in items
+        if item.mapping_mode == "file_total"
+        and item.origin == "remembered"
+        and item.suggested_gl_account
+    }
+
+
 def persistable_upserts(
     items: list[MappingDraftItem],
     decisions: dict[str, str],
+    file_total_decisions: dict[str, str] | None = None,
 ) -> list[tuple[str, str, str]]:
     """Return (file_type, source_pattern, gl_account) rows safe to remember."""
     out: list[tuple[str, str, str]] = []
     seen: set[tuple[str, str]] = set()
+    file_total_decisions = file_total_decisions or {}
     for item in items:
         if item.mapping_mode == "file_total":
-            continue
-        if not is_persistable(item.file_type):
-            continue
-        gl_account = decisions.get(item.source_pattern)
+            if item.file_type not in PERSISTABLE_FILE_TYPES:
+                continue
+            gl_account = file_total_decisions.get(item.source_file)
+            key = (item.file_type, FILE_TOTAL_PATTERN)
+        else:
+            if not is_persistable(item.file_type):
+                continue
+            gl_account = decisions.get(item.source_pattern)
+            key = (item.file_type, item.source_pattern)
         if not gl_account:
             continue
-        key = (item.file_type, item.source_pattern)
         if key in seen:
             continue
         seen.add(key)

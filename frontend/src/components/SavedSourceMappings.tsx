@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useToast } from "./ToastProvider";
 import { apiFetch } from "../lib/api";
-import { cn } from "../lib/utils";
 
 interface SavedMapping {
   id: string;
@@ -15,14 +14,26 @@ interface SavedMapping {
 interface SourceMappingsResponse {
   mappings: SavedMapping[];
   gl_account_pool: string[];
+  gl_account_options?: { name: string; code: string | null }[];
 }
 
 const FILE_TYPE_LABELS: Record<string, string> = {
-  supplier_invoices: "Vendors & expenses",
+  payroll: "Payroll",
+  supplier_invoices: "Vendors",
   contracts: "Contracts",
-  bank_statement: "Bank",
-  processor_settlement: "Processor",
 };
+
+function sourceName(row: SavedMapping): string {
+  return row.source_pattern === "(entire file)" && row.file_type === "contracts"
+    ? "All contracts"
+    : row.source_pattern;
+}
+
+function accountOptionLabel(account: { name: string; code: string | null }): string {
+  const name = account.name.trim();
+  const code = account.code?.trim();
+  return code ? `${code} ${name}` : name;
+}
 
 export function SavedSourceMappings() {
   const toast = useToast();
@@ -43,6 +54,15 @@ export function SavedSourceMappings() {
     return [...names].sort();
   }, [data]);
 
+  const accountOptions = useMemo(() => {
+    const options = data?.gl_account_options ?? [];
+    const byName = new Map(options.map((account) => [account.name, account]));
+    for (const name of pool) {
+      if (!byName.has(name)) byName.set(name, { name, code: null });
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [data?.gl_account_options, pool]);
+
   const updateMutation = useMutation({
     mutationFn: ({ id, gl_account }: { id: string; gl_account: string }) =>
       apiFetch(`/source-mappings/${id}`, {
@@ -52,11 +72,11 @@ export function SavedSourceMappings() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["source-mappings"] });
-      toast.success("Saved name updated");
+      toast.success("Match updated");
     },
     onError: (err: unknown) => {
       toast.error(
-        "Could not update that name",
+        "Could not update that match",
         err instanceof Error ? err.message : undefined
       );
     },
@@ -68,11 +88,11 @@ export function SavedSourceMappings() {
     onSuccess: () => {
       setPendingDeleteId(null);
       queryClient.invalidateQueries({ queryKey: ["source-mappings"] });
-      toast.success("Saved name removed");
+      toast.success("Match removed");
     },
     onError: (err: unknown) => {
       toast.error(
-        "Could not remove that name",
+        "Could not remove that match",
         err instanceof Error ? err.message : undefined
       );
     },
@@ -81,7 +101,7 @@ export function SavedSourceMappings() {
   if (isLoading) {
     return (
       <div className="rounded-lg border border-border bg-surface p-8 text-center">
-        <p className="text-sm text-text-secondary">Loading saved names…</p>
+        <p className="text-sm text-text-secondary">Loading matches…</p>
       </div>
     );
   }
@@ -90,10 +110,8 @@ export function SavedSourceMappings() {
   if (mappings.length === 0) {
     return (
       <div className="rounded-lg border border-border bg-surface p-8 text-center">
-        <p className="text-sm font-medium text-text-primary">No saved names yet</p>
-        <p className="text-sm text-text-secondary mt-1">
-          When you confirm a vendor or expense during upload, it is remembered
-          here so next month does not start from scratch.
+        <p className="text-sm font-medium text-text-primary">
+          No saved matches yet. They appear after you confirm names on an upload.
         </p>
       </div>
     );
@@ -106,13 +124,13 @@ export function SavedSourceMappings() {
           <thead className="border-b border-border bg-canvas">
             <tr>
               <th className="px-4 py-2.5 text-xs font-medium text-text-secondary uppercase tracking-wide">
-                Source name
+                Name in your file
               </th>
               <th className="px-4 py-2.5 text-xs font-medium text-text-secondary uppercase tracking-wide">
                 Type
               </th>
               <th className="px-4 py-2.5 text-xs font-medium text-text-secondary uppercase tracking-wide">
-                GL account
+                Account in your books
               </th>
               <th className="px-4 py-2.5 text-xs font-medium text-text-secondary uppercase tracking-wide text-right">
                 Actions
@@ -123,14 +141,14 @@ export function SavedSourceMappings() {
             {mappings.map((row) => (
               <tr key={row.id} className="hover:bg-canvas transition-colors">
                 <td className="px-4 py-3 text-sm font-data text-text-primary">
-                  {row.source_pattern}
+                  {sourceName(row)}
                 </td>
                 <td className="px-4 py-3 text-xs text-text-secondary">
-                  {FILE_TYPE_LABELS[row.file_type] ?? row.file_type}
+                  {FILE_TYPE_LABELS[row.file_type] ?? "Vendors"}
                 </td>
                 <td className="px-4 py-3">
                   <select
-                    aria-label={`GL account for ${row.source_pattern}`}
+                    aria-label={`Account in your books for ${sourceName(row)}`}
                     className="w-full max-w-xs rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
                     value={row.gl_account}
                     disabled={updateMutation.isPending}
@@ -141,9 +159,9 @@ export function SavedSourceMappings() {
                       })
                     }
                   >
-                    {pool.map((acct) => (
-                      <option key={acct} value={acct}>
-                        {acct}
+                    {accountOptions.map((account) => (
+                      <option key={account.name} value={account.name}>
+                        {accountOptionLabel(account)}
                       </option>
                     ))}
                   </select>

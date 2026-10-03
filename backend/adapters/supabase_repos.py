@@ -1103,7 +1103,7 @@ class SupabaseAccountsRepo:
         try:
             resp = (
                 self._db.table("accounts")
-                .select("id, name, account_categories(name)")
+                .select("id, name, code, account_categories(name)")
                 .eq("company_id", company_id)
                 .eq("is_active", True)
                 .execute()
@@ -1116,6 +1116,7 @@ class SupabaseAccountsRepo:
             cat = row.get("account_categories") or {}
             result[row["id"]] = {
                 "name": row["name"],
+                "code": row.get("code"),
                 "category": cat.get("name", "OTHER"),
             }
         return result

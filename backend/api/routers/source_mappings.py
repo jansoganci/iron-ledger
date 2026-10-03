@@ -45,11 +45,23 @@ async def list_source_mappings(
 ):
     """List saved vendor and expense names for the authenticated company."""
     mappings = get_source_mappings_repo().list_for_company(company_id)
-    accounts = get_accounts_repo().list_for_company(company_id)
+    accounts_repo = get_accounts_repo()
+    accounts = accounts_repo.list_for_company(company_id)
     pool = sorted(accounts.keys()) if accounts else list(DEFAULT_GL_CATEGORIES)
+    accounts_by_id = accounts_repo.get_accounts_by_id(company_id)
+    account_options = (
+        [
+            {"name": info["name"], "code": info.get("code")}
+            for info in accounts_by_id.values()
+            if isinstance(info, dict) and info.get("name")
+        ]
+        if isinstance(accounts_by_id, dict)
+        else []
+    )
     return {
         "mappings": [_public_mapping(row) for row in mappings],
         "gl_account_pool": pool,
+        "gl_account_options": account_options,
     }
 
 

@@ -14,6 +14,7 @@ import QuarterlyReportPage from "./pages/QuarterlyReportPage";
 import ProfilePage from "./pages/ProfilePage";
 import DashboardPage from "./pages/DashboardPage";
 import DataPage from "./pages/DataPage";
+import MappingPage from "./pages/MappingPage";
 import ReportsPage from "./pages/ReportsPage";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 
@@ -61,6 +62,16 @@ export default function App() {
                     <ProtectedRoute>
                       <AppShell>
                         <DataPage />
+                      </AppShell>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/mapping"
+                  element={
+                    <ProtectedRoute>
+                      <AppShell>
+                        <MappingPage />
                       </AppShell>
                     </ProtectedRoute>
                   }

@@ -751,7 +751,7 @@ async def confirm_mappings(
 
     mappings_repo = get_source_mappings_repo()
     for file_type, source_pattern, gl_account in persistable_upserts(
-        draft_model.items, body.decisions
+        draft_model.items, body.decisions, body.file_total_decisions
     ):
         mappings_repo.upsert(company_id, file_type, source_pattern, gl_account)
 

@@ -384,7 +384,7 @@ Tone: friendly, inviting, not alarming. The user has done nothing wrong.
 
 ### 7. Mapping Confirmation Surfaces
 
-`MappingReview` pauses multi-source runs when vendor or expense names need a canonical GL account. Conflicts with a saved mapping are shown first; payroll lines never appear here. Saved names are edited on Data → Saved names, not in the sidebar. `MappingConfirmPanel` handles up to three low-confidence column/category mappings.
+`MappingReview` pauses multi-source runs when vendor or expense names need a canonical GL account. Conflicts with a saved mapping are shown first; payroll lines never appear here. Saved matches are edited on the Mapping page in the sidebar. New matches are created only when a user confirms names during an upload; the Mapping page has no manual add form. `MappingConfirmPanel` handles up to three low-confidence column/category mappings.
 
 Blocks the pipeline until resolved. Background is dimmed; rest of the UI is non-interactive.
 

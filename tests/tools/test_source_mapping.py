@@ -11,8 +11,10 @@ from backend.tools.source_mapping import (
     index_stored,
     is_payroll,
     is_persistable,
+    remember_file_total_item,
     needs_user_review,
     persistable_upserts,
+    remembered_file_total_decisions,
     remembered_decisions,
 )
 
@@ -33,7 +35,7 @@ def test_payroll_choices_are_saved_like_vendor_names() -> None:
     assert is_payroll("payroll")
     assert is_persistable("payroll")
     assert is_persistable("supplier_invoices")
-    assert not is_persistable("contracts")
+    assert is_persistable("contracts")
 
 
 def test_payroll_roles_become_unselected_review_rows() -> None:
@@ -117,9 +119,7 @@ def test_saved_payroll_role_is_reused_when_the_wage_account_is_on_the_gl() -> No
         period=date(2026, 3, 1),
     )
     stored = {("payroll", "Owner / Operations"): "Owner Salary"}
-    items = remember_payroll_items(
-        draft, stored, ["Owner Salary", "Technician Wages"]
-    )
+    items = remember_payroll_items(draft, stored, ["Owner Salary", "Technician Wages"])
     by_role = {item.source_pattern: item for item in items}
     assert by_role["Owner / Operations"].origin == "remembered"
     assert by_role["Owner / Operations"].suggested_gl_account == "Owner Salary"
@@ -142,6 +142,45 @@ def test_saved_payroll_role_is_asked_again_when_the_wage_account_is_gone() -> No
     assert items[0].origin == "new"
     assert items[0].suggested_gl_account is None
     assert needs_user_review(items)
+
+
+def test_saved_contract_file_mapping_ignores_filename_when_account_exists() -> None:
+    item = _item(
+        source_pattern="(entire file)",
+        source_file="renamed_customer_roster.xlsx",
+        file_type="contracts",
+        mapping_mode="file_total",
+        suggested_gl_account="Service Revenue",
+    )
+    saved = {("contracts", "(entire file)"): "Service Revenue"}
+
+    remembered = remember_file_total_item(item, saved, ["Service Revenue"])
+
+    assert remembered.origin == "remembered"
+    assert remembered.suggested_gl_account == "Service Revenue"
+    assert remembered_file_total_decisions([remembered]) == {
+        "renamed_customer_roster.xlsx": "Service Revenue"
+    }
+    assert not needs_user_review([remembered])
+
+
+def test_saved_contract_file_mapping_is_asked_again_when_account_is_gone() -> None:
+    item = _item(
+        source_pattern="(entire file)",
+        source_file="contracts_april.xlsx",
+        file_type="contracts",
+        mapping_mode="file_total",
+        suggested_gl_account="Service Revenue",
+    )
+    remembered = remember_file_total_item(
+        item,
+        {("contracts", "(entire file)"): "Service Revenue"},
+        ["Other Revenue"],
+    )
+
+    assert remembered.origin == "new"
+    assert remembered.suggested_gl_account is None
+    assert needs_user_review([remembered])
 
 
 def test_persistable_upserts_keep_payroll() -> None:
@@ -167,7 +206,7 @@ def test_persistable_upserts_keep_payroll() -> None:
     ]
 
 
-def test_persistable_upserts_skip_file_total() -> None:
+def test_persistable_upserts_remember_contract_file_total() -> None:
     items = [
         _item(
             source_pattern="(entire file)",
@@ -181,11 +220,14 @@ def test_persistable_upserts_skip_file_total() -> None:
     rows = persistable_upserts(
         items,
         {
-            "(entire file)": "Service Revenue",
             "AlarmTech Industries": "Equipment COGS",
         },
+        {"contracts.xlsx": "Service Revenue"},
     )
-    assert rows == [("supplier_invoices", "AlarmTech Industries", "Equipment COGS")]
+    assert rows == [
+        ("contracts", "(entire file)", "Service Revenue"),
+        ("supplier_invoices", "AlarmTech Industries", "Equipment COGS"),
+    ]
 
 
 def test_index_stored_uses_company_file_type_pattern() -> None:
