@@ -1,9 +1,11 @@
+const SCREENSHOT_SRC = "";
+
 export default function LandingPage() {
   return (
     <div className="bg-canvas text-text-primary font-sans antialiased min-h-screen">
       <header className="max-w-[720px] mx-auto px-6 pt-10 pb-6 flex items-center justify-between">
         <span className="font-data text-xs tracking-widest uppercase text-text-secondary">
-          Month Proof · Month-End Close · 2026
+          TrueCost · Month-End Close · 2026
         </span>
         <a
           href="/login"
@@ -13,120 +15,63 @@ export default function LandingPage() {
         </a>
       </header>
 
-      {/* §1 — Hero */}
       <section className="max-w-[720px] mx-auto px-6 pt-16 pb-24">
         <p className="font-data text-xs text-text-secondary mb-10 tracking-widest uppercase">
           §1 · The Problem
         </p>
 
-        {/* Two-tone display headline */}
         <h1 className="font-serif font-semibold leading-[1.08] tracking-tight mb-8">
           <span className="block text-5xl md:text-6xl text-text-primary">
-            "The financial chaos
+            A close report from
           </span>
           <span className="block text-5xl md:text-6xl italic text-accent">
-            ends here."
+            the files you already have.
           </span>
         </h1>
 
-        <p className="text-lg leading-relaxed text-text-secondary max-w-[580px] mb-10">
-          Drop any Excel export from your accounting system — GL, payroll,
-          supplier invoices. Get a verified, plain-language close report in
-          under two minutes.
+        <p className="text-lg leading-relaxed text-text-secondary max-w-[580px]">
+          TrueCost is a month-end close tool for small finance teams. Upload
+          Excel or CSV exports. It consolidates them, writes a plain-language
+          report, and saves that report only after the numbers match the pandas
+          results.
         </p>
 
-        <p className="text-base leading-relaxed text-text-primary max-w-[560px]">
-          You're still in the spreadsheet. Travel is up $38K against last month
-          and you can't yet tell if it's the Denver offsite, a miscoded Amex
-          batch, or something worse. The report goes to the CEO at 9 a.m.
-          The last close took four days to reconcile; this one has to go out
-          in twelve hours.
-        </p>
-
-        <p className="font-serif text-3xl md:text-4xl font-semibold leading-snug tracking-tight text-text-primary mt-10 max-w-[580px]">
-          It's 11:47 PM. One number moved. You're the only one who's noticed.
-        </p>
-
-        <p className="text-base text-text-secondary mt-6 max-w-[520px] leading-relaxed">
-          Month Proof is a month-end close agent for US finance teams. This page
-          explains how it works before it asks you to trust it.
-        </p>
+        {SCREENSHOT_SRC ? (
+          <img
+            src={SCREENSHOT_SRC}
+            alt="TrueCost close report"
+            className="mt-12 w-full rounded-xl border border-border"
+          />
+        ) : null}
       </section>
 
-      {/* §2 — The Single Anomaly Card */}
-      <section className="max-w-[720px] mx-auto px-6 py-20">
+      <section className="max-w-[720px] mx-auto px-6 py-20 border-t border-border">
         <p className="font-data text-xs text-text-secondary mb-8 tracking-widest uppercase">
-          §2 · Evidence
+          §2 · How it works
         </p>
 
-        <p className="font-serif text-2xl font-semibold text-text-primary mb-8 leading-snug">
-          Here's what Month Proof flagged in DRONE Inc.'s March close.
-        </p>
+        <h2 className="font-serif text-3xl md:text-4xl font-semibold leading-tight text-text-primary mb-10">
+          How it works
+        </h2>
 
-        <article className="bg-surface border border-border rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <span className="inline-block rounded-md bg-severity-high-bg text-severity-high-fg text-xs font-semibold uppercase tracking-wide px-2 py-0.5">
-              High · Travel &amp; Entertainment
-            </span>
-            <span className="font-data text-xs text-text-secondary">March 2026</span>
-          </div>
-
-          <p className="font-hero-num text-3xl text-text-primary">
-            +$38,420{" "}
-            <span className="font-data text-text-secondary text-lg">(+61%)</span>
-          </p>
-
-          <p className="text-base text-text-primary mt-4 leading-relaxed">
-            Travel spending nearly doubled against the 6-month baseline of
-            $24K/month. The increase concentrates in the final week of March —
-            consistent with an offsite, not a steady-state change.
-          </p>
-
-          <p className="text-xs text-text-secondary mt-6 flex items-center gap-1.5">
-            Verified against source · Guardrail passed
-            <span className="text-teal-600 font-semibold" aria-label="verified">✓</span>
-          </p>
-        </article>
+        <ol className="space-y-6 text-base leading-relaxed text-text-primary list-decimal list-outside pl-6 marker:text-accent marker:font-data marker:text-sm marker:font-semibold">
+          <li>Drop your Excel or CSV exports.</li>
+          <li>TrueCost consolidates them and finds where they disagree.</li>
+          <li>
+            You get a plain-language report. Every number is verified against
+            pandas before the report is saved.
+          </li>
+        </ol>
 
         <p className="text-base text-text-secondary mt-10 leading-relaxed">
-          No screenshots of dashboards on this page. That's the actual shape of
-          what Month Proof writes after it reads your file — one card per flagged
-          account, one paragraph per anomaly, every number traceable back to a
-          cell in the source spreadsheet.
+          Uncertain account mappings pause so you can review them. If earlier
+          months are already uploaded, the report includes variance against
+          that history. With at least two complete months in a quarter,
+          TrueCost can also write a quarterly narrative, including trends and
+          anomalies that have shown up before.
         </p>
-
-        {/* How it works — 4 steps */}
-        <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { step: "01", label: "Read", desc: "Parses your GL export. Detects headers, maps columns to GAAP categories." },
-            { step: "02", label: "Map", desc: "Matches your chart of accounts to standard categories. Flags low-confidence mappings for your review." },
-            { step: "03", label: "Compare", desc: "Calculates variance against your historical baseline. Python only — no AI arithmetic." },
-            { step: "04", label: "Report", desc: "Claude writes plain-English narrative. Guardrail verifies every number. Report is sent or rejected." },
-          ].map(({ step, label, desc }) => (
-            <div key={step} className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <span className="font-data text-xs text-accent font-semibold">{step}</span>
-                <span className="text-sm font-semibold text-text-primary">{label}</span>
-              </div>
-              <p className="text-xs text-text-secondary leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Quarterly reports callout */}
-        <div className="mt-10 rounded-xl border border-border bg-surface px-5 py-4 flex items-start gap-3">
-          <span className="font-data text-xs text-violet-500 font-semibold uppercase tracking-wide shrink-0 mt-0.5">
-            New
-          </span>
-          <p className="text-sm text-text-secondary leading-relaxed">
-            <span className="font-medium text-text-primary">Quarterly summaries.</span>{" "}
-            After three monthly closes, Month Proof generates a quarter-over-quarter
-            narrative with trend analysis and recurring anomaly patterns.
-          </p>
-        </div>
       </section>
 
-      {/* §3 — How We Know the Numbers Are Right */}
       <section className="max-w-[720px] mx-auto px-6 py-20 border-t border-border">
         <p className="font-data text-xs text-text-secondary mb-8 tracking-widest uppercase">
           §3 · Trust
@@ -138,39 +83,18 @@ export default function LandingPage() {
         </h2>
 
         <p className="text-lg leading-relaxed text-text-primary mb-6">
-          Every number in the report is calculated in Python. Not by the model.
-          Totals, variances, anomaly thresholds — all pandas, all deterministic,
-          all reproducible from your source file.
-        </p>
-
-        <p className="text-lg leading-relaxed text-text-primary mb-6">
-          The model only writes the sentences around those numbers. Its job is
-          to interpret, not to compute. Before any report is saved, a numeric
-          guardrail compares every figure the model used against the pandas
-          output. If they disagree by more than 2%, the report is rejected and
-          rewritten.
+          Totals, variances, and anomaly thresholds are calculated in Python
+          with pandas. The model writes the sentences around those numbers. It
+          does not calculate them.
         </p>
 
         <p className="text-lg leading-relaxed text-text-primary">
-          That's it. No benchmarks. No accuracy percentage. Just a rule that is
-          either satisfied, or the report does not leave the system.
+          Before a report is saved, a numeric guardrail checks the figures in
+          the prose against the pandas results. If they do not match, the
+          report is not saved.
         </p>
-
-        <div className="border-l-2 border-accent/30 pl-5 mt-12 space-y-3 font-data text-sm text-text-secondary">
-          <p className="flex items-start gap-2">
-            <span className="text-emerald-600 font-semibold shrink-0 mt-0.5">✓</span>
-            Accepted · The report said "$4.8M revenue" — pandas had $4,730,000.
-            Difference 1.46%, within tolerance.
-          </p>
-          <p className="flex items-start gap-2">
-            <span className="text-severity-high-fg font-semibold shrink-0 mt-0.5">✗</span>
-            Rejected · The report said "$5.1M revenue" — pandas had $4,730,000.
-            Difference 7.8%, outside tolerance. Rewritten on second pass.
-          </p>
-        </div>
       </section>
 
-      {/* §4 — CTA */}
       <section className="max-w-[720px] mx-auto px-6 py-24 border-t border-border">
         <p className="font-data text-xs text-text-secondary mb-8 tracking-widest uppercase">
           §4 · Try It
@@ -182,9 +106,9 @@ export default function LandingPage() {
         </h2>
 
         <p className="text-lg text-text-secondary max-w-[500px] mb-10 leading-relaxed">
-          Create an account and upload any GL export from your accounting
-          system. You'll see the first draft of the close report in under two
-          minutes — ready to email directly from the app.
+          Create an account and upload an Excel or CSV export. You review the
+          draft before you rely on it. You can also download an Excel close
+          package.
         </p>
 
         <div className="flex items-center gap-4 flex-wrap">
@@ -195,63 +119,59 @@ export default function LandingPage() {
             Get Started →
           </a>
           <p className="text-sm text-text-secondary">
-            Private by default. We never train on your data.
+            Each company only sees its own data.
           </p>
         </div>
       </section>
 
-      {/* §5 — The Memo */}
       <section className="max-w-[720px] mx-auto px-6 py-20 border-t border-border">
         <p className="font-data text-xs text-text-secondary mb-8 tracking-widest uppercase">
           §5 · Commitments
         </p>
 
         <div className="font-data text-sm text-text-secondary mb-10 space-y-1 border border-border rounded-xl px-5 py-4 bg-surface">
-          <p><span className="uppercase tracking-wider text-text-primary">To:</span>{" "}Finance directors evaluating Month Proof</p>
-          <p><span className="uppercase tracking-wider text-text-primary">From:</span>{" "}The Month Proof team</p>
+          <p><span className="uppercase tracking-wider text-text-primary">To:</span>{" "}Finance teams evaluating TrueCost</p>
+          <p><span className="uppercase tracking-wider text-text-primary">From:</span>{" "}The TrueCost team</p>
           <p><span className="uppercase tracking-wider text-text-primary">Re:</span>{" "}What this tool will not do</p>
-          <p><span className="uppercase tracking-wider text-text-primary">Date:</span> April 2026</p>
         </div>
 
         <ol className="space-y-5 text-base leading-relaxed text-text-primary list-decimal list-outside pl-6 marker:text-accent marker:font-data marker:text-sm marker:font-semibold">
           <li>
-            We do not do arithmetic. Every number in every report comes from
-            pandas operating on your source file. The model writes sentences;
-            it does not calculate totals.
+            We do not do arithmetic. Every number in a saved report comes from
+            pandas operating on your source file. The model writes sentences.
           </li>
           <li>
-            We do not train on your data. Your files are not used to improve
-            any model, ours or a vendor's.
+            This app does not train a model on your files. Personal columns
+            are removed before a model sees a sample.
           </li>
           <li>
-            We do not replace your judgment. Month Proof produces a first draft
-            of the close narrative. The decision of what to send — and what to
-            change — is yours.
+            We do not replace your judgment. The report is a first draft. You
+            decide what to change.
           </li>
           <li>
-            We do not claim to close your books. We claim to get you to a
-            defensible first draft faster than rewriting last month's
-            commentary by hand.
+            A saved report does not close the month. Closing the month is a
+            separate step you confirm.
           </li>
           <li>
-            We do not lock you in. The report is plain text you own — no
-            proprietary format, no vendor dependency, no export gate.
+            You can read the report in the app and download the Excel close
+            package.
           </li>
         </ol>
 
         <p className="text-base text-text-primary mt-10 leading-relaxed">
-          If any of the above stops being true, this page will be updated the
-          same day.
-        </p>
-
-        <p className="font-data text-sm text-text-secondary mt-6">
-          — Jan, Founder
+          Questions:{" "}
+          <a
+            href="mailto:john@truecost.lol"
+            className="text-text-primary underline decoration-dotted underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          >
+            john@truecost.lol
+          </a>
         </p>
       </section>
 
       <footer className="max-w-[720px] mx-auto px-6 py-8 border-t border-border flex items-center justify-between">
         <p className="font-data text-xs text-text-secondary uppercase tracking-widest">
-          Month Proof · 2026
+          TrueCost · 2026
         </p>
         <p className="text-xs text-text-secondary">
           Built at Anthropic Hackathon, April 2026
