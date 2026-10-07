@@ -105,18 +105,12 @@ export default function LandingPage() {
           <span className="italic text-accent">real month.</span>
         </h2>
 
-        <p className="text-lg text-text-secondary max-w-[500px] mb-10 leading-relaxed">
-          Create an account and upload an Excel or CSV export. You review the
-          draft before you rely on it. You can also download an Excel close
-          package.
-        </p>
-
         <div className="flex items-center gap-4 flex-wrap">
           <a
-            href="/register"
+            href="mailto:john@truecost.lol?subject=TrueCost%20access"
             className="inline-block rounded-md bg-accent text-white px-8 py-3 text-base font-medium hover:bg-accent/90 hover:scale-[1.015] active:scale-[0.97] transition-all [transition-duration:var(--duration-base)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
           >
-            Get Started →
+            Request access
           </a>
           <p className="text-sm text-text-secondary">
             Each company only sees its own data.
