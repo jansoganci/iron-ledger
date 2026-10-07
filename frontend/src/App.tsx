@@ -3,7 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/ToastProvider";
 import { AppShell } from "./components/AppShell";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -26,6 +26,25 @@ const queryClient = new QueryClient({
   },
 });
 
+function HomeRoute() {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <div
+          className="h-6 w-6 border-2 border-accent border-t-transparent rounded-full animate-spin"
+          aria-label="Loading session"
+        />
+      </div>
+    );
+  }
+  if (session) {
+    return <Navigate to="/upload" replace />;
+  }
+  return <LandingPage />;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -34,7 +53,8 @@ export default function App() {
           <ToastProvider>
             <BrowserRouter>
               <Routes>
-                <Route path="/landing" element={<LandingPage />} />
+                <Route path="/" element={<HomeRoute />} />
+                <Route path="/landing" element={<Navigate to="/" replace />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route

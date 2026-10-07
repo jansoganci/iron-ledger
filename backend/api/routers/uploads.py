@@ -304,7 +304,7 @@ async def run_raw(
     from datetime import datetime
 
     banner = (
-        f"=== Month Proof Raw Data — UNVERIFIED ===\n"
+        f"=== TrueCost Raw Data — UNVERIFIED ===\n"
         f"Run ID: {run_id}\n"
         f"Company: {company_name}\n"
         f"Period: {period}\n"

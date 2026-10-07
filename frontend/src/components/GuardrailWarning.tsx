@@ -95,7 +95,7 @@ export function GuardrailWarning({
           )}
 
           <a
-            href="mailto:support@monthproof.app"
+            href="mailto:john@truecost.lol"
             className="block text-center text-sm text-accent hover:underline"
           >
             Contact Support

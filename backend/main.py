@@ -37,16 +37,17 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    logger.info("MonthProof starting up")
+    logger.info("TrueCost starting up")
     yield
-    logger.info("MonthProof shutting down")
+    logger.info("TrueCost shutting down")
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="MonthProof",
+        title="TrueCost",
+        description="TrueCost month-end close API",
         version="0.1.0",
         lifespan=lifespan,
     )

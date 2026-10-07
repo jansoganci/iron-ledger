@@ -1,4 +1,4 @@
-# Month Proof
+# TrueCost
 ### AI-Powered Month-End Close Agent
 *Built with Claude Opus 4.7 — Anthropic Hackathon April 2026*
 
@@ -8,7 +8,7 @@
 
 ## What it does
 
-Drop your messy financial Excel files. Month Proof reads them, compares them with history, finds anomalies, writes a plain-language report, verifies its numbers, and exports a close package.
+Drop your messy financial Excel files. TrueCost reads them, compares them with history, finds anomalies, writes a plain-language report, verifies its numbers, and exports a close package.
 
 Built for US finance teams spending 10-15 hours/month on manual close work.
 

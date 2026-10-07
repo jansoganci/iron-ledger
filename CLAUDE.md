@@ -1,4 +1,4 @@
-# Month Proof — Claude Code Context
+# TrueCost — Claude Code Context
 
 AI-powered month-end close agent for US finance teams. Drop messy Excel files → agent finds anomalies, compares to history, writes a verified plain-language report, and exports an Excel close package. The frontend can open a prefilled `mailto:` draft; backend email delivery is still stubbed.
 
