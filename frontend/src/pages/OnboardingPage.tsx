@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HowItWorks } from "../components/HowItWorks";
 import { CompanySetupForm } from "../components/CompanySetupForm";
+import { LogoMark } from "../components/Logo";
 
 type Phase = "walkthrough" | "form" | "success";
 
@@ -19,7 +20,7 @@ function OnboardingSuccess() {
     <div className="min-h-screen flex items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-[400px]">
         <div className="bg-surface border border-border rounded-lg p-8 shadow-sm text-center">
-          <div className="text-4xl mb-4">✓</div>
+          <LogoMark size={56} className="mx-auto mb-4" />
           <h1 className="text-2xl font-semibold text-text-primary mb-2">
             You're all set!
           </h1>

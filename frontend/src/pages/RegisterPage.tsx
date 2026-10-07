@@ -1,6 +1,9 @@
+import { LogoMark } from "../components/Logo";
+
 export default function RegisterPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-canvas px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-canvas px-4">
+      <LogoMark size={48} />
       <p className="text-base text-text-primary text-center max-w-[400px]">
         Sign-ups are closed. Email{" "}
         <a

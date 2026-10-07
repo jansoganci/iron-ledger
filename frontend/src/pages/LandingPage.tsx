@@ -1,11 +1,16 @@
+import { LogoMark } from "../components/Logo";
+
 const SCREENSHOT_SRC = "";
 
 export default function LandingPage() {
   return (
     <div className="bg-canvas text-text-primary font-sans antialiased min-h-screen">
       <header className="max-w-[720px] mx-auto px-6 pt-10 pb-6 flex items-center justify-between">
-        <span className="font-data text-xs tracking-widest uppercase text-text-secondary">
-          TrueCost · Month-End Close · 2026
+        <span className="flex items-center gap-2.5">
+          <LogoMark size={20} className="shrink-0" />
+          <span className="font-data text-xs tracking-widest uppercase text-text-secondary">
+            TrueCost · Month-End Close · 2026
+          </span>
         </span>
         <a
           href="/login"
