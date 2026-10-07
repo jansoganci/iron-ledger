@@ -9,7 +9,8 @@ export default function LandingPage() {
         <span className="flex items-center gap-2.5">
           <LogoMark size={20} className="shrink-0" />
           <span className="font-data text-xs tracking-widest uppercase text-text-secondary">
-            TrueCost · Month-End Close · 2026
+            TrueCost
+            <span className="hidden sm:inline"> · Month-End Close · 2026</span>
           </span>
         </span>
         <a
@@ -169,11 +170,14 @@ export default function LandingPage() {
       </section>
 
       <footer className="max-w-[720px] mx-auto px-6 py-8 border-t border-border flex items-center justify-between">
-        <p className="font-data text-xs text-text-secondary uppercase tracking-widest">
+        <p className="font-data text-xs text-text-secondary uppercase tracking-widest md:hidden">
           TrueCost · 2026
         </p>
-        <p className="text-xs text-text-secondary">
+        <p className="text-xs text-text-secondary md:hidden">
           Built at Anthropic Hackathon, April 2026
+        </p>
+        <p className="hidden md:block text-xs text-text-secondary">
+          © 2026 TrueCost. Made in Istanbul. Built with Claude.
         </p>
       </footer>
     </div>

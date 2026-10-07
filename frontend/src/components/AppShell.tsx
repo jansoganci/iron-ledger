@@ -152,12 +152,14 @@ function NavHeader({
     <div className="flex items-center justify-between px-4 h-14 border-b border-border shrink-0">
       <div className="flex items-center gap-2 min-w-0">
         <LogoMark size={28} className="shrink-0" />
-        <span className="text-base font-semibold text-text-primary tracking-tight">
-          TrueCost
-        </span>
-        <span className="text-xs text-text-secondary hidden xl:inline">
-          Month-end close
-        </span>
+        <div className="flex flex-col min-w-0">
+          <span className="text-base font-semibold text-text-primary tracking-tight leading-tight">
+            TrueCost
+          </span>
+          <span className="text-xs text-text-secondary leading-tight whitespace-nowrap">
+            Month-end close
+          </span>
+        </div>
       </div>
       {showClose && (
         <button
