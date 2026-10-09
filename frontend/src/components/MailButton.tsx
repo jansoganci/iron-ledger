@@ -18,14 +18,14 @@ export function MailButton({ summary, companyName, period, anomalyCount }: MailB
 
   function buildMailto(to: string): string {
     const periodLabel = formatPeriod(period);
-    const subject = `Month Proof Close Package - ${companyName} - ${periodLabel}`;
+    const subject = `TrueCost Close Package - ${companyName} - ${periodLabel}`;
     const body = [
       `Period: ${periodLabel}`,
       `Anomalies detected: ${anomalyCount}`,
       "",
       summary,
       "",
-      "Please attach the Excel close package from Month Proof before sending.",
+      "Please attach the Excel close package from TrueCost before sending.",
     ].join("\n");
     return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }

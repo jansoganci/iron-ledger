@@ -285,7 +285,7 @@ export function ReportSummary({
       objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = objectUrl;
-      link.download = filename ?? `monthproof_${period}_close_package.xlsx`;
+      link.download = filename ?? `truecost_${period}_close_package.xlsx`;
       document.body.appendChild(link);
       link.click();
       link.remove();

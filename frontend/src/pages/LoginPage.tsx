@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signIn } from "../lib/auth";
 import { CLIENT_MESSAGES } from "../lib/messages";
+import { LogoMark } from "../components/Logo";
 
 /**
  * Login screen per docs/design.md §5.
@@ -49,7 +50,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-[400px]">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-text-primary">Month Proof</h1>
+          <LogoMark size={48} className="mx-auto mb-4" />
+          <h1 className="text-2xl font-semibold text-text-primary">TrueCost</h1>
           <p className="text-sm text-text-secondary mt-1">
             Month-end close, verified.
           </p>

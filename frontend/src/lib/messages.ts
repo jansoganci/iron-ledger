@@ -34,7 +34,7 @@ export const CLIENT_MESSAGES = {
   PROFILE_BAND_FAILED: "We couldn't save your typical monthly revenue. Please try again.",
 
   BANK_OUTSIDE_ATTESTATION:
-    "Bank and card reconciliation is done outside Month Proof. This report does not confirm it.",
+    "Bank and card reconciliation is done outside TrueCost. This report does not confirm it.",
 
   // Period lock — mirrors backend/messages.py
   PERIOD_CLOSED:

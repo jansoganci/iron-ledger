@@ -94,7 +94,7 @@ MAPPING_CONFIRMATION_REQUIRED = (
 )
 MAPPING_DRAFT_INVALID = "The mapping choices no longer match this analysis. Please reload and review them again."
 BANK_OUTSIDE_ATTESTATION = (
-    "Bank and card reconciliation is done outside Month Proof. "
+    "Bank and card reconciliation is done outside TrueCost. "
     "This report does not confirm it."
 )
 CONTROL_SCOPE_INSTALL_FUEL = (

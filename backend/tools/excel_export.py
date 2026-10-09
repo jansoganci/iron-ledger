@@ -1,4 +1,4 @@
-"""Excel export for Month Proof close packages.
+"""Excel export for TrueCost close packages.
 
 Builds a 3-sheet .xlsx workbook from consolidated monthly data:
   Sheet 1 — Consolidated P&L   (one row per account, totals by category)
@@ -63,6 +63,10 @@ _EVIDENCE_HEADERS = [
 # ---------------------------------------------------------------------------
 
 
+def close_package_filename(period: date) -> str:
+    return f"truecost_{period.isoformat()}_close_package.xlsx"
+
+
 def build_close_package(
     entries: list[dict],
     reconciliations: list[dict] | None,
@@ -79,6 +83,7 @@ def build_close_package(
         company_name: shown in the header row
     """
     wb = openpyxl.Workbook()
+    wb.properties.title = "TrueCost close package"
     wb.remove(wb.active)  # remove default Sheet
 
     _build_pl_sheet(wb, entries, period, company_name)
@@ -106,7 +111,9 @@ def _build_pl_sheet(
     ws = wb.create_sheet("Consolidated P&L")
 
     # Title row
-    ws.append([f"{company_name} — Consolidated P&L — {period.strftime('%B %Y')}"])
+    ws.append(
+        [f"TrueCost — {company_name} — Consolidated P&L — {period.strftime('%B %Y')}"]
+    )
     _style_row(ws, 1, font=Font(bold=True, size=13))
     ws.merge_cells("A1:D1")
 
@@ -208,7 +215,7 @@ def _build_reconciliation_sheet(
     }.items():
         ws.column_dimensions[column].width = width
 
-    ws.append([f"Cross-Source Reconciliation — {period.strftime('%B %Y')}"])
+    ws.append([f"TrueCost — Cross-Source Reconciliation — {period.strftime('%B %Y')}"])
     _style_row(ws, 1, font=Font(bold=True, size=13))
     ws.merge_cells("A1:H1")
 
@@ -392,7 +399,7 @@ def _build_source_breakdown_sheet(
 
     ws.append(
         [
-            f"Source Breakdown — {period.strftime('%B %Y')} "
+            f"TrueCost — Source Breakdown — {period.strftime('%B %Y')} "
             "(supporting files are evidence, not added)"
         ]
     )

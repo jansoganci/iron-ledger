@@ -250,7 +250,7 @@ async def export_report_xlsx(
     company: dict = Depends(get_cached_company),
 ):
     """Download the close package as a 3-sheet Excel workbook."""
-    from backend.tools.excel_export import build_close_package
+    from backend.tools.excel_export import build_close_package, close_package_filename
 
     if company_id != jwt_company_id:
         raise HTTPException(status_code=403, detail=messages.FORBIDDEN)
@@ -302,7 +302,7 @@ async def export_report_xlsx(
         control_summary=control_summary.model_dump(mode="json"),
     )
 
-    filename = f"monthproof_{period}_close_package.xlsx"
+    filename = close_package_filename(period_date)
     return Response(
         content=xlsx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

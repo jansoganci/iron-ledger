@@ -1,0 +1,2 @@
+# The root package.json only runs local dev. This service is the Python API.
+providers = ["python"]

@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { LogoMark } from "./Logo";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useCompany } from "../hooks/useCompany";
@@ -68,7 +69,7 @@ const NAV_ITEMS: NavItem[] = [
 function isRouteActive(pathname: string, to: string): boolean {
   if (pathname === to) return true;
   // Report pages belong to the Upload flow — highlight Upload while reading a report.
-  if (to === "/upload" && pathname.startsWith("/report")) return true;
+  if (to === "/upload" && pathname.startsWith("/report/")) return true;
   return false;
 }
 
@@ -156,13 +157,16 @@ function NavHeader({
 }) {
   return (
     <div className="flex items-center justify-between px-4 h-14 border-b border-border shrink-0">
-      <div className="flex items-baseline gap-2 min-w-0">
-        <span className="text-base font-semibold text-text-primary tracking-tight">
-          Month Proof
-        </span>
-        <span className="text-xs text-text-secondary hidden xl:inline">
-          Month-end close
-        </span>
+      <div className="flex items-center gap-2 min-w-0">
+        <LogoMark size={28} className="shrink-0" />
+        <div className="flex flex-col min-w-0">
+          <span className="text-base font-semibold text-text-primary tracking-tight leading-tight">
+            TrueCost
+          </span>
+          <span className="text-xs text-text-secondary leading-tight whitespace-nowrap">
+            Month-end close
+          </span>
+        </div>
       </div>
       {showClose && (
         <button
@@ -302,8 +306,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Dialog.Portal>
           </Dialog.Root>
 
-          <span className="text-base font-semibold text-text-primary tracking-tight">
-            Month Proof
+          <span className="flex items-center gap-2">
+            <LogoMark size={24} className="shrink-0" />
+            <span className="text-base font-semibold text-text-primary tracking-tight">
+              TrueCost
+            </span>
           </span>
         </div>
       </header>
