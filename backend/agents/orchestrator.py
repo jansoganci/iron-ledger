@@ -1305,6 +1305,9 @@ def _run_consolidation(
         "source_breakdown_by_account": source_breakdown_by_account,
         "reconciliations": reconciliations_payload,
         "is_multi_file": True,
+        # Every file, so a later Retry re-runs the whole upload and not
+        # only the first key stored on the run row.
+        "storage_keys": list(storage_keys),
         "file_total_decisions": file_total,
         "control_source_files": source_files,
         "control_per_file_rows": per_file_rows,

@@ -48,6 +48,7 @@ from backend.domain.regenerate import run_wants_regenerate, strip_regenerate_fla
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger
 from backend.tools.file_reader import SUPPORTED_EXTENSIONS
+from backend.tools.retry_files import files_for_retry
 from backend.tools.source_mapping import mapping_confirmation_error, persistable_upserts
 
 # Categories accepted by POST /runs/{run_id}/mapping/confirm.
@@ -202,9 +203,8 @@ async def upload(
         extra={"run_id": run_id, "files": len(storage_keys), "company_id": company_id},
     )
 
-    # Persist the first storage key on the run row so POST /runs/{run_id}/retry
-    # can reschedule the pipeline without forcing a re-upload (Day 4 decision E).
-    # Multi-file retry is post-MVP; today we reuse the first file only.
+    # The column keeps the first file. A multi-file Retry reads every key from
+    # parse_preview["storage_keys"], written when the files are consolidated.
     if storage_keys:
         try:
             runs_repo.set_storage_key(run_id, storage_keys[0])
@@ -366,11 +366,13 @@ async def run_retry(
     run_id: str,
     background_tasks: BackgroundTasks,
     company_id: str = Depends(get_company_id),
+    user_id: str = Depends(get_current_user),
 ):
-    """Re-trigger the pipeline against the storage_key of a guardrail_failed run.
+    """Re-trigger the pipeline for a guardrail_failed run.
 
     Creates a new runs row with fresh run_id; the failed run is left untouched
-    for audit. No re-upload — file stays in Storage per guardrail_failed rules.
+    for audit. A single file is re-read as before. A multi-file run is re-read
+    through the multi-file pipeline, using every key stored at consolidation.
     """
     runs_repo = get_runs_repo()
     try:
@@ -382,18 +384,7 @@ async def run_retry(
         raise HTTPException(status_code=403, detail=messages.FORBIDDEN)
 
     if old_run.get("status") != RunStatus.GUARDRAIL_FAILED.value:
-        raise HTTPException(
-            status_code=422,
-            detail="This run cannot be retried. Only guardrail-failed runs "
-            "support Retry Analysis.",
-        )
-
-    storage_key = old_run.get("storage_key")
-    if not storage_key:
-        raise HTTPException(
-            status_code=422,
-            detail="This run has no stored file to retry. Please upload again.",
-        )
+        raise HTTPException(status_code=422, detail=messages.RETRY_NOT_ALLOWED)
 
     period_value = old_run.get("period")
     try:
@@ -410,8 +401,14 @@ async def run_retry(
 
     ensure_period_open(company_id, period_date)
 
-    # Create fresh run row; inherit storage_key for downstream retries if this
-    # one also fails
+    files = files_for_retry(old_run, user_id, period_date)
+    if files.refusal == "no_file":
+        raise HTTPException(status_code=422, detail=messages.RETRY_NO_FILE)
+    if files.refusal == "reupload":
+        raise HTTPException(status_code=422, detail=messages.RETRY_REUPLOAD)
+
+    # Create fresh run row; inherit the first storage key. The full list is
+    # written again when this run's files are consolidated.
     new_run = runs_repo.create(company_id=company_id, period=period_date)
     new_run_id = new_run["id"]
     if run_wants_regenerate(old_run):
@@ -423,7 +420,7 @@ async def run_retry(
                 extra={"run_id": new_run_id, "error": str(exc)},
             )
     try:
-        runs_repo.set_storage_key(new_run_id, storage_key)
+        runs_repo.set_storage_key(new_run_id, files.keys[0])
     except Exception as exc:
         logger.warning(
             "failed to persist storage_key on retry run",
@@ -435,18 +432,27 @@ async def run_retry(
         extra={
             "old_run_id": run_id,
             "new_run_id": new_run_id,
-            "storage_key": storage_key,
+            "files": len(files.keys),
             "company_id": company_id,
         },
     )
 
-    background_tasks.add_task(
-        run_parser_until_preview,
-        run_id=new_run_id,
-        storage_key=storage_key,
-        company_id=company_id,
-        period=period_date,
-    )
+    if len(files.keys) > 1:
+        background_tasks.add_task(
+            run_multi_file_parser_with_mapping,
+            run_id=new_run_id,
+            storage_keys=list(files.keys),
+            company_id=company_id,
+            period=period_date,
+        )
+    else:
+        background_tasks.add_task(
+            run_parser_until_preview,
+            run_id=new_run_id,
+            storage_key=files.keys[0],
+            company_id=company_id,
+            period=period_date,
+        )
 
     return {
         "run_id": new_run_id,

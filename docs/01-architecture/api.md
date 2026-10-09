@@ -283,9 +283,15 @@ Re-trigger the pipeline against the storage key of a previously failed run. Used
 Empty body. `period` and `storage_key` are read from the old run row server-side.
 
 **Behavior**
-- Creates a **new** `runs` row with a fresh `run_id`, `status=pending`, same `(company_id, period, storage_key)`.
+- Creates a **new** `runs` row with a fresh `run_id`, `status=pending`, same `(company_id, period)`.
 - The old run is left untouched with `status=guardrail_failed` for audit.
-- Schedules the Parser → Comparison → Interpreter background task against the existing storage file.
+- One stored file is re-read through the single-file pipeline. When
+  `parse_preview.storage_keys` lists more than one file, every file is re-read
+  through the multi-file pipeline, in that order. Each key must be in this
+  user's folder for the run's period; anything else is refused.
+- A multi-file run saved before that list existed (`file_count` > 1 and no
+  `storage_keys`) returns 422 and asks for a fresh upload. It does not retry
+  the first file alone.
 - Parser's DELETE-then-INSERT on `monthly_entries` keeps the re-run clean.
 
 **Response 200**

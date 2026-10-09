@@ -32,11 +32,6 @@ Pre-push yalnız pytest çalıştırıyor (black/flake8 yok).
 
 ## Bilinen, şimdi yapılmaz
 
-Çok dosyalı run’da Retry yalnız ilk dosyayı tek dosyalık akışla yeniden
-çalıştırır (`uploads.py` `run_retry` → `run_parser_until_preview`,
-`storage_key` = ilk anahtar). Tüm anahtarlar `parse_preview.file_keys`
-içinde duruyor. Düzeltme ayrı iş; temizlikle karıştırılmaz.
-
 Canlı `account_categories` tablosunda RLS açık ve policy yok.
 `0001` bu tabloyu RLS’siz kamu araması sayar. Frontend tabloyu doğrudan okumuyor.
 Servis rolü RLS’ten geçtiği için bugünkü close bozulmuyor.
@@ -46,6 +41,11 @@ Açmadan önce kim okuyor, ona bakılır.
 
 ## Yapıldı — yeniden açma
 
+- Çok dosyalı Retry (9 Ekim 2026). Birleştirme `parse_preview.storage_keys`
+  listesini saklar; Retry o listedeki her dosyayı çok dosyalı akışla yeniden
+  okur. Anahtar bu kullanıcının o ay klasöründe değilse reddedilir. Liste
+  olmayan eski çok dosyalı run “dosyaları yeniden yükle” der; ilk dosyayla
+  sessizce devam etmez. Tek dosya eskisi gibi. Migration yok.
 - Kod stili (9 Ekim 2026, ayrı commit). `.flake8` black ile aynı: 88 sütun,
   E203 yok sayılır. `black --check backend tests` temiz; `flake8` 900 → 2
   (yalnız `anthropic_llm.py`). Kullanılmayan importlar silindi,

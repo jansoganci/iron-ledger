@@ -71,6 +71,12 @@ UPLOAD_EXPIRED = (
     "after 7 days. Please upload the file again."
 )
 
+RETRY_NOT_ALLOWED = (
+    "This run cannot be retried. Only guardrail-failed runs " "support Retry Analysis."
+)
+RETRY_NO_FILE = "This run has no stored file to retry. Please upload again."
+RETRY_REUPLOAD = "This analysis used more than one file. Please upload the files again."
+
 INVALID_PERIOD = (
     "'{period}' is not a valid period. "
     "Use the first day of the month, e.g. 2026-03-01."
