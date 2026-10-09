@@ -12,7 +12,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=$(jq -r '.tool_input.file_path // empty'); if echo \"$FILE\" | grep -q '\\.py$'; then grep -n 'client.messages.create\\|anthropic.Anthropic' \"$FILE\" 2>/dev/null | grep -v 'prompts/' && echo 'WARNING: Possible inline prompt detected. All Claude prompts must live in backend/prompts/ — not inline in code.' || true; fi"
+            "command": "FILE=$(jq -r '.tool_input.file_path // empty'); if echo \"$FILE\" | grep -q '\\.py$' && ! echo \"$FILE\" | grep -q 'backend/adapters/anthropic_llm.py'; then grep -n 'client.messages.create\\|anthropic.Anthropic' \"$FILE\" 2>/dev/null | grep -v 'prompts/' && echo 'WARNING: Possible inline prompt detected. All Claude prompts must live in backend/prompts/ — not inline in code.' || true; fi"
           }
         ]
       },

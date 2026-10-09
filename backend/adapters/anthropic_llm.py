@@ -56,7 +56,8 @@ class AnthropicLLMClient:
         context: dict,
         schema: type[BaseModel],
     ) -> BaseModel:
-        """Load *prompt* by filename, send to *model* with *context*, parse into *schema*."""
+        """Load *prompt* by filename, send to *model* with *context*, parse
+        into *schema*."""
         prompt_text = _load_prompt(prompt)
         sha = _git_sha(prompt)
         logger.info(
@@ -71,7 +72,10 @@ class AnthropicLLMClient:
                 messages=[
                     {
                         "role": "user",
-                        "content": f"{prompt_text}\n\nInput:\n{json.dumps(context, default=_json_default)}",
+                        "content": (
+                            f"{prompt_text}\n\nInput:\n"
+                            f"{json.dumps(context, default=_json_default)}"
+                        ),
                     }
                 ],
             )

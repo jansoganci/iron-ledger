@@ -20,13 +20,7 @@ Commit, bu turdaki kod işleri bitince bir kez atılır.
 
 ## Sıradaki iş — tek tek
 
-### 1. Kod stili — son iki satır
-
-`backend/adapters/anthropic_llm.py` satır 59 ve 74 hâlâ 88 karakterden uzun.
-Bu dosyaya düzenleme, yerel “inline prompt” hook’u geçersiz JSON döndürdüğü
-için editörde engelleniyor. Hook düzelince iki satır bölünür; davranış değişmez.
-
-Pre-push yalnız pytest çalıştırıyor (black/flake8 yok).
+Açık madde yok.
 
 ---
 
@@ -46,11 +40,10 @@ Açmadan önce kim okuyor, ona bakılır.
   okur. Anahtar bu kullanıcının o ay klasöründe değilse reddedilir. Liste
   olmayan eski çok dosyalı run “dosyaları yeniden yükle” der; ilk dosyayla
   sessizce devam etmez. Tek dosya eskisi gibi. Migration yok.
-- Kod stili (9 Ekim 2026, ayrı commit). `.flake8` black ile aynı: 88 sütun,
-  E203 yok sayılır. `black --check backend tests` temiz; `flake8` 900 → 2
-  (yalnız `anthropic_llm.py`). Kullanılmayan importlar silindi,
-  `supabase_repos.py` importları başa alındı, uzun satırlar bölündü.
-  Davranış aynı: değişen her dosyanın AST’i commit öncesiyle karşılaştırıldı.
+- Kod stili (9 Ekim 2026). `.flake8` black ile aynı: 88 sütun, E203 yok sayılır.
+  `black --check` ve `flake8 backend tests` temiz. `anthropic_llm.py` içindeki
+  son iki uzun satır da bölündü. Inline-prompt hook’u bu adaptör dosyasını
+  atlar; başka bir dosyadaki `messages.create` hâlâ uyarır.
 - 7 günlük upload temizliği (9 Ekim 2026). Klasör (`kullanıcı/ay`) bazında:
   o şirket ve ayın en yeni run’ı 7 günden eskiyse klasördeki tüm dosyalar
   silinir; çok dosyalı yüklemenin artıkları da gider. Uygulama içinde,
