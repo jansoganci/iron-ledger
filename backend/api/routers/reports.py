@@ -3,7 +3,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from backend import messages
 from backend.api.auth import get_cached_company, get_company_id
@@ -19,6 +19,7 @@ from backend.tools.close_controls import (
     unpack_report_reconciliations,
 )
 from backend.tools.tie_out_summary import group_for_item
+from backend.tools.ytd_summary import build_ytd_summary
 
 router = APIRouter()
 
@@ -415,7 +416,8 @@ async def list_reports(
 @limiter.limit("60/minute")
 async def get_data(
     request: Request,
-    year: int,
+    year: int = Query(ge=1, le=9999),
+    through_month: int | None = Query(default=None, ge=1, le=12),
     company_id: str = Depends(get_company_id),
 ):
     """Fetch all monthly_entries for a given year with account metadata.
@@ -462,4 +464,5 @@ async def get_data(
         "total_amount": float(total_amount),
         "account_count": len(entries_list),
         "entries": entries_list,
+        "ytd": build_ytd_summary(all_entries, accounts_map, year, through_month),
     }

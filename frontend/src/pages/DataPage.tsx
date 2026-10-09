@@ -16,6 +16,7 @@ import { apiFetch } from "../lib/api";
 import { formatCurrency, formatPeriod, formatVariance } from "../lib/formatters";
 import { cn } from "../lib/utils";
 import { exportToCSV } from "../lib/exportCSV";
+import { YtdSummaryTable, type YtdSummary } from "../components/YtdSummaryTable";
 
 interface DataEntry {
   period: string;
@@ -32,6 +33,7 @@ interface DataResponse {
   total_amount: number;
   account_count: number;
   entries: DataEntry[];
+  ytd: YtdSummary;
 }
 
 const CATEGORIES = ["REVENUE", "COGS", "OPEX", "G&A", "R&D", "OTHER_INCOME", "OTHER"];
@@ -67,6 +69,7 @@ export default function DataPage() {
   );
   const [selectedMonth, setSelectedMonth] = useState(initialMonth || "all");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<"accounts" | "ytd">("accounts");
   const [sorting, setSorting] = useState<SortingState>([
     { id: "period", desc: true },
   ]);
@@ -87,10 +90,20 @@ export default function DataPage() {
     }
   }, [searchParams]);
 
-  const { data, isLoading } = useQuery<DataResponse>({
+  const { data, isLoading, isError } = useQuery<DataResponse>({
     queryKey: ["data", selectedYear],
     queryFn: () => apiFetch<DataResponse>(`/data?year=${selectedYear}`),
     enabled: selectedYear !== null,
+    staleTime: 30_000,
+  });
+
+  const selectedYtd = useQuery<DataResponse>({
+    queryKey: ["data-ytd", selectedYear, selectedMonth],
+    queryFn: () =>
+      apiFetch<DataResponse>(
+        `/data?year=${selectedYear}&through_month=${Number(selectedMonth)}`
+      ),
+    enabled: selectedYear !== null && activeView === "ytd" && selectedMonth !== "all",
     staleTime: 30_000,
   });
 
@@ -277,6 +290,58 @@ export default function DataPage() {
           </div>
         </div>
 
+        {!selectedYear && (
+          <div className="rounded-lg border border-border bg-surface p-8 text-center">
+            <p className="text-sm font-medium text-text-primary">
+              Please select a year
+            </p>
+            <p className="text-sm text-text-secondary mt-1">
+              Choose a year from the dropdown above to display your uploaded financial entries.
+            </p>
+          </div>
+        )}
+
+        {selectedYear && (
+          <div role="group" aria-label="Data views" className="flex gap-2">
+            <button
+              type="button"
+              aria-pressed={activeView === "accounts"}
+              onClick={() => setActiveView("accounts")}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                activeView === "accounts"
+                  ? "bg-accent text-white"
+                  : "bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-canvas"
+              )}
+            >
+              Account list
+            </button>
+            <button
+              type="button"
+              aria-pressed={activeView === "ytd"}
+              onClick={() => setActiveView("ytd")}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                activeView === "ytd"
+                  ? "bg-accent text-white"
+                  : "bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-canvas"
+              )}
+            >
+              YTD
+            </button>
+          </div>
+        )}
+
+        {selectedYear && activeView === "ytd" ? (
+          <YtdSummaryTable
+            year={selectedYear}
+            summary={selectedMonth === "all" ? data?.ytd : selectedYtd.data?.ytd}
+            isLoading={selectedMonth === "all" ? isLoading : selectedYtd.isLoading}
+            isError={selectedMonth === "all" ? isError : selectedYtd.isError}
+          />
+        ) : (
+          <>
+
         {selectedYear && (
           <>
             <div className="flex flex-wrap gap-2">
@@ -358,16 +423,7 @@ export default function DataPage() {
                 ))}
               </div>
             </div>
-        {!selectedYear ? (
-          <div className="rounded-lg border border-border bg-surface p-8 text-center">
-            <p className="text-sm font-medium text-text-primary">
-              Please select a year to view data
-            </p>
-            <p className="text-sm text-text-secondary mt-1">
-              Choose a year from the dropdown above to display your uploaded financial entries.
-            </p>
-          </div>
-        ) : isLoading ? (
+        {isLoading ? (
           <DataTableSkeleton />
         ) : filteredData.length === 0 ? (
           <div className="rounded-lg border border-border bg-surface p-8 text-center">
@@ -472,6 +528,8 @@ export default function DataPage() {
               </table>
             </div>
           </div>
+        )}
+          </>
         )}
           </>
         )}

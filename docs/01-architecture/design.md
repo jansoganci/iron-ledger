@@ -382,6 +382,10 @@ Tone: friendly, inviting, not alarming. The user has done nothing wrong.
 
 ---
 
+### 6b. Data year summary
+
+The Data page keeps its account list as the default view and adds a YTD view beside it. Year and month selectors apply to both views. The account list retains its category filters, four existing cards, sortable rows, and CSV export. The YTD view uses the existing Data table styling and shows six P&L lines with one column per month from January through the selected month (or the last GL-backed month when all months is selected), plus a Year to date column. Monthly columns contain that month's amount, not a running total. Months without GL data show an em dash and contribute nothing to the total. The server calculates the six lines from GL-backed monthly entries using Decimal; supporting-only rows and reconciliation differences are not added to book totals. OTHER_INCOME contributes to Revenue, and R&D contributes to Operating expenses. A note appears when unclassified OTHER accounts are omitted.
+
 ### 7. Mapping Confirmation Surfaces
 
 `MappingReview` pauses multi-source runs when vendor or expense names need a canonical GL account. Conflicts with a saved mapping are shown first; payroll lines never appear here. Saved matches are edited on the Mapping page in the sidebar. New matches are created only when a user confirms names during an upload; the Mapping page has no manual add form. `MappingConfirmPanel` handles up to three low-confidence column/category mappings.
