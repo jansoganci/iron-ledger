@@ -10,6 +10,7 @@ from backend.agents.interpreter import (
     _apply_reconciliation_classifications,
     _classify_from_hints,
 )
+from backend.domain.contracts import ReconciliationSource
 from backend.tools.hint_computer import compute_hints
 from tests.tools.deposit_vs_fee_fixture import (
     BANK_CHARGES_GL,
@@ -90,6 +91,56 @@ def test_deposit_classifies_as_timing_cutoff_not_accrual() -> None:
     assert _classify_from_hints(hints.model_dump()) == "timing_cutoff"
     assert _classify_from_hints(hints.model_dump()) != "accrual_mismatch"
     assert _classify_from_hints(hints.model_dump()) != "structural_explained"
+
+
+def test_fee_band_on_a_vendor_file_is_not_a_processor_fee() -> None:
+    item = fee_item().model_copy(deep=True)
+    item.sources[1].source_file = "vendor_invoices_mar.xlsx"
+    raw = fee_raw_dfs()
+    raw["vendor_invoices_mar.xlsx"] = raw.pop("payout_march.xlsx")
+    hints = compute_hints(item, fee_consolidated(), PERIOD, raw)
+    assert hints.is_processor_fee_gap is False
+    assert hints.hints_unavailable is False
+    assert _classify_from_hints(hints.model_dump()) == "stale_reference"
+
+
+def test_processor_settlement_above_the_gl_is_not_a_fee() -> None:
+    gl = 57_500.0
+    net = 61_000.0
+    delta = net - gl
+    item = fee_item().model_copy(
+        update={
+            "gl_amount": gl,
+            "non_gl_total": net,
+            "delta": delta,
+            "delta_pct": round(delta / gl, 4),
+            "sources": [
+                ReconciliationSource(
+                    source_file="gl_export.xlsx", amount=gl, row_count=1
+                ),
+                ReconciliationSource(
+                    source_file="payout_march.xlsx", amount=net, row_count=1
+                ),
+            ],
+        }
+    )
+    raw = {
+        "gl_export.xlsx": pd.DataFrame(
+            {"account": ["Product Sales"], "amount": [gl]}
+        ),
+        "payout_march.xlsx": pd.DataFrame(
+            {"account": ["Product Sales"], "amount": [net]}
+        ),
+    }
+    hints = compute_hints(item, fee_consolidated(), PERIOD, raw)
+    assert _FEE_BAND_HOLDS(item.delta_pct)
+    assert item.delta > 0
+    assert hints.is_processor_fee_gap is False
+    assert hints.hints_unavailable is False
+
+
+def _FEE_BAND_HOLDS(delta_pct: float) -> bool:
+    return 0.03 <= abs(delta_pct) <= 0.08
 
 
 def test_fee_classifies_as_structural_explained() -> None:

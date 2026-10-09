@@ -39,6 +39,10 @@ class InvalidRunTransition(Exception):
     """RunStateMachine.transition() called with an illegal state move."""
 
 
+class PeriodClosedError(Exception):
+    """A background write found the month closed and must not change it."""
+
+
 class FileHasNoValidColumns(Exception):
     """PII sanitizer stripped all columns — nothing left to process."""
 

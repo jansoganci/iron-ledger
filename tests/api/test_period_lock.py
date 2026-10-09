@@ -221,6 +221,27 @@ def test_closed_month_stops_a_run_already_in_flight() -> None:
     fail.assert_called_once_with("run-1", messages.PERIOD_CLOSED)
 
 
+def test_close_after_the_first_read_does_not_start_the_report() -> None:
+    from backend.agents import orchestrator
+    from backend.domain.errors import PeriodClosedError
+
+    with patch.object(orchestrator, "is_period_closed", return_value=False), patch.object(
+        orchestrator, "ComparisonAgent"
+    ) as comparison, patch.object(orchestrator, "InterpreterAgent") as interpreter, patch.object(
+        orchestrator, "get_runs_repo"
+    ) as runs, patch.object(orchestrator, "_fail_if_not_terminal") as fail:
+        runs.return_value.get_by_id.return_value = {"parse_preview": {}}
+        comparison.return_value.run.side_effect = PeriodClosedError()
+        orchestrator.run_comparison_and_report(
+            run_id="run-1",
+            company_id="co-1",
+            period=date(2026, 3, 1),
+            storage_key="k",
+        )
+    interpreter.return_value.run.assert_not_called()
+    fail.assert_called_once_with("run-1", messages.PERIOD_CLOSED)
+
+
 def test_closed_month_is_not_rewritten_by_the_opus_upgrade() -> None:
     from backend.agents import opus_upgrade
 

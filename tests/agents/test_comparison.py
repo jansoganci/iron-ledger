@@ -6,6 +6,8 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock
 
+import pytest
+
 from backend.agents.comparison import (
     ComparisonAgent,
     _TIER1_DOLLAR,
@@ -372,6 +374,16 @@ def _make_agent(prior_flag_counts: dict[str, int]) -> ComparisonAgent:
         accounts_repo,
         companies_repo,
     )
+
+
+def test_closed_month_does_not_replace_anomalies(period_closes_repo) -> None:
+    from backend.domain.errors import PeriodClosedError
+
+    agent = _make_agent({})
+    period_closes_repo.close(COMPANY_ID, PERIOD, "user-1")
+    with pytest.raises(PeriodClosedError):
+        agent.run("run-1", COMPANY_ID, PERIOD)
+    agent._anomalies.replace_period.assert_not_called()
 
 
 def test_recurrence_suffix_appended_when_prior_count_is_2() -> None:

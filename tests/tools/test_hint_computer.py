@@ -12,7 +12,11 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from backend.domain.contracts import ReconciliationItem, ReconciliationSource
+from backend.domain.contracts import (
+    ReconciliationHints,
+    ReconciliationItem,
+    ReconciliationSource,
+)
 from backend.tools.hint_computer import (
     _crosses_period_boundary,
     _is_gl_only,
@@ -357,6 +361,7 @@ def test_other_account_12x_is_not_annual_prepayment() -> None:
         ),
     }
     hints = compute_hints(item, df, PERIOD, raw)
+    assert hints.hints_unavailable is False
     assert hints.looks_like_annual_prepayment is False
     assert hints.implied_monthly is None
 
@@ -439,10 +444,36 @@ def test_compute_hints_installation_timing() -> None:
     assert hints.similar_amount_in_other_account is False
 
 
+def test_old_hint_json_omits_unavailable_flag() -> None:
+    hints = ReconciliationHints.model_validate({"is_gl_only": True})
+    assert hints.hints_unavailable is False
+    assert hints.is_gl_only is True
+
+
 def test_compute_hints_never_raises() -> None:
-    """compute_hints must return a default ReconciliationHints on any error."""
+    """A hint failure stays on the run and is not a silent empty hint."""
     item = _item()
-    # Pass a broken consolidated_df to trigger an exception internally
     bad_df = pd.DataFrame({"wrong_column": [1, 2, 3]})
     hints = compute_hints(item, bad_df, PERIOD, {})
-    assert hints is not None  # returned default, did not raise
+    assert hints.hints_unavailable is True
+    assert hints.is_gl_only is False
+    assert hints.is_source_only is False
+
+
+def test_failed_gl_only_hint_is_not_a_clean_negative() -> None:
+    """GL-only sources still must not look like a successful empty hint."""
+    item = _item(
+        account="Rent",
+        gl_amount=1500.0,
+        non_gl_total=0.0,
+        delta=-1500.0,
+        sources=[
+            ReconciliationSource(
+                source_file="gl_export.xlsx", amount=1500.0, row_count=1
+            )
+        ],
+    )
+    bad_df = pd.DataFrame({"wrong_column": [1]})
+    hints = compute_hints(item, bad_df, PERIOD, {})
+    assert hints.hints_unavailable is True
+    assert hints.is_gl_only is False

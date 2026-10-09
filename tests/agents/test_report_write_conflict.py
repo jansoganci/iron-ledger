@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -176,6 +177,22 @@ def _interpreter(reports_repo, runs_repo) -> InterpreterAgent:
 # ---------------------------------------------------------------------------
 # Rule 1 — the existing report is never replaced
 # ---------------------------------------------------------------------------
+
+
+def test_close_during_drafting_leaves_the_report_unwritten(
+    period_closes_repo,
+) -> None:
+    reports = MagicMock()
+    runs = _FakeRunsRepo()
+    period_closes_repo.close(str(COMPANY), PERIOD, "user-1")
+
+    ok = _interpreter(reports, runs).run(_summary(), [], RUN_ID)
+
+    assert ok is False
+    reports.write.assert_not_called()
+    reports.delete_monthly.assert_not_called()
+    assert runs.status == RunStatus.REPORT_FAILED.value
+    assert runs.updates[-1][1]["error_message"] == messages.PERIOD_CLOSED
 
 
 def test_second_run_leaves_the_existing_report_untouched() -> None:

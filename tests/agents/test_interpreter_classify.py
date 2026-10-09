@@ -80,6 +80,45 @@ def test_vendor_annual_alias_still_classifies() -> None:
     )
 
 
+def test_unavailable_hints_are_not_stale_reference() -> None:
+    assert _classify_from_hints({"hints_unavailable": True}) is None
+
+
+def test_clean_negative_hints_stay_stale_reference() -> None:
+    hints = {"hints_unavailable": False}
+    assert _classify_from_hints(hints) == "stale_reference"
+
+
+def test_unavailable_hints_drop_claude_class() -> None:
+    items = [
+        {
+            "account": "Rent",
+            "card_kind": "exception",
+            "hints": {"hints_unavailable": True},
+            "classification": None,
+        }
+    ]
+    _apply_reconciliation_classifications(items, {"Rent": "missing_je"})
+    assert items[0]["classification"] is None
+    assert items[0]["card_kind"] == "exception"
+
+
+def test_unavailable_hints_keep_pandas_match_class() -> None:
+    items = [
+        {
+            "account": "Undeposited Funds",
+            "card_kind": "exception",
+            "hints": {"hints_unavailable": True},
+            "classification": None,
+            "matches": [{"classification": "timing_cutoff"}],
+        }
+    ]
+    _apply_reconciliation_classifications(
+        items, {"Undeposited Funds": "stale_reference"}
+    )
+    assert items[0]["classification"] == "timing_cutoff"
+
+
 def test_annual_outranks_cutoff_in_fallback() -> None:
     assert (
         _classify_from_hints(

@@ -102,6 +102,41 @@ def test_opus_upgrade_copies_net_income_and_passes_strict(monkeypatch) -> None:
     runs.set_opus_status.assert_called_with("run-1", "done")
 
 
+def test_opus_does_not_publish_if_the_month_closes_while_it_writes(
+    monkeypatch,
+) -> None:
+    pandas_summary = {
+        "accounts": {
+            "Revenue": {"category": "REVENUE", "current": 300_000.0},
+            "COGS": {"category": "COGS", "current": 100_000.0},
+            "OpEx": {"category": "OPEX", "current": 50_000.0},
+        }
+    }
+    narrative = NarrativeJSON(
+        narrative="Net income was $150,000.00 this month.",
+        numbers_used=[150_000.0],
+        reconciliation_classifications={},
+    )
+    runs, reports, _llm, period = _wire_opus(
+        monkeypatch,
+        pandas_summary=pandas_summary,
+        reconciliations=[],
+        narrative=narrative,
+    )
+    from backend.agents import opus_upgrade as mod
+
+    answers = iter((False, True))
+    monkeypatch.setattr(
+        mod, "is_period_closed", lambda *_args, **_kwargs: next(answers)
+    )
+
+    run_opus_upgrade("run-1", "c-1", period)
+
+    reports.upgrade_summary.assert_not_called()
+    runs.update_status.assert_not_called()
+    runs.set_opus_status.assert_called_with("run-1", "failed")
+
+
 def test_opus_upgrade_invented_dollar_fails_closed(monkeypatch) -> None:
     pandas_summary = {
         "accounts": {

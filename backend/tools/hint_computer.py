@@ -41,9 +41,16 @@ Hint definitions (match ReconciliationHints in domain/contracts.py):
                               source file has deposit / balance-remaining columns.
                               Not a vendor prepaid.
 
-  is_processor_fee_gap      — two-sided gross-vs-net gap whose |delta_pct| sits
-                              in a pandas fee band. Never set on GL-only /
-                              source-only / customer-deposit items.
+  is_processor_fee_gap      — every non-GL file is a processor settlement,
+                              the settlement total is below the GL, and
+                              |delta_pct| sits in the pandas fee band.
+                              Never set on GL-only / source-only /
+                              customer-deposit items, or on any other
+                              file type.
+
+  hints_unavailable         — compute_hints raised. Not the same as every
+                              flag being false. The caller must not treat it
+                              as stale_reference.
 """
 
 from __future__ import annotations
@@ -54,6 +61,7 @@ import pandas as pd
 
 from backend.domain.contracts import ReconciliationHints, ReconciliationItem
 from backend.logger import get_logger
+from backend.tools.file_type import match_file_type
 
 logger = get_logger(__name__)
 
@@ -161,10 +169,10 @@ def compute_hints(
             extra={
                 "event": "hint_computer_error",
                 "account": item.account,
-                "error": str(exc),
+                "error_type": type(exc).__name__,
             },
         )
-        return ReconciliationHints()
+        return ReconciliationHints(hints_unavailable=True)
 
 
 # ---------------------------------------------------------------------------
@@ -287,10 +295,24 @@ def _is_processor_fee_gap(
     is_source_only: bool,
     is_customer_deposit: bool,
 ) -> bool:
-    """Two-sided gross-vs-net whose |delta_pct| sits in the pandas fee band."""
+    """Processor settlement below the GL, inside the pandas fee band.
+
+    The band numbers stay put. A same-sized gap on a payroll or vendor
+    file is not a fee, and a settlement that is larger than the GL is
+    not the fee direction.
+    """
     if is_gl_only or is_source_only or is_customer_deposit:
         return False
+    if item.gl_amount is None or item.gl_amount <= 0 or item.delta >= 0:
+        return False
     if item.delta_pct is None:
+        return False
+    from backend.agents.consolidator import _is_gl_label
+
+    non_gl = [s for s in item.sources if not _is_gl_label(s.source_file)]
+    if not non_gl:
+        return False
+    if any(match_file_type(s.source_file) != "processor_settlement" for s in non_gl):
         return False
     abs_pct = abs(item.delta_pct)
     return _FEE_BAND_MIN <= abs_pct <= _FEE_BAND_MAX

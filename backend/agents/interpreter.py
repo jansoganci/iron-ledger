@@ -6,6 +6,7 @@ import uuid
 from pydantic import ValidationError
 
 from backend import messages
+from backend.api.period_lock import is_period_closed
 from backend.domain.contracts import NarrativeJSON, PandasSummary
 from backend.domain.entities import Anomaly, Report
 from backend.domain.errors import (
@@ -102,6 +103,9 @@ def _hints_as_dict(hints) -> dict:
 def _classify_from_hints(hints: dict) -> str | None:
     """Rule-based fallback when Claude doesn't return a classification.
 
+    A failed hint computation is not a clean negative. Returning
+    stale_reference here would invent a class pandas did not compute.
+
     Priority order:
     1. GL-only → no exception class (coverage card; not missing_je).
     2. Source-only → missing_je.
@@ -115,6 +119,8 @@ def _classify_from_hints(hints: dict) -> str | None:
     7. Both sources present, similar amount in another account → categorical_misclassification.
     8. Both sources present, general delta → stale_reference.
     """
+    if hints.get("hints_unavailable"):
+        return None
     if hints.get("is_gl_only"):
         return None
     if hints.get("is_source_only"):
@@ -194,6 +200,11 @@ def _apply_reconciliation_classifications(
         residue = _residue_from_matches(item.get("matches"))
         if residue is not None:
             item["classification"] = residue
+            continue
+        # A crashed hint is not "nothing special." Leave the card unclassified
+        # instead of borrowing Claude's class or the stale_reference fallback.
+        if hints.get("hints_unavailable"):
+            item["classification"] = None
             continue
         # Pandas-backed speech acts are not Claude's to override.
         # Fee > deposit > annual: never two stories on one card.
@@ -378,6 +389,29 @@ class InterpreterAgent:
         if reconciliations:
             cls_map = narrative.reconciliation_classifications or {}
             _apply_reconciliation_classifications(reconciliations, cls_map)
+
+        # The month may have been closed while the narrative was drafting.
+        # Leave the existing report in place.
+        if is_period_closed(str(pandas_summary.company_id), pandas_summary.period):
+            logger.warning(
+                "report not written: period closed",
+                extra={"run_id": run_id, "trace_id": get_trace_id()},
+            )
+            try:
+                fail_status = RunStateMachine.transition(
+                    RunStatus.GENERATING, RunStatus.REPORT_FAILED
+                )
+                self._runs.update_status(
+                    run_id,
+                    fail_status,
+                    extra={"error_message": messages.PERIOD_CLOSED},
+                )
+            except Exception as inner:
+                logger.error(
+                    "failed to stop a closed-period report write",
+                    extra={"run_id": run_id, "inner_error": str(inner)},
+                )
+            return False
 
         # Write reports row. The numbers are already verified by this point, so
         # a failure here is persistence, not correctness — it gets its own

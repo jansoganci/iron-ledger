@@ -1,92 +1,122 @@
 # Kalan işler
 
-*17 Eylül 2026 ürün kararı. Kaynak: güncel `main` kodu + kilitli ürün kararları.
-Kabul: 1 Ekim 2026 canlı Redhawk Mart yürüyüşü — üç kontrol geçti.
-Kâr tablosu tutarı, GL varsa GL'dir; destek dosyası üstüne eklenmez.*
+*9 Ekim 2026. Kaynak: güncel `main` (`c93ca0e`) + canlı Supabase kontrolü.
+Kâr tablosu tutarı, GL varsa GL'dir; destek dosyası üstüne eklenmez.
+Claude matematik yapmaz.*
 
-Tek canlı backlog burasıdır. Bitmiş planları buraya geri kopyalama. Yeni iş ancak kilit + onay sonrası.
+Tek canlı backlog burasıdır. Ayrı bir “Documents” listesi açılmaz.
+Bitmiş planları buraya geri kopyalama.
 
-**Sıra (değişmez):** kalan ürün işi → canlı Supabase SQL en son (uygulayan insan; `supabase db push` yok) → Cloudflare en son.
+**Çalışma kuralı:** tek seferde bir madde, yukarıdan aşağı.
+Bir maddenin “Bitti” satırı geçmeden sonrakine geçilmez.
+Madde bitince bu dosyada “yapıldı” olur.
+Commit, bu turdaki kod işleri bitince bir kez atılır.
+Çelişince kod kazanır.
 
----
-
-## Şimdi açık — ürün
-
-### Close checklist Dil 2 — ana yol geçti (2026-10-01)
-
-Redhawk Mart 2026 canlı yürüyüş: bordro Tied out (6.200 / 1.400 / 5.500),
-tedarikçi Tied out, sözleşme 3.825 vs 3.540, fark 285. Kanıt:
-`docs/qa/slice2-acceptance-2026-10-01-payroll-retest/`.
-
-Kâr tablosu artık aynı hesabı iki kez toplamaz. GL satırı varsa tutar GL'dir.
-Destek dosyası kırılımda ve kontrol kartında kalır. Kayıtlı eski rapor eski
-toplamı gösterir; yeni bir analiz güncel tutarı yazar.
-
-Dil 2 kenarları canlıda denendi (1 Ekim 2026): `docs/qa/slice2-acceptance-2026-10-01-final/README.md`.
-Geçenler: eksik kaynak, iki dosyalı kontrol (kart), iki GL hedefli sözleşme, belirsiz sözleşme, geçersiz mapping, stale-export, Excel görsel.
-**Açık hatalar:** (1) boş bordro dosyası `KeyError: 'amount'` ile çöküyor (consolidator), (2) bir kontrol için iki dosya yüklenince istisna listesi ve anlatı yine toplanmış tutarı fark gibi gösteriyor, (3) kapalı ayda Replace'te kullanıcı ham "API 409" görüyor (ParsePreviewPanel'in hata gösterimi).
-Install/fuel ayrı durur. `0011` demo projede uygulandı. Dönem kilidi (`closed`) aşağıda: yapıldı.
-
-Güncel karar, UX ve uygulama kaydı:
-[Close checklist pre-analysis §11](../sprint/pre-analysis-close-checklist.md#11-17-eylül-2026--dil-2-ürün-kararı-ve-rapor-ux-tasarımı).
-
-### Close checklist Dil 3 — dönem kilidi: yapıldı (`96cf24e`, 1 Ekim 2026)
-
-Migrasyon `0012_add_period_closes.sql` demo projede uygulandı. Canlıda denendi: kapat,
-yeniden aç (log: closed → reopened), düzeltilmiş raporla tekrar kapat.
-
-- `RunStatus` değişmedi; kapanış bir run durumu değil, `period_closes` satırı
-  (aktif kilit: `reopened_at IS NULL`, `(şirket, ay)` başına tek). Yeniden açma
-  satırı silmez, `reopened_*` damgalar; `period_close_log` yalnız ekleme.
-- `POST /periods/{ay}/close` ve `/reopen` ayrı açık onay ister (`{"confirm": true}`);
-  kapatmak için bitmiş aylık rapor şart. `GET /periods/{ay}/close` durum + log.
-- Kapalı ayda `/upload`, `/runs/{id}/confirm` (Replace) ve `/runs/{id}/retry` 409
-  (`PERIOD_CLOSED`); uçuştaki run ve Opus yükseltmesi de dokunmadan durur.
-- Çeyrek rapor kilidin parçası değil. Banka, kurulum/yakıt, yaşlandırma, e-posta yok.
-
-Canlıda denendi: `/upload` ve Replace (`/runs/{id}/confirm`) kapalı ayda 409. Retry yalnız birim testte (`guardrail_failed` run üretilemedi).
-Açık kenar: Opus yükseltmesi ve karşılaştırma kontrolü iki ayrı okuma; kapatma tam o
-aralıkta olursa küçük bir yarış penceresi kalır.
-
-### Arayüz: yapıldı (1 Ekim 2026)
-
-- Sekme gizliyken yoklama sürer (`refetchIntervalInBackground`, `LoadingProgress.tsx`).
-- Yenilemede bekleyen run'a dönülür: run kimliği tarayıcıda saklanır, açılışta sunucuyla doğrulanır (`UploadPage.tsx`). Tarayıcıya bağlı.
-- Excel: "Sources" sütunu kesilmiyor, "GL amount wins; other files are evidence" başlığı (`excel_export.py`).
-
-### Anlatı–kart tutarlılığı: yapıldı (1 Ekim 2026)
-
-Destek dosyası olmayan (coverage / `is_gl_only`) bir GL hesabına "missing journal entry" veya
-yüksek/orta önem diyen anlatı bir kez yeniden denenir; ikinci denemede rapor yazılmaz
-(`NarrativeContradictionError`, `narrative_check.py`). Opus yükseltmesi çelişkiliyse yayınlanmaz.
-Sınır: kural kelime tabanlıdır; hesap adı anmayan genel cümleler yakalanmaz.
+**Sıra (değişmez):** aşağıdaki ürün işi → canlı Supabase SQL en son
+(uygulayan insan; `supabase db push` yok) → Cloudflare en son.
 
 ---
 
-## Yapıldı — listeye alma
+## Sıradaki iş — tek tek
 
-- Aynı dönemi yeniden üretme (açık onay, sessiz UPSERT yok)
-- Kalıcı kaynak eşlemeleri (`0011` demo projede uygulandı)
-- Uydurma classification token düşer, run ölmez
-- Guardrail Stage 1 enforce + quarterly/Opus `strict=True`
-- Close checklist Dil 1 (`tie_out_summary`)
-- Quarterly kalıcı rapor (`0009`, `mark_quarterly_stale`)
-- Redhawk seed `under_100k`; coverage kartları; `_is_material` AND-gate; roster tarihlerini cutoff’tan çıkarma; onboarding `onboarding_done`
+### 1. Başarısız analiz dosyaları
+
+Complete sonrası storage temizliği var. `guardrail_failed` dosyası
+Retry için duruyor ve hiç süpürülmüyor.
+
+Bitti: Retry hâlâ dosyayı bulur. Terk edilmiş başarısız run’ın dosyası
+belirli bir süre sonra silinir. Silme, kullanıcının açık Retry’sini bozmaz.
+Logda dosya içeriği yok.
+
+Yapma: başarısız olur olmaz silme. Complete temizliğini bu işe bağlayıp
+başarılı run’ın dosyasını erken silme.
+
+### 2. Yüzde eşikleri
+
+Dosya: `backend/agents/comparison.py`.
+Dolar kapıları banda göre (`_gates_from_band`).
+`_TIER1_PCT = 10` ve `_TIER2_PCT = 3` sabit.
+
+Bitti: ancak sen yüzde kapılarının da banda göre değişeceğine karar
+verirsen. Karar yoksa bu madde açılmaz. Karar sonrası pandas hesaplar,
+Claude sayıları görmez, dolar kapılarına dokunulmaz, test eski ve yeni
+bandı birlikte kanıtlar.
+
+Yapma: 10 ve 3’ü kendin değiştirme.
+
+### 3. `500k_plus` üst sınırı
+
+Dört bant var. `500k_plus` tavanı `$2_000_000` varsayılanıyla hem
+500 bin hem 5 milyona aynı dolar kapısını verir
+(`backend/agents/comparison.py`, `backend/api/routers/companies.py`).
+
+Bitti: ancak sen yeni bandı veya tavanı seçersen. Seçim yoksa kod yazılmaz.
+Seçim olursa kolon, API literal, migration ve test birlikte gider.
+Uygulanmış `0010` dosyası yeniden yazılmaz; yeni numaralı migration açılır.
+
+Yapma: bant adını veya `$2_000_000` rakamını kendin uydurma.
+
+### 4. Anlatı kontrolünün sınırı
+
+`narrative_check.py` kelimeye bakar. Hesap adını anmayan genel cümle
+“missing journal entry” dese de yakalanmaz. Kelime kuralı bilinçli sınırdır.
+
+Bitti: ancak yakalanması gereken cümle örnekle sabitlenirse.
+Guardrail toleransı gevşetilmez. LLM kendi cümlesini sayı diye onaylamaz.
+
+Yapma: bu maddeyi “rapor düzeltmesi” sanıp sayıları prompt’a hesaplatma.
+
+### 5. Kod stili
+
+`black` 5 dosyayı yeniden biçimlendirmek istiyor.
+`flake8` çoğunlukla satır uzunluğu, yüzlerce uyarı.
+Pre-push yalnız pytest çalıştırıyor.
+
+Bitti: biçim commit’i davranışı değiştirmez. Finans hesabı aynı testlerle geçer.
+
+Yapma: stil düzeltmesini davranış değişikliğiyle aynı commit’e koyma.
 
 ---
 
-## Yarım — kodda var, kenarı açık
+## Bilinen, şimdi yapılmaz
 
-Claude matematik yapmaz; bunları “rapor düzeltmesi” sanma.
+Canlı `account_categories` tablosunda RLS açık ve policy yok.
+`0001` bu tabloyu RLS’siz kamu araması sayar. Frontend tabloyu doğrudan okumuyor.
+Servis rolü RLS’ten geçtiği için bugünkü close bozulmuyor.
+Açmadan önce kim okuyor, ona bakılır.
 
-| Konu | Ne var | Ne eksik |
-|---|---|---|
-| Migrasyon `0010` | `monthly_revenue_band` kolonu `IF NOT EXISTS` | `ADD CONSTRAINT` ikinci çalışmada kırılır |
-| `500k_plus` bandı | Dört bant var | Üst sınır yok; $500k ile $5M aynı kapı |
-| Flux yüzde kapıları | Dolar kapıları banda göre | `_TIER1_PCT` / `_TIER2_PCT` sabit |
-| Processor fee bandı | `_is_processor_fee_gap` %3–8 | Dosya / hesap / yön yok; herhangi iki taraflı fark `structural_explained` olabilir |
-| `compute_hints` hata yutma | Run düşmez | Her exception boş hint — yanlış sınıf riski |
-| Storage TTL | Complete sonrası cleanup var | `guardrail_failed` dosyaları süpürülmüyor (production öncesi) |
+---
+
+## Yapıldı — yeniden açma
+
+- İşlemci ücreti yalnız settlement dosyasında ve GL’nin altında yanar
+  (9 Ekim 2026). Bant %3–8 durur. Tedarikçi dosyasındaki aynı yüzde
+  `stale_reference` kalır. Settlement GL’den büyükse ücret sayılmaz.
+- Ay kapanışı yazımdan hemen önce bir kez daha okunur (9 Ekim 2026).
+  Karşılaştırma anomalileri değiştirmez, rapor yazılmaz, Opus yayınlamaz.
+  `RunStatus` listesine yeni durum eklenmedi. Çeyrek rapor kilide girmez.
+- Kapalı ayda Retry zaten 409 ve düz mesaj
+  (`test_closed_month_refuses_replace_upload_and_retry_and_writes_nothing`).
+  Canlıda sahte başarısız rapor üretilmedi.
+- Migrasyon `0010` canlıda duruyor. Dosyası yeniden yazılmaz.
+- `compute_hints` hata yolu sessiz boş ipucu değil (9 Ekim 2026).
+  `hints_unavailable` başarılı “özel bir şey yok” sonucundan ayrıdır.
+  Run düşmez. Sınıf `stale_reference` olmaz. Logda hata tipi var, hücre yok.
+  Tarih sütunundaki dar `except` duruyor.
+- Data sayfası yılbaşından bugüne tablosu (`c93ca0e`, 9 Ekim 2026).
+  Sunucu GL’den Decimal ile hesaplar. Boş ay “—” ve toplama girmez.
+  Chrome: Redhawk 2026, Haziran’a kadar. Mayıs geliri $35,890.00, net kâr $2,810.00.
+- Üç Dil 2 hatası (`bdaaf7b`, 3 Ekim 2026): boş bordro çökmez,
+  bir kontrole iki dosya sahte fark göstermez, kapalı ay düz mesaj verir.
+- Migrasyon `0013` canlıda uygulı (9 Ekim 2026 okuma). Bordro eşlemesi hatırlanır.
+- Sözleşme dosyası toplamı hatırlanır; kayıtlı eşleşmelerin kendi sayfası var (`6c73423`).
+- Dönem kilidi (`96cf24e`, `0012` canlıda). Retry kenarı madde 8’de.
+- Anlatı–kart kelime kontrolü (1 Ekim 2026). Genel cümle sınırı madde 7’de.
+- Sekme gizliyken yoklama, yenilemede bekleyen run, Excel kaynak sütunu (`a5ee407`).
+- TrueCost adı, kapalı kayıt, Railway/Cloudflare yüzeyi (`origin/main`, 7 Ekim 2026).
+- Aynı dönemi yeniden üretme, kalıcı kaynak eşlemeleri (`0011`),
+  uydurma classification token, guardrail Stage 1, Dil 1, çeyrek rapor.
 
 ---
 
@@ -102,11 +132,3 @@ Claude matematik yapmaz; bunları “rapor düzeltmesi” sanma.
 | Banka satır eşleştirme, 7. sınıf, Claude’un N/M sayması | Bilinçli yasak |
 
 Detay spec: `docs/sprint/kova2-implementation-plan.md` (Item 2 / 3 / 6).
-
----
-
-## Bu dosyayı nasıl kullan
-
-1. Yeni iş buraya bir satır olarak girer, ayrı bir “master brief” açılmaz.
-2. Bitince satır düşer veya “yapıldı” olur; plan dosyası arşive gider.
-3. Çelişince kod kazanır.

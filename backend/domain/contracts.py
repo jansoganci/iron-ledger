@@ -371,6 +371,10 @@ class ReconciliationHints(BaseModel):
     # Pandas-computed dollar size of the gap, so the narrative can state it
     # without Claude subtracting the two sums itself.
     fee_gap: float | None = None
+    # True when compute_hints failed. Distinct from an all-false success,
+    # which means pandas looked and found no special signal. Old report JSON
+    # omits this field and still parses as a successful hint.
+    hints_unavailable: bool = False
 
 
 class ReconciliationItem(BaseModel):

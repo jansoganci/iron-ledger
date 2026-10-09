@@ -25,7 +25,11 @@ from backend.domain.contracts import (
     MappingDraft,
     MappingDraftItem,
 )
-from backend.domain.errors import DiscoveryLowConfidence, MappingAmbiguous
+from backend.domain.errors import (
+    DiscoveryLowConfidence,
+    MappingAmbiguous,
+    PeriodClosedError,
+)
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
 from backend.tools.file_type import FILE_TYPE_PATTERNS, detect_file_type
@@ -490,6 +494,12 @@ def run_comparison_and_report(
                     },
                 )
 
+    except PeriodClosedError:
+        logger.warning(
+            "run stopped: period closed before the report was written",
+            extra={"run_id": run_id, "trace_id": get_trace_id()},
+        )
+        _fail_if_not_terminal(run_id, messages.PERIOD_CLOSED)
     except Exception as exc:
         logger.error(
             "orchestrator unhandled exception",

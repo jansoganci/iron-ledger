@@ -5,8 +5,10 @@ from datetime import date
 from statistics import mean
 from uuid import UUID
 
+from backend.api.period_lock import is_period_closed
 from backend.domain.contracts import AccountSummary, PandasSummary
 from backend.domain.entities import Anomaly
+from backend.domain.errors import PeriodClosedError
 from backend.domain.ports import (
     AccountsRepo,
     AnomaliesRepo,
@@ -221,6 +223,14 @@ class ComparisonAgent:
                 )
 
         # 7. Persist anomalies — replace the period so a re-run cannot stack.
+        # Re-read the lock here. The orchestrator already checked once, and
+        # the month may have been closed while history was loading.
+        if is_period_closed(company_id, period):
+            logger.warning(
+                "comparison skipped: period closed before anomalies were replaced",
+                extra={"run_id": run_id, "company_id": company_id},
+            )
+            raise PeriodClosedError()
         self._anomalies.replace_period(company_id, period, flagged_anomalies)
 
         # Update progress: comparison complete

@@ -194,6 +194,15 @@ def run_opus_upgrade(run_id: str, company_id: str, period: date) -> None:
             runs_repo.set_opus_status(run_id, "failed")
             return
 
+        # Second read. The month can close while Opus is writing.
+        if is_period_closed(company_id, period):
+            logger.info(
+                "opus_upgrade skipped: period closed before publish",
+                extra={"run_id": run_id, "trace_id": get_trace_id()},
+            )
+            runs_repo.set_opus_status(run_id, "failed")
+            return
+
         # Guardrail passed — atomically overwrite the report.
         reports_repo.upgrade_summary(
             company_id=company_id,
