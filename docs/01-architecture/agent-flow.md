@@ -10,7 +10,8 @@
 > (bordro, tedarikçi, sözleşme; kâr tablosu GL varsa GL tutarını kullanır, destek dosyasını üstüne
 > eklemez); anlatı–kart tutarlılık kontrolü (`narrative_check.py`: destek dosyası olmayan bir GL
 > hesabına "missing journal entry" diyen anlatı bir kez yeniden denenir, ikinci denemede rapor
-> yazılmaz); çeyrek raporu; Opus yükseltmesi; **dönem kilidi** (Dil 3, `period_closes`; kapalı ay
+> yazılmaz; hiçbir kart `missing_je` değilken hesap adı anmayan genel "missing journal entry"
+> cümlesi de aynı yoldan reddedilir); çeyrek raporu; Opus yükseltmesi; **dönem kilidi** (Dil 3, `period_closes`; kapalı ay
 > salt okunur, `RunStatus` değişmedi). Güncel akış için `backend/agents/orchestrator.py` ve
 > `docs/04-status/REMAINING_WORK.md`.
 

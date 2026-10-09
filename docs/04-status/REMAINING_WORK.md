@@ -20,54 +20,7 @@ Commit, bu turdaki kod işleri bitince bir kez atılır.
 
 ## Sıradaki iş — tek tek
 
-### 1. Başarısız analiz dosyaları
-
-Complete sonrası storage temizliği var. `guardrail_failed` dosyası
-Retry için duruyor ve hiç süpürülmüyor.
-
-Bitti: Retry hâlâ dosyayı bulur. Terk edilmiş başarısız run’ın dosyası
-belirli bir süre sonra silinir. Silme, kullanıcının açık Retry’sini bozmaz.
-Logda dosya içeriği yok.
-
-Yapma: başarısız olur olmaz silme. Complete temizliğini bu işe bağlayıp
-başarılı run’ın dosyasını erken silme.
-
-### 2. Yüzde eşikleri
-
-Dosya: `backend/agents/comparison.py`.
-Dolar kapıları banda göre (`_gates_from_band`).
-`_TIER1_PCT = 10` ve `_TIER2_PCT = 3` sabit.
-
-Bitti: ancak sen yüzde kapılarının da banda göre değişeceğine karar
-verirsen. Karar yoksa bu madde açılmaz. Karar sonrası pandas hesaplar,
-Claude sayıları görmez, dolar kapılarına dokunulmaz, test eski ve yeni
-bandı birlikte kanıtlar.
-
-Yapma: 10 ve 3’ü kendin değiştirme.
-
-### 3. `500k_plus` üst sınırı
-
-Dört bant var. `500k_plus` tavanı `$2_000_000` varsayılanıyla hem
-500 bin hem 5 milyona aynı dolar kapısını verir
-(`backend/agents/comparison.py`, `backend/api/routers/companies.py`).
-
-Bitti: ancak sen yeni bandı veya tavanı seçersen. Seçim yoksa kod yazılmaz.
-Seçim olursa kolon, API literal, migration ve test birlikte gider.
-Uygulanmış `0010` dosyası yeniden yazılmaz; yeni numaralı migration açılır.
-
-Yapma: bant adını veya `$2_000_000` rakamını kendin uydurma.
-
-### 4. Anlatı kontrolünün sınırı
-
-`narrative_check.py` kelimeye bakar. Hesap adını anmayan genel cümle
-“missing journal entry” dese de yakalanmaz. Kelime kuralı bilinçli sınırdır.
-
-Bitti: ancak yakalanması gereken cümle örnekle sabitlenirse.
-Guardrail toleransı gevşetilmez. LLM kendi cümlesini sayı diye onaylamaz.
-
-Yapma: bu maddeyi “rapor düzeltmesi” sanıp sayıları prompt’a hesaplatma.
-
-### 5. Kod stili
+### 1. Kod stili
 
 `black` 5 dosyayı yeniden biçimlendirmek istiyor.
 `flake8` çoğunlukla satır uzunluğu, yüzlerce uyarı.
@@ -81,6 +34,11 @@ Yapma: stil düzeltmesini davranış değişikliğiyle aynı commit’e koyma.
 
 ## Bilinen, şimdi yapılmaz
 
+Çok dosyalı run’da Retry yalnız ilk dosyayı tek dosyalık akışla yeniden
+çalıştırır (`uploads.py` `run_retry` → `run_parser_until_preview`,
+`storage_key` = ilk anahtar). Tüm anahtarlar `parse_preview.file_keys`
+içinde duruyor. Düzeltme ayrı iş; temizlikle karıştırılmaz.
+
 Canlı `account_categories` tablosunda RLS açık ve policy yok.
 `0001` bu tabloyu RLS’siz kamu araması sayar. Frontend tabloyu doğrudan okumuyor.
 Servis rolü RLS’ten geçtiği için bugünkü close bozulmuyor.
@@ -90,6 +48,23 @@ Açmadan önce kim okuyor, ona bakılır.
 
 ## Yapıldı — yeniden açma
 
+- 7 günlük upload temizliği (9 Ekim 2026). Klasör (`kullanıcı/ay`) bazında:
+  o şirket ve ayın en yeni run’ı 7 günden eskiyse klasördeki tüm dosyalar
+  silinir; çok dosyalı yüklemenin artıkları da gider. Uygulama içinde,
+  açılıştan 60 sn sonra ve günde bir. Silmeden önce ikinci okuma; bozuk
+  veya kök adres reddedilir; okunamayan zaman damgası saklar; logda yalnız
+  sayılar. Süresi dolan dosyada onay/Retry `UPLOAD_EXPIRED` der.
+  Migration yok (`runs.updated_at` zaten var).
+- `500k_plus` dolar kapıları bant tabanından (9 Ekim 2026): `R = $500,000`,
+  kapılar $12,500 / $2,500. 250k–500k bandından düzgün devam eder.
+  Bant seçmemiş şirket $50k / $10k güvenli varsayılanında kalır.
+  Yeni bant, migration, API değişmedi. Yeni bant: ilk gerçek $1M+ müşteride.
+- Yüzde eşikleri kararı (9 Ekim 2026): %10 / %3 sabit kalır, banda göre
+  değişmez. Ölçeklenen kısım dolar kapısıdır.
+- Genel “missing journal entry” cümlesi (9 Ekim 2026): hiçbir kart
+  `missing_je` değilken olumsuzlanmamış ifade reddedilir, bir kez yeniden
+  denenir, ikinci seferde rapor yazılmaz. Karar son kart sınıfına göredir
+  (Claude’un birleştirmede ezilen sınıfı saymaz). Opus yükseltmesi de aynı.
 - İşlemci ücreti yalnız settlement dosyasında ve GL’nin altında yanar
   (9 Ekim 2026). Bant %3–8 durur. Tedarikçi dosyasındaki aynı yüzde
   `stale_reference` kalır. Settlement GL’den büyükse ücret sayılmaz.
@@ -112,7 +87,7 @@ Açmadan önce kim okuyor, ona bakılır.
 - Migrasyon `0013` canlıda uygulı (9 Ekim 2026 okuma). Bordro eşlemesi hatırlanır.
 - Sözleşme dosyası toplamı hatırlanır; kayıtlı eşleşmelerin kendi sayfası var (`6c73423`).
 - Dönem kilidi (`96cf24e`, `0012` canlıda). Retry kenarı madde 8’de.
-- Anlatı–kart kelime kontrolü (1 Ekim 2026). Genel cümle sınırı madde 7’de.
+- Anlatı–kart kelime kontrolü (1 Ekim 2026). Genel cümle kuralı 9 Ekim’de eklendi.
 - Sekme gizliyken yoklama, yenilemede bekleyen run, Excel kaynak sütunu (`a5ee407`).
 - TrueCost adı, kapalı kayıt, Railway/Cloudflare yüzeyi (`origin/main`, 7 Ekim 2026).
 - Aynı dönemi yeniden üretme, kalıcı kaynak eşlemeleri (`0011`),

@@ -28,6 +28,8 @@ logger = get_logger(__name__)
 
 T = TypeVar("T")
 
+_SWEEP_PAGE = 1000
+
 # Connection-class failure markers — httpx / httpcore raise these when the
 # TCP stream is dropped mid-request, which happens on Supabase's edge when
 # a single HTTP/2 connection is thrashed by rapid sequential calls.
@@ -642,6 +644,44 @@ class SupabaseRunsRepo:
             )
         except Exception as exc:
             raise _wrap_db(exc) from exc
+
+    def list_runs_with_storage_key(self) -> list[dict]:
+        rows: list[dict] = []
+        start = 0
+        while True:
+            try:
+                resp = (
+                    self._db.table("runs")
+                    .select(
+                        "id, company_id, period, storage_key, created_at, updated_at"
+                    )
+                    .not_.is_("storage_key", "null")
+                    .order("id")
+                    .range(start, start + _SWEEP_PAGE - 1)
+                    .execute()
+                )
+            except Exception as exc:
+                raise _wrap_db(exc) from exc
+            page = resp.data or []
+            rows.extend(page)
+            if len(page) < _SWEEP_PAGE:
+                return rows
+            start += _SWEEP_PAGE
+
+    def latest_run_activity(self, company_id: str, period: date) -> dict | None:
+        try:
+            resp = (
+                self._db.table("runs")
+                .select("id, created_at, updated_at")
+                .eq("company_id", company_id)
+                .eq("period", str(period))
+                .order("updated_at", desc=True, nullsfirst=True)
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:
+            raise _wrap_db(exc) from exc
+        return resp.data[0] if resp.data else None
 
     def set_parse_preview(self, run_id: str, preview: dict) -> None:
         payload = dict(preview)

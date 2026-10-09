@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import uuid
 
@@ -27,6 +28,8 @@ from backend.tools.close_controls import (
 from backend.tools.narrative_check import (
     coverage_accounts,
     find_coverage_contradictions,
+    find_unbacked_missing_je,
+    has_missing_je_card,
     known_accounts,
 )
 from backend.tools.guardrail import (
@@ -233,6 +236,18 @@ def _apply_reconciliation_classifications(
                 item["classification"] = proposed
         elif not item.get("classification"):
             item["classification"] = _classify_from_hints(hints)
+
+
+def _final_cards_have_missing_je(
+    reconciliations: list[dict] | None, cls_map: dict[str, str]
+) -> bool:
+    """Whether the cards, once classes are merged, will show a missing_je.
+
+    Works on a copy; the real merge still happens once, after the guardrail.
+    """
+    cards = copy.deepcopy(list(reconciliations or []))
+    _apply_reconciliation_classifications(cards, cls_map)
+    return has_missing_je_card(cards)
 
 
 class InterpreterAgent:
@@ -617,17 +632,26 @@ class InterpreterAgent:
                 contradictions = find_coverage_contradictions(
                     result.narrative, covered, known
                 )
-                if not contradictions:
+                backed = _final_cards_have_missing_je(
+                    reconciliations, result.reconciliation_classifications or {}
+                )
+                unbacked = [
+                    s
+                    for s in find_unbacked_missing_je(result.narrative, backed)
+                    if s not in contradictions
+                ]
+                if not contradictions and not unbacked:
                     return result
                 last_was_contradiction = True
-                last_message = "; ".join(contradictions)
+                last_message = "; ".join(contradictions + unbacked)
                 logger.warning(
                     "narrative contradicts coverage cards",
                     extra={
                         "event": "narrative_contradiction",
                         "run_id": run_id,
                         "attempt": attempt + 1,
-                        "sentence_count": len(contradictions),
+                        "sentence_count": len(contradictions) + len(unbacked),
+                        "unbacked_missing_je_count": len(unbacked),
                         "trace_id": get_trace_id(),
                     },
                 )
@@ -641,6 +665,12 @@ class InterpreterAgent:
                         "account, so it was not compared, this is not a missing "
                         "journal entry, and no severity. Sentence: " + s
                         for s in contradictions
+                    ]
+                    + [
+                        "No reconciliation item in this report is a missing "
+                        "journal entry. Rewrite the sentence below so it does "
+                        "not say a journal entry is missing. Sentence: " + s
+                        for s in unbacked
                     ],
                 }
                 continue

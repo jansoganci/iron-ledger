@@ -22,7 +22,7 @@ from backend.tools.account_tags import is_payroll_account
 logger = get_logger(__name__)
 
 
-# Fail-safe constants — also the 500k_plus / NULL-band gates.
+# Fail-safe constants for NULL / unknown bands.
 # Claude never sees these. Pandas only.
 _TIER1_DOLLAR = 50_000.0
 _TIER1_PCT = 10.0
@@ -33,7 +33,9 @@ _BAND_R: dict[str, float] = {
     "under_100k": 50_000.0,
     "100k_250k": 175_000.0,
     "250k_500k": 375_000.0,
-    "500k_plus": 2_000_000.0,
+    # Band floor: the band is unbounded above, so a midpoint would
+    # under-flag companies just over $500k/month.
+    "500k_plus": 500_000.0,
 }
 
 

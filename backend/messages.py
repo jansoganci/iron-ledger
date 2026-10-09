@@ -65,6 +65,11 @@ UPLOAD_FAILED = (
     "We couldn't save your file after several attempts. " "Please try uploading again."
 )
 
+UPLOAD_EXPIRED = (
+    "Your uploaded file is no longer available. We remove unfinished uploads "
+    "after 7 days. Please upload the file again."
+)
+
 INVALID_PERIOD = (
     "'{period}' is not a valid period. "
     "Use the first day of the month, e.g. 2026-03-01."

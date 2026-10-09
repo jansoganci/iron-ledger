@@ -40,7 +40,15 @@ class FileStorage(Protocol):
 
     def download(self, storage_key: str) -> bytes: ...
 
+    # Raises StoredFileMissing when the object no longer exists.
+
     def delete(self, storage_key: str) -> None: ...
+
+    def list_folder(self, folder: str) -> list[str]: ...
+
+    # Full storage keys directly inside `folder` ("{user_id}/{period}").
+
+    def delete_many(self, storage_keys: list[str]) -> None: ...
 
 
 @runtime_checkable
@@ -174,6 +182,16 @@ class RunsRepo(Protocol):
     # Populated by POST /upload after the file lands in Storage.
     # Read by POST /runs/{run_id}/retry to re-run the pipeline against
     # the existing file (no re-upload required).
+
+    def list_runs_with_storage_key(self) -> list[dict]: ...
+
+    # System-wide (storage sweep only). Rows carry company_id, period,
+    # storage_key, created_at, updated_at. Never called with browser input.
+
+    def latest_run_activity(self, company_id: str, period: date) -> dict | None: ...
+
+    # Newest run row (created_at, updated_at) for (company_id, period),
+    # with or without a storage_key.
 
     def set_parse_preview(self, run_id: str, preview: dict) -> None: ...
 

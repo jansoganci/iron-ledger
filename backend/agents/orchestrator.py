@@ -29,6 +29,7 @@ from backend.domain.errors import (
     DiscoveryLowConfidence,
     MappingAmbiguous,
     PeriodClosedError,
+    StoredFileMissing,
 )
 from backend.domain.run_state_machine import RunStateMachine, RunStatus
 from backend.logger import get_logger, get_trace_id
@@ -182,6 +183,9 @@ def run_multi_file_parser_until_preview(
                         "trace_id": get_trace_id(),
                     },
                 )
+            except StoredFileMissing:
+                _fail_if_not_terminal(run_id, messages.UPLOAD_EXPIRED)
+                return
             except Exception as exc:
                 logger.error(
                     "multi_file_parse_error",
@@ -883,6 +887,9 @@ def run_multi_file_parser_with_mapping(
                     ),
                 )
                 return
+            except StoredFileMissing:
+                _fail_if_not_terminal(run_id, messages.UPLOAD_EXPIRED)
+                return
             except Exception as exc:
                 logger.error(
                     "multi_file_parse_error",
@@ -1160,6 +1167,9 @@ def apply_mapping_and_consolidate(
                         "trace_id": get_trace_id(),
                     },
                 )
+            except StoredFileMissing:
+                _fail_if_not_terminal(run_id, messages.UPLOAD_EXPIRED)
+                return
             except Exception as exc:
                 logger.error(
                     "apply_mapping parse error",

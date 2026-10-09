@@ -275,7 +275,8 @@ Agents import entities from `domain.entities`, never from adapters. Adapters are
 ### Storage cleanup
 - Triggered by the orchestrator only after the interpreter writes the `reports` row and transitions the run to `complete`
 - Runs in a **FastAPI BackgroundTask** — the user response is sent first, cleanup happens after
-- On guardrail failure (attempt 2 also failed): **file stays in storage** so the user's "Retry Analysis" button works without re-upload. Storage-leak mitigation (TTL sweep of abandoned guardrail_failed runs) is post-MVP.
+- On guardrail failure (attempt 2 also failed): **file stays in storage** so the user's "Retry Analysis" button works without re-upload.
+- **7-day sweep** (`backend/agents/storage_sweep.py`, rule in `backend/tools/storage_sweep_rule.py`): an in-process loop started in `main.py` lifespan runs 60 s after startup, then daily. Uploads are keyed `{user_id}/{period}/{filename}`, so the sweep works per folder: when the newest run for that company and month is older than 7 days, every file in the folder is deleted (failed runs, abandoned confirmations, and the extra files of multi-file uploads). It re-reads the newest run just before deleting, refuses malformed or root prefixes, keeps anything with an unreadable timestamp, and logs counts only. A later confirm/Retry on a swept file fails with `messages.UPLOAD_EXPIRED` (`StoredFileMissing`).
 - If cleanup itself fails: **log at WARNING with `trace_id`, `run_id`, `storage_key`, and the adapter's error. Do not raise.** The run is already complete from the user's perspective — a leaked object is an ops problem, not a product failure. Wrap the background task in a top-level `try/except Exception`.
 
 ---

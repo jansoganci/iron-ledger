@@ -10,6 +10,8 @@ from backend.tools.close_controls import unpack_report_reconciliations
 from backend.tools.narrative_check import (
     coverage_accounts,
     find_coverage_contradictions,
+    find_unbacked_missing_je,
+    has_missing_je_card,
     known_accounts,
 )
 from backend.tools.guardrail import (
@@ -181,6 +183,8 @@ def run_opus_upgrade(run_id: str, company_id: str, period: date) -> None:
             result.narrative,
             coverage_accounts(reconciliations),
             known_accounts(reconciliations, current_summary.get("accounts")),
+        ) + find_unbacked_missing_je(
+            result.narrative, has_missing_je_card(reconciliations)
         )
         if contradictions:
             logger.warning(

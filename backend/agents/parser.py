@@ -15,6 +15,7 @@ from backend.domain.errors import (
     DiscoveryLowConfidence,
     FileHasNoValidColumns,
     MappingAmbiguous,
+    StoredFileMissing,
 )
 from backend.domain.ports import (
     AccountsRepo,
@@ -108,6 +109,9 @@ class ParserAgent:
         # Read the first 100x10 cells for Discovery's sample
         try:
             sample = self._read_sample(storage_key)
+        except StoredFileMissing:
+            self._fail(run_id, RunStatus.PARSING, messages.UPLOAD_EXPIRED)
+            raise
         except Exception:
             self._fail(run_id, RunStatus.PARSING, messages.PARSE_FAILED)
             raise
@@ -207,6 +211,9 @@ class ParserAgent:
         # Re-download the full file. Storage persists per R-015 until COMPLETE.
         try:
             df_raw = self._read_full(storage_key)
+        except StoredFileMissing:
+            self._fail(run_id, RunStatus.MAPPING, messages.UPLOAD_EXPIRED)
+            raise
         except Exception:
             self._fail(run_id, RunStatus.MAPPING, messages.PARSE_FAILED)
             raise

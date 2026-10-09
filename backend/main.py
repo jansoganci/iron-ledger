@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,8 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from backend import messages
+from backend.agents.storage_sweep import sweep_abandoned_uploads
+from backend.api.deps import get_file_storage, get_runs_repo
 from backend.api.middleware import TraceIdMiddleware
 from backend.api.rate_limit import limiter
 from backend.api.routers import (
@@ -34,11 +37,34 @@ from backend.settings import get_settings
 logger = get_logger(__name__)
 
 
+_SWEEP_FIRST_DELAY_SECONDS = 60
+_SWEEP_INTERVAL_SECONDS = 24 * 60 * 60
+
+
+async def _storage_sweep_loop() -> None:
+    """Daily, in-process (no Celery). Idempotent, so extra workers are harmless."""
+    await asyncio.sleep(_SWEEP_FIRST_DELAY_SECONDS)
+    while True:
+        try:
+            await asyncio.to_thread(
+                sweep_abandoned_uploads, get_runs_repo(), get_file_storage()
+            )
+        except Exception as exc:
+            logger.warning(
+                "storage_sweep_failed", extra={"error_type": type(exc).__name__}
+            )
+        await asyncio.sleep(_SWEEP_INTERVAL_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
     logger.info("TrueCost starting up")
+    sweep_task = asyncio.create_task(_storage_sweep_loop())
     yield
+    sweep_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await sweep_task
     logger.info("TrueCost shutting down")
 
 

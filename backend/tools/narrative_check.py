@@ -6,6 +6,10 @@ compared" and "this is not a missing journal entry". A narrative sentence that
 names such an account and calls it a missing journal entry (or high/medium
 severity) contradicts them and is rejected. Source-only items (a real
 missing_je) and the stale_reference gap are not coverage items and pass.
+
+A sentence that names no account ("Some journal entries may be missing.") is
+judged against the cards as a whole: when no card is classified missing_je,
+any non-negated missing-journal-entry wording is rejected.
 """
 
 from __future__ import annotations
@@ -96,5 +100,32 @@ def find_coverage_contradictions(
                 continue
             scrubbed = _NEGATED.sub("", text)
             if _MISSING_JE.search(scrubbed) or _SEVERITY.search(scrubbed):
+                found.append(text)
+    return found
+
+
+def has_missing_je_card(reconciliations: list[dict] | None) -> bool:
+    """True when at least one non-coverage card is classified missing_je."""
+    return any(
+        isinstance(item, dict)
+        and not is_coverage_item(item)
+        and item.get("classification") == "missing_je"
+        for item in reconciliations or []
+    )
+
+
+def find_unbacked_missing_je(narrative: str, backed: bool) -> list[str]:
+    """Sentences that claim a missing journal entry when no card says missing_je.
+
+    `backed` comes from the final card classes (`has_missing_je_card`), never
+    from the narrative. Negated wording ("not a missing journal entry") passes.
+    """
+    if not narrative or backed:
+        return []
+    found: list[str] = []
+    for paragraph in narrative.split("\n"):
+        for raw in re.split(r"(?<=[.!?])\s+", paragraph):
+            text = raw.strip()
+            if text and _MISSING_JE.search(_NEGATED.sub("", text)):
                 found.append(text)
     return found

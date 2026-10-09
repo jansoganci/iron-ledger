@@ -176,8 +176,42 @@ def test_gates_from_band_null_equals_legacy_constants() -> None:
     assert _gates_from_band(None) == (_TIER1_DOLLAR, _TIER2_DOLLAR)
 
 
-def test_gates_from_band_500k_plus_equals_legacy_constants() -> None:
-    assert _gates_from_band("500k_plus") == (_TIER1_DOLLAR, _TIER2_DOLLAR)
+def test_gates_from_band_500k_plus_uses_band_floor() -> None:
+    assert _gates_from_band("500k_plus") == (12_500.0, 2_500.0)
+
+
+def test_gates_from_band_500k_plus_continues_from_250k_500k() -> None:
+    lower_t1, lower_t2 = _gates_from_band("250k_500k")
+    t1, t2 = _gates_from_band("500k_plus")
+    assert lower_t1 < t1 < _TIER1_DOLLAR
+    assert lower_t2 < t2 < _TIER2_DOLLAR
+
+
+def test_500k_plus_flags_expense_swing_old_gate_missed() -> None:
+    t1, t2 = _gates_from_band("500k_plus")
+    result = calculate_variance(
+        current=445_000.0,
+        historical_avg=400_000.0,
+        history_count=3,
+        category="OPEX",
+        dollar_t1=t1,
+        dollar_t2=t2,
+    )
+    assert result["flag"] is True
+    assert calculate_variance(445_000.0, 400_000.0, 3, "OPEX")["flag"] is False
+
+
+def test_500k_plus_keeps_pct_gate_against_noise() -> None:
+    t1, t2 = _gates_from_band("500k_plus")
+    result = calculate_variance(
+        current=420_000.0,
+        historical_avg=400_000.0,
+        history_count=3,
+        category="OPEX",
+        dollar_t1=t1,
+        dollar_t2=t2,
+    )
+    assert result["flag"] is False
 
 
 def test_gates_from_band_under_100k() -> None:

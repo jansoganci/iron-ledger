@@ -43,6 +43,10 @@ class PeriodClosedError(Exception):
     """A background write found the month closed and must not change it."""
 
 
+class StoredFileMissing(Exception):
+    """The uploaded file is no longer in storage (expired or removed)."""
+
+
 class FileHasNoValidColumns(Exception):
     """PII sanitizer stripped all columns — nothing left to process."""
 

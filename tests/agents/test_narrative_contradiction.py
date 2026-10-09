@@ -19,6 +19,8 @@ from backend.domain.run_state_machine import RunStatus
 from backend.tools.narrative_check import (
     coverage_accounts,
     find_coverage_contradictions,
+    find_unbacked_missing_je,
+    has_missing_je_card,
 )
 from tests.agents.test_interpreter_schema_retry import (
     COMPANY,
@@ -185,6 +187,42 @@ def test_a_sentence_without_an_account_belongs_to_the_last_named_one() -> None:
     assert find_coverage_contradictions(other, covered, known) == []
 
 
+# Second paragraph names no account, so the coverage check cannot see it.
+GENERIC = (
+    "Installation Revenue was 28400.00 and was not compared.\n"
+    "Some journal entries may be missing."
+)
+
+
+def test_generic_missing_je_without_a_missing_je_card_is_rejected() -> None:
+    for text in (
+        "Some journal entries may be missing.",
+        "Several accounts appear to be missing journal entries.",
+        "There may be unrecorded journal entries this month.",
+        "Watch for a missing JE before you close.",
+    ):
+        assert find_unbacked_missing_je(text, backed=False) == [text], text
+
+
+def test_generic_missing_je_with_a_missing_je_card_passes() -> None:
+    assert find_unbacked_missing_je("Some journal entries may be missing.", True) == []
+
+
+def test_negated_missing_je_passes_without_a_card() -> None:
+    for text in (
+        "No missing journal entries were found.",
+        "Installation Revenue was not compared. This is not a missing journal entry.",
+    ):
+        assert find_unbacked_missing_je(text, backed=False) == [], text
+
+
+def test_only_a_non_coverage_missing_je_card_backs_the_wording() -> None:
+    assert has_missing_je_card([{**SOURCE_ONLY, "classification": "missing_je"}])
+    assert not has_missing_je_card([{**STALE, "classification": "stale_reference"}])
+    assert not has_missing_je_card([{**COVERAGE, "classification": "missing_je"}])
+    assert not has_missing_je_card(None)
+
+
 # --- interpreter ---------------------------------------------------------
 
 
@@ -217,6 +255,69 @@ def test_source_only_missing_je_passes_first_try() -> None:
     )
     llm = _ScriptedLLM(_narr(text, (28400.00, 500.00)))
     ok, _, reports = _run(llm)
+    assert ok is True and len(llm.prompts) == 1
+    assert reports.written
+
+
+def test_generic_missing_je_with_no_missing_je_card_is_retried_then_fixed() -> None:
+    llm = _ScriptedLLM(_narr(GENERIC), _narr(GOOD))
+    ok, runs, reports = _run(llm, recons=[dict(COVERAGE), dict(STALE)])
+
+    assert ok is True
+    assert llm.prompts == ["narrative_prompt.txt", "narrative_prompt_reinforced.txt"]
+    corrections = llm.contexts[1]["narrative_corrections"]
+    assert corrections == [
+        "No reconciliation item in this report is a missing journal entry. "
+        "Rewrite the sentence below so it does not say a journal entry is "
+        "missing. Sentence: Some journal entries may be missing."
+    ]
+    assert reports.written[0].summary == GOOD
+
+
+def test_generic_missing_je_twice_does_not_publish() -> None:
+    llm = _ScriptedLLM(_narr(GENERIC), _narr(GENERIC))
+    ok, runs, reports = _run(llm, recons=[dict(COVERAGE), dict(STALE)])
+
+    assert ok is False
+    assert reports.written == []
+    assert runs.status == RunStatus.GUARDRAIL_FAILED.value
+    assert runs.updates[-1][1]["error_message"] == (
+        messages.NARRATIVE_CONTRADICTION_FAILED
+    )
+
+
+def test_claude_class_the_cards_will_not_show_does_not_back_the_wording() -> None:
+    # Service Revenue has a roster count gap, so its card is forced to
+    # stale_reference whatever Claude proposes.
+    claimed = NarrativeJSON(
+        narrative=GENERIC,
+        numbers_used=[28400.00],
+        reconciliation_classifications={"Service Revenue": "missing_je"},
+    )
+    llm = _ScriptedLLM(claimed, claimed)
+    ok, _, reports = _run(llm, recons=[dict(COVERAGE), dict(STALE)])
+
+    assert ok is False
+    assert reports.written == []
+
+
+def test_claude_missing_je_class_that_survives_the_merge_backs_the_wording() -> None:
+    plain = {
+        "account": "Office Supplies",
+        "category": "OPEX",
+        "gl_amount": 1200.0,
+        "non_gl_total": 1450.0,
+        "delta": 250.0,
+        "hints": {},
+    }
+    claimed = NarrativeJSON(
+        narrative=GENERIC,
+        numbers_used=[28400.00],
+        reconciliation_classifications={"Office Supplies": "missing_je"},
+    )
+    llm = _ScriptedLLM(claimed)
+    ok, _, reports = _run(llm, recons=[dict(COVERAGE), plain])
+
     assert ok is True and len(llm.prompts) == 1
     assert reports.written
 
@@ -290,5 +391,41 @@ def test_opus_upgrade_with_coverage_wording_still_upgrades(monkeypatch) -> None:
     )
     run_opus_upgrade("run-1", "c-1", period)
 
+    reports.upgrade_summary.assert_called_once()
+    runs.set_opus_status.assert_called_with("run-1", "done")
+
+
+def _opus_with_cards(monkeypatch, cards):
+    from tests.agents.test_opus_upgrade import _wire_opus
+    from backend.agents.opus_upgrade import run_opus_upgrade
+
+    pandas_summary = {
+        "accounts": {
+            "Installation Revenue": {"category": "REVENUE", "current": 28400.0}
+        }
+    }
+    runs, reports, _, period = _wire_opus(
+        monkeypatch,
+        pandas_summary=pandas_summary,
+        reconciliations=cards,
+        narrative=_narr(GENERIC),
+    )
+    run_opus_upgrade("run-1", "c-1", period)
+    return runs, reports
+
+
+def test_opus_generic_missing_je_without_a_card_keeps_the_report(monkeypatch) -> None:
+    runs, reports = _opus_with_cards(
+        monkeypatch, [dict(COVERAGE), {**STALE, "classification": "stale_reference"}]
+    )
+    reports.upgrade_summary.assert_not_called()
+    runs.set_opus_status.assert_called_with("run-1", "failed")
+
+
+def test_opus_generic_missing_je_with_a_saved_card_upgrades(monkeypatch) -> None:
+    runs, reports = _opus_with_cards(
+        monkeypatch,
+        [dict(COVERAGE), {**SOURCE_ONLY, "classification": "missing_je"}],
+    )
     reports.upgrade_summary.assert_called_once()
     runs.set_opus_status.assert_called_with("run-1", "done")

@@ -111,3 +111,5 @@ Return ONLY valid JSON — no prose outside the JSON:
 If reconciliations is empty, set reconciliation_classifications to {}. Omit coverage accounts and accounts with a non-empty matches list from reconciliation_classifications.
 
 If the context contains narrative_corrections, those sentences named an account with no supporting file (a coverage / is_gl_only item) and called it a missing journal entry or gave it a severity. Rewrite them as coverage: the GL shows the amount, no uploaded file includes the account, so it was not compared, and this is not a missing journal entry. No severity for these accounts.
+
+A correction that begins "No reconciliation item in this report is a missing journal entry" means the sentence claimed a missing journal entry, but no item is classified missing_je. Rewrite or remove that sentence so it does not say any journal entry is missing, and do not classify any item as missing_je to make the sentence fit.
