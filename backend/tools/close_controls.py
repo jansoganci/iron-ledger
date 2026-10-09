@@ -291,7 +291,9 @@ def build_control_summary(
                     status="source_missing",
                     mapping_mode="none",
                     next_action=_NEXT_ACTION["source_missing"],
-                    incomplete_reason="No supporting file for this control was uploaded.",
+                    incomplete_reason=(
+                        "No supporting file for this control was uploaded."
+                    ),
                     period=period,
                 )
             )
@@ -323,7 +325,9 @@ def build_control_summary(
                     source_files=list(files),
                     period=period,
                     amount_scope=amount_scopes.get(source_file),
-                    mapping_mode=modes.get(source_file, "none"),  # type: ignore[arg-type]
+                    mapping_mode=modes.get(  # type: ignore[arg-type]
+                        source_file, "none"
+                    ),
                     next_action=_NEXT_ACTION["mapping_required"],
                     incomplete_reason=messages.CONTROL_UNCONFIRMED_MAPPING,
                 )
@@ -340,7 +344,9 @@ def build_control_summary(
                     source_files=list(files),
                     period=period,
                     amount_scope=amount_scopes.get(source_file),
-                    mapping_mode=modes.get(source_file, "none"),  # type: ignore[arg-type]
+                    mapping_mode=modes.get(  # type: ignore[arg-type]
+                        source_file, "none"
+                    ),
                     next_action=_NEXT_ACTION["not_compared"],
                     incomplete_reason=messages.CONTROL_EMPTY_SOURCE,
                 )

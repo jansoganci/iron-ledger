@@ -6,7 +6,8 @@ class TransientIOError(Exception):
 
 
 class DuplicateEntryError(Exception):
-    """Unique-constraint violation on monthly_entries(company_id, account_id, period)."""
+    """Unique-constraint violation on monthly_entries(company_id, account_id,
+    period)."""
 
 
 class RLSForbiddenError(Exception):

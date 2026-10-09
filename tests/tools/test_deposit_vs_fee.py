@@ -19,8 +19,6 @@ from tests.tools.deposit_vs_fee_fixture import (
     DEPOSIT_PCT,
     DEPOSIT_SOURCE,
     FEE_DELTA,
-    FEE_GL,
-    FEE_NET,
     FEE_PCT,
     PERIOD,
     VANDELAY_TIMING_PCT,
@@ -125,9 +123,7 @@ def test_processor_settlement_above_the_gl_is_not_a_fee() -> None:
         }
     )
     raw = {
-        "gl_export.xlsx": pd.DataFrame(
-            {"account": ["Product Sales"], "amount": [gl]}
-        ),
+        "gl_export.xlsx": pd.DataFrame({"account": ["Product Sales"], "amount": [gl]}),
         "payout_march.xlsx": pd.DataFrame(
             {"account": ["Product Sales"], "amount": [net]}
         ),
@@ -194,16 +190,24 @@ def test_claude_cannot_invent_structural_explained_without_fee_hint() -> None:
             "classification": None,
         }
     ]
-    _apply_reconciliation_classifications(items, {"Office Rent": "structural_explained"})
+    _apply_reconciliation_classifications(
+        items, {"Office Rent": "structural_explained"}
+    )
     assert items[0]["classification"] == "stale_reference"
 
 
 def test_prompt_binds_deposit_to_liability_not_prepaid() -> None:
     assert "liability until the job is done" in PROMPT
     assert "not a vendor prepaid" in PROMPT or "not a prepaid" in PROMPT
-    deposit_block = PROMPT.split("Template (is_customer_deposit")[1].split("2. categorical")[0]
+    deposit_block = PROMPT.split("Template (is_customer_deposit")[1].split(
+        "2. categorical"
+    )[0]
     assert "prepaid asset" not in deposit_block
-    assert "earned revenue" in deposit_block or "unearned" in PROMPT.lower() or "liability" in deposit_block
+    assert (
+        "earned revenue" in deposit_block
+        or "unearned" in PROMPT.lower()
+        or "liability" in deposit_block
+    )
 
 
 def test_prompt_binds_fee_to_netting_not_future_revenue() -> None:
@@ -211,4 +215,7 @@ def test_prompt_binds_fee_to_netting_not_future_revenue() -> None:
     fee_block = PROMPT.split("6. structural_explained")[1].split("Hard rules")[0]
     assert "unearned revenue" in fee_block
     assert "No action required" in fee_block
-    assert "recognized as revenue later" in fee_block or "Do not say the amount will be recognized as revenue later" in fee_block
+    assert (
+        "recognized as revenue later" in fee_block
+        or "Do not say the amount will be recognized as revenue later" in fee_block
+    )

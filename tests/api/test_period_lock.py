@@ -225,11 +225,15 @@ def test_close_after_the_first_read_does_not_start_the_report() -> None:
     from backend.agents import orchestrator
     from backend.domain.errors import PeriodClosedError
 
-    with patch.object(orchestrator, "is_period_closed", return_value=False), patch.object(
-        orchestrator, "ComparisonAgent"
-    ) as comparison, patch.object(orchestrator, "InterpreterAgent") as interpreter, patch.object(
+    with patch.object(
+        orchestrator, "is_period_closed", return_value=False
+    ), patch.object(orchestrator, "ComparisonAgent") as comparison, patch.object(
+        orchestrator, "InterpreterAgent"
+    ) as interpreter, patch.object(
         orchestrator, "get_runs_repo"
-    ) as runs, patch.object(orchestrator, "_fail_if_not_terminal") as fail:
+    ) as runs, patch.object(
+        orchestrator, "_fail_if_not_terminal"
+    ) as fail:
         runs.return_value.get_by_id.return_value = {"parse_preview": {}}
         comparison.return_value.run.side_effect = PeriodClosedError()
         orchestrator.run_comparison_and_report(

@@ -119,7 +119,8 @@ def run_multi_file_parser_until_preview(
         "source_column": "Consolidated",
         "drops": {},
         "source_breakdown_by_account": {account: [{source_file, amount, row_count}]},
-        "reconciliations": [{account, delta, severity, ...}],   # ReconciliationItem dicts
+        "reconciliations": [{account, delta, severity, ...}],
+            # ReconciliationItem dicts
         "is_multi_file": true
       }
     """
@@ -409,7 +410,8 @@ def run_comparison_and_report(
             file_storage=get_file_storage(),
         )
 
-        # Read reconciliations stored during multi-file parse (None for single-file runs)
+        # Read reconciliations stored during multi-file parse
+        # (None for single-file runs).
         try:
             run_row = get_runs_repo().get_by_id(run_id)
             parse_preview = run_row.get("parse_preview") or {}

@@ -20,15 +20,13 @@ Commit, bu turdaki kod işleri bitince bir kez atılır.
 
 ## Sıradaki iş — tek tek
 
-### 1. Kod stili
+### 1. Kod stili — son iki satır
 
-`black` 5 dosyayı yeniden biçimlendirmek istiyor.
-`flake8` çoğunlukla satır uzunluğu, yüzlerce uyarı.
-Pre-push yalnız pytest çalıştırıyor.
+`backend/adapters/anthropic_llm.py` satır 59 ve 74 hâlâ 88 karakterden uzun.
+Bu dosyaya düzenleme, yerel “inline prompt” hook’u geçersiz JSON döndürdüğü
+için editörde engelleniyor. Hook düzelince iki satır bölünür; davranış değişmez.
 
-Bitti: biçim commit’i davranışı değiştirmez. Finans hesabı aynı testlerle geçer.
-
-Yapma: stil düzeltmesini davranış değişikliğiyle aynı commit’e koyma.
+Pre-push yalnız pytest çalıştırıyor (black/flake8 yok).
 
 ---
 
@@ -48,6 +46,11 @@ Açmadan önce kim okuyor, ona bakılır.
 
 ## Yapıldı — yeniden açma
 
+- Kod stili (9 Ekim 2026, ayrı commit). `.flake8` black ile aynı: 88 sütun,
+  E203 yok sayılır. `black --check backend tests` temiz; `flake8` 900 → 2
+  (yalnız `anthropic_llm.py`). Kullanılmayan importlar silindi,
+  `supabase_repos.py` importları başa alındı, uzun satırlar bölündü.
+  Davranış aynı: değişen her dosyanın AST’i commit öncesiyle karşılaştırıldı.
 - 7 günlük upload temizliği (9 Ekim 2026). Klasör (`kullanıcı/ay`) bazında:
   o şirket ve ayın en yeni run’ı 7 günden eskiyse klasördeki tüm dosyalar
   silinir; çok dosyalı yüklemenin artıkları da gider. Uygulama içinde,

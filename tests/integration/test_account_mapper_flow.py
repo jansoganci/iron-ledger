@@ -13,7 +13,8 @@ NOT mocked (real logic exercised):
 - _run_consolidation (consolidate + hint_computer)
 
 Flow verified:
-  Step 1: Upload GL + payroll → run created (AWAITING_MAPPING_CONFIRMATION after BG task)
+  Step 1: Upload GL + payroll → run created
+          (AWAITING_MAPPING_CONFIRMATION after BG task)
   Step 2: status == awaiting_mapping_confirmation
   Step 3: mapping_draft contains employee names from payroll file
   Step 4: POST confirm-mappings with employee→GL account decisions
@@ -29,11 +30,9 @@ import io
 import uuid
 from contextlib import ExitStack
 from datetime import date
-from decimal import Decimal
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 

@@ -71,15 +71,16 @@ def _guardrail_user_message(exc_str: str) -> str:
             sign_note = " with a negative sign" if val < 0 else ""
             neg_revenue_hint = (
                 (
-                    "Negative values in income or revenue accounts are the most common cause — "
-                    "check that revenue amounts in your GL file are entered as positive numbers. "
+                    "Negative values in income or revenue accounts are the most "
+                    "common cause — check that revenue amounts in your GL file are "
+                    "entered as positive numbers. "
                 )
                 if val < 0
                 else ""
             )
             return (
-                f"The AI report mentioned {formatted}{sign_note}, but that exact figure "
-                f"could not be matched to your financial data. "
+                f"The AI report mentioned {formatted}{sign_note}, but that exact "
+                f"figure could not be matched to your financial data. "
                 f"{neg_revenue_hint}"
                 f"You can download the unverified raw data below, fix the source file, "
                 f"and re-upload to generate a verified report."
@@ -88,8 +89,9 @@ def _guardrail_user_message(exc_str: str) -> str:
             pass
     return (
         "The AI report contained a figure that could not be verified against your "
-        "financial data after two attempts. Download the raw data below, review your "
-        "source files for unexpected negative values or formatting issues, and re-upload."
+        "financial data after two attempts. Download the raw data below, review "
+        "your source files for unexpected negative values or formatting issues, "
+        "and re-upload."
     )
 
 
@@ -119,7 +121,8 @@ def _classify_from_hints(hints: dict) -> str | None:
        column-triggered deposit still wins because that speech act is
        unearned/liability, not “create a prepaid asset.”
     6. Cross-period date → timing_cutoff.
-    7. Both sources present, similar amount in another account → categorical_misclassification.
+    7. Both sources present, similar amount in another account →
+       categorical_misclassification.
     8. Both sources present, general delta → stale_reference.
     """
     if hints.get("hints_unavailable"):
@@ -270,7 +273,8 @@ class InterpreterAgent:
         run_id: str,
         reconciliations: list[dict] | None = None,
     ) -> bool:
-        """Run interpretation pipeline. Returns True on complete, False on guardrail_failed.
+        """Run interpretation pipeline. Returns True on complete, False on
+        guardrail_failed.
 
         Never raises — all failure paths are handled by transitioning run state.
         """
@@ -535,7 +539,8 @@ class InterpreterAgent:
         max_retries: int = 2,
         reconciliations: list[dict] | None = None,
     ) -> NarrativeJSON:
-        """Semantic retry loop — attempt 1 with base prompt, attempt 2 with reinforced prompt.
+        """Semantic retry loop — attempt 1 with base prompt, attempt 2 with
+        reinforced prompt.
 
         Semantic retry is a content-quality concern, not an I/O concern.
         I/O retries (network/5xx) stay in anthropic_llm.py.
@@ -577,7 +582,9 @@ class InterpreterAgent:
                 self._update_generating_progress(
                     run_id,
                     progress_pct=97,
-                    step_label=f"Re-checking narrative ({attempt + 1}/{max_retries})...",
+                    step_label=(
+                        f"Re-checking narrative ({attempt + 1}/{max_retries})..."
+                    ),
                 )
             prompt_file = (
                 "narrative_prompt.txt"

@@ -291,7 +291,8 @@ def test_pii_never_reaches_claude(pii_laced_xlsx_bytes):
     assert "alice@example.com" not in all_payloads
     assert "123-45-6789" not in all_payloads
     assert "4111-1111-1111-1111" not in all_payloads
-    # At least one [REDACTED] proves the sanitizer fired, not just that PII happened to be absent.
+    # At least one [REDACTED] proves the sanitizer fired, not just that PII
+    # happened to be absent.
     assert "[REDACTED]" in all_payloads
 
 

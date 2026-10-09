@@ -131,7 +131,13 @@ def fee_raw_dfs() -> dict[str, pd.DataFrame]:
 
 def fee_consolidated() -> pd.DataFrame:
     return pd.DataFrame(
-        [{"account": "Product Sales", "category": "REVENUE", "amount": FEE_GL + FEE_NET}]
+        [
+            {
+                "account": "Product Sales",
+                "category": "REVENUE",
+                "amount": FEE_GL + FEE_NET,
+            }
+        ]
     )
 
 

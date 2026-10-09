@@ -2,12 +2,6 @@ from __future__ import annotations
 
 import time
 from datetime import date, datetime
-
-# Module-level accounts cache: {company_id: (result_dict, fetched_at_epoch)}
-# Avoids N identical Supabase round-trips when parsing N files in a single run.
-# Invalidated on any write (upsert/bulk_upsert). TTL = 120 s as a safety net.
-_accounts_cache: dict[str, tuple[dict[str, str], float]] = {}
-_ACCOUNTS_CACHE_TTL = 120.0
 from decimal import Decimal
 from typing import Callable, TypeVar
 
@@ -23,6 +17,12 @@ from backend.domain.errors import (
 from backend.domain.regenerate import attach_regenerate_flag, run_wants_regenerate
 from backend.domain.run_state_machine import RunStatus
 from backend.logger import get_logger
+
+# Module-level accounts cache: {company_id: (result_dict, fetched_at_epoch)}
+# Avoids N identical Supabase round-trips when parsing N files in a single run.
+# Invalidated on any write (upsert/bulk_upsert). TTL = 120 s as a safety net.
+_accounts_cache: dict[str, tuple[dict[str, str], float]] = {}
+_ACCOUNTS_CACHE_TTL = 120.0
 
 logger = get_logger(__name__)
 
@@ -616,7 +616,8 @@ class SupabaseRunsRepo:
     def get_prior_pandas_summaries(
         self, company_id: str, before_period: date, limit: int = 3
     ) -> list[dict]:
-        """Return pandas_summary JSONB for the N most recent completed runs before the given period."""
+        """Return pandas_summary JSONB for the N most recent completed runs
+        before the given period."""
         try:
             resp = (
                 self._db.table("runs")
@@ -1139,7 +1140,8 @@ class SupabaseAccountsRepo:
             raise _wrap_db(exc) from exc
 
     def get_accounts_by_id(self, company_id: str) -> dict[str, dict]:
-        """Return {account_id: {"name": str, "category": str}} for all active accounts."""
+        """Return {account_id: {"name": str, "category": str}} for all
+        active accounts."""
         try:
             resp = (
                 self._db.table("accounts")

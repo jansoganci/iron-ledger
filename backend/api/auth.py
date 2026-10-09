@@ -58,7 +58,8 @@ async def _validate_jwt(token: str) -> str:
 async def get_current_user(
     creds: HTTPAuthorizationCredentials = Depends(_bearer),
 ) -> str:
-    """Validate Supabase JWT and return user_id. Result cached for _TOKEN_TTL seconds."""
+    """Validate Supabase JWT and return user_id. Result cached for _TOKEN_TTL
+    seconds."""
     token = creds.credentials
     entry = _token_cache.get(token)
     if entry and entry[1] > time.monotonic():
@@ -70,7 +71,8 @@ async def get_current_user(
 
 
 async def get_company_id(user_id: str = Depends(get_current_user)) -> str:
-    """Resolve company_id from user_id via companies.owner_id. Result cached for _COMPANY_TTL seconds.
+    """Resolve company_id from user_id via companies.owner_id. Result cached
+    for _COMPANY_TTL seconds.
 
     Never accepts company_id from the client.
     """
@@ -91,7 +93,8 @@ async def get_company_id(user_id: str = Depends(get_current_user)) -> str:
 
 
 async def get_cached_company(user_id: str = Depends(get_current_user)) -> dict:
-    """Return the full company dict for the authenticated user. Result cached for _COMPANY_TTL seconds.
+    """Return the full company dict for the authenticated user. Result cached
+    for _COMPANY_TTL seconds.
 
     Shares _company_cache with get_company_id — one DB call warms both.
     """

@@ -1,4 +1,5 @@
-"""Unit tests for quarterly.py — aggregation logic, progress tracking, and guardrail integration."""
+"""Unit tests for quarterly.py — aggregation logic, progress tracking, and
+guardrail integration."""
 
 from __future__ import annotations
 
@@ -256,7 +257,8 @@ def test_quarterly_agent_progress_callback():
         return_value={"status": "complete", "pandas_summary": summary}
     )
     anomalies_repo.list_for_period = MagicMock(return_value=[])
-    # Use numbers that will pass guardrail - quarterly totals (3x100k revenue, 3x40k cogs, etc.)
+    # Use numbers that will pass guardrail - quarterly totals
+    # (3x100k revenue, 3x40k cogs, etc.)
     llm_client.call = MagicMock(
         return_value=NarrativeJSON(
             narrative="Test",
@@ -430,7 +432,8 @@ def test_quarterly_agent_groups_recurring_anomalies():
         return_value={"status": "complete", "pandas_summary": summary}
     )
 
-    # Create anomalies: Account A in all 3 months, Account B in 2 months, Account C in 1 month
+    # Create anomalies: Account A in all 3 months, Account B in 2 months,
+    # Account C in 1 month
     def mock_list_for_period(company_id, period):
         anomalies = []
         if period.month >= 1:  # Jan, Feb, Mar

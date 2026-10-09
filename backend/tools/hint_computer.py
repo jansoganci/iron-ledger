@@ -125,7 +125,8 @@ def compute_hints(
         consolidated_df: Full consolidated DataFrame — columns [account, category,
                          amount, source_breakdown]. One row per canonical account.
         period: The reporting period end (last day of the month).
-        source_raw_dfs: {filename: validated DataFrame with [account, amount, date, ...]}
+        source_raw_dfs: {filename: validated DataFrame with
+                         [account, amount, date, ...]}
                          produced by ParserAgent.parse_file_silently().
     """
     try:
@@ -276,7 +277,9 @@ def _deposit_column_signal(
                 continue
             if "payment type" in col_l or "payment_type" in col_l:
                 tokens = df[col].dropna().astype(str).str.lower()
-                if tokens.apply(lambda v: any(t in v for t in _DEPOSIT_VALUE_TOKENS)).any():
+                if tokens.apply(
+                    lambda v: any(t in v for t in _DEPOSIT_VALUE_TOKENS)
+                ).any():
                     return True
                 continue
             if "balance remaining" in col_l or "balance_remaining" in col_l:

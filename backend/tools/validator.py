@@ -39,7 +39,8 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
     try:
         return _SCHEMA.validate(df)
     except pa.errors.SchemaError as exc:
-        # Re-raise with a plain-English message; caller surfaces via messages.PARSE_FAILED.
+        # Re-raise with a plain-English message; caller surfaces via
+        # messages.PARSE_FAILED.
         col = getattr(exc, "schema_context", None) or "unknown column"
         raise pa.errors.SchemaError(
             _SCHEMA,

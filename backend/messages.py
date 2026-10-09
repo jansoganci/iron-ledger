@@ -19,7 +19,8 @@ MAPPING_FAILED = (
     "Please review and confirm the mapping."
 )
 FILE_HAS_NO_VALID_COLUMNS = (
-    "This file looks empty or contains only columns we had to remove for privacy reasons. "
+    "This file looks empty or contains only columns we had to remove for "
+    "privacy reasons. "
     "Please upload a file with financial data."
 )
 
@@ -97,7 +98,10 @@ MAPPING_GL_REQUIRED = "Choose a GL account before saving."
 MAPPING_CONFIRMATION_REQUIRED = (
     "Select a valid GL account for every required mapping before continuing."
 )
-MAPPING_DRAFT_INVALID = "The mapping choices no longer match this analysis. Please reload and review them again."
+MAPPING_DRAFT_INVALID = (
+    "The mapping choices no longer match this analysis. "
+    "Please reload and review them again."
+)
 BANK_OUTSIDE_ATTESTATION = (
     "Bank and card reconciliation is done outside TrueCost. "
     "This report does not confirm it."
@@ -128,7 +132,8 @@ CONTROL_NEXT_COMBINE_SOURCES = (
 )
 CONTROL_CONTRACT_SCHEMA = (
     "Use a contracts export with GL account columns, or a customer roster with "
-    "monthly fees, status and last-billed dates. We could not confirm this file's scope."
+    "monthly fees, status and last-billed dates. "
+    "We could not confirm this file's scope."
 )
 CONTROL_PARTIAL_SCOPE = (
     "Only part of this control could be compared, so it is not tied out."

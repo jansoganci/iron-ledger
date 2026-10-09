@@ -405,7 +405,8 @@ class ParserAgent:
         Returns (preview_rows, source_column, df_detailed) where:
           - preview_rows: [{account, category, amount}] aggregated per account
           - source_column: verbatim header mapped to "amount" for provenance
-          - df_detailed: per-row validated DataFrame with [account, category, amount, date]
+          - df_detailed: per-row validated DataFrame with
+            [account, category, amount, date]
             used by hint_computer.py for period-boundary and cross-account checks.
 
         Low-confidence Discovery plans are auto-approved — user reviews the
@@ -519,7 +520,8 @@ class ParserAgent:
         current_status: RunStatus,
         error_message: str,
     ) -> None:
-        """Transition to parsing_failed, swallowing any errors from the update itself."""
+        """Transition to parsing_failed, swallowing any errors from the update
+        itself."""
         try:
             failed_status = RunStateMachine.transition(
                 current_status, RunStatus.PARSING_FAILED

@@ -15,7 +15,8 @@ QUARTERLY_MODEL = "claude-opus-4-7"  # no user toggle in MVP
 
 
 def _month_offset(year: int, month: int, offset_months: int) -> tuple[int, int]:
-    """Add or subtract offset_months from (year, month). Return (new_year, new_month)."""
+    """Add or subtract offset_months from (year, month). Return (new_year,
+    new_month)."""
     total_months = (year * 12 + month - 1) + offset_months
     new_year = total_months // 12
     new_month = (total_months % 12) + 1
@@ -25,7 +26,11 @@ def _month_offset(year: int, month: int, offset_months: int) -> tuple[int, int]:
 def _quarter_to_months(year: int, quarter: int) -> list[date]:
     """Return list of 3 month start dates for the quarter (Q1=Jan/Feb/Mar, etc.)."""
     base_month = (quarter - 1) * 3 + 1
-    return [date(year, base_month, 1), date(year, base_month + 1, 1), date(year, base_month + 2, 1)]
+    return [
+        date(year, base_month, 1),
+        date(year, base_month + 1, 1),
+        date(year, base_month + 2, 1),
+    ]
 
 
 def _period_to_label(period: date) -> str:
@@ -90,7 +95,9 @@ class QuarterlyAgent:
             missing_months = []
 
             for period in quarter_months:
-                latest_run_id = self._runs.get_latest_run_id_for_period(company_id, period)
+                latest_run_id = self._runs.get_latest_run_id_for_period(
+                    company_id, period
+                )
                 if latest_run_id:
                     run = self._runs.get_by_id(latest_run_id)
                     if run.get("status") == "complete" and run.get("pandas_summary"):
@@ -131,7 +138,9 @@ class QuarterlyAgent:
             for idx, period in enumerate(sorted(runs_data.keys())):
                 progress_pct = 25 + (idx * 15)
                 month_label = month_labels[period.month - 1]
-                update_progress(progress_pct, f"Aggregating {month_label.capitalize()}...")
+                update_progress(
+                    progress_pct, f"Aggregating {month_label.capitalize()}..."
+                )
 
                 pandas_summary = runs_data[period]
                 accounts = pandas_summary.get("accounts", {})
@@ -159,7 +168,9 @@ class QuarterlyAgent:
                         total_opex += current
 
                 gross_profit = total_revenue - total_cogs
-                gross_margin = (gross_profit / total_revenue * 100) if total_revenue != 0 else 0.0
+                gross_margin = (
+                    (gross_profit / total_revenue * 100) if total_revenue != 0 else 0.0
+                )
 
                 # Store per-month values in aggregated_summary
                 aggregated_summary[f"{month_label}_revenue"] = total_revenue
@@ -175,7 +186,9 @@ class QuarterlyAgent:
             prior_runs_data = {}
 
             for period in prior_quarter_months:
-                latest_run_id = self._runs.get_latest_run_id_for_period(company_id, period)
+                latest_run_id = self._runs.get_latest_run_id_for_period(
+                    company_id, period
+                )
                 if latest_run_id:
                     run = self._runs.get_by_id(latest_run_id)
                     if run.get("status") == "complete" and run.get("pandas_summary"):
@@ -185,10 +198,13 @@ class QuarterlyAgent:
             update_progress(75, "Computing quarterly aggregates...")
 
             # Quarterly totals and averages
-            available_month_labels = [month_labels[p.month - 1] for p in sorted(runs_data.keys())]
+            available_month_labels = [
+                month_labels[p.month - 1] for p in sorted(runs_data.keys())
+            ]
 
             q_total_revenue = sum(
-                aggregated_summary.get(f"{m}_revenue", 0.0) for m in available_month_labels
+                aggregated_summary.get(f"{m}_revenue", 0.0)
+                for m in available_month_labels
             )
             q_total_cogs = sum(
                 aggregated_summary.get(f"{m}_cogs", 0.0) for m in available_month_labels
@@ -198,7 +214,9 @@ class QuarterlyAgent:
             )
             q_gross_profit = q_total_revenue - q_total_cogs
             q_gross_margin = (
-                (q_gross_profit / q_total_revenue * 100) if q_total_revenue != 0 else 0.0
+                (q_gross_profit / q_total_revenue * 100)
+                if q_total_revenue != 0
+                else 0.0
             )
 
             aggregated_summary["q_total_revenue"] = q_total_revenue
@@ -255,7 +273,9 @@ class QuarterlyAgent:
 
                 py_gross_profit = py_total_revenue - py_total_cogs
                 py_gross_margin = (
-                    (py_gross_profit / py_total_revenue * 100) if py_total_revenue != 0 else 0.0
+                    (py_gross_profit / py_total_revenue * 100)
+                    if py_total_revenue != 0
+                    else 0.0
                 )
 
                 # Compute YoY deltas
@@ -284,7 +304,9 @@ class QuarterlyAgent:
                 if yoy_revenue_pct is not None:
                     aggregated_summary["yoy_revenue_pct"] = yoy_revenue_pct
                 if yoy_gross_margin_delta is not None:
-                    aggregated_summary["yoy_gross_margin_delta"] = yoy_gross_margin_delta
+                    aggregated_summary["yoy_gross_margin_delta"] = (
+                        yoy_gross_margin_delta
+                    )
                 if yoy_opex_pct is not None:
                     aggregated_summary["yoy_opex_pct"] = yoy_opex_pct
                 aggregated_summary["py_revenue"] = py_total_revenue
@@ -350,7 +372,9 @@ class QuarterlyAgent:
 
             if yoy_deltas:
                 kpis["yoy_revenue_pct"] = yoy_deltas.get("yoy_revenue_pct")
-                kpis["yoy_gross_margin_delta"] = yoy_deltas.get("yoy_gross_margin_delta")
+                kpis["yoy_gross_margin_delta"] = yoy_deltas.get(
+                    "yoy_gross_margin_delta"
+                )
                 kpis["yoy_opex_pct"] = yoy_deltas.get("yoy_opex_pct")
 
             # Persist quarterly report to DB
@@ -377,7 +401,8 @@ class QuarterlyAgent:
                 period=period_for_report,
                 summary=result.narrative,
                 anomaly_count=sum(
-                    len(anomalies_grouped.get(k, [])) for k in ["recurring", "persistent", "oneOff"]
+                    len(anomalies_grouped.get(k, []))
+                    for k in ["recurring", "persistent", "oneOff"]
                 ),
                 error_count=0,
                 report_type="quarterly",
@@ -428,7 +453,8 @@ class QuarterlyAgent:
                 "status": "failed",
                 "error_type": "guardrail_failed",
                 "message": (
-                    "We couldn't verify the report's numbers. " "This usually resolves on a retry."
+                    "We couldn't verify the report's numbers. "
+                    "This usually resolves on a retry."
                 ),
             }
         except Exception as exc:
@@ -503,9 +529,12 @@ class QuarterlyAgent:
 
             # Determine account name from first anomaly description
             first_anomaly = list(periods_map.values())[0]
-            # Extract account name from description (format: "Account Name is X% above...")
+            # Extract account name from description
+            # (format: "Account Name is X% above...")
             description = first_anomaly["description"]
-            account_name = description.split(" is ")[0] if " is " in description else account_id
+            account_name = (
+                description.split(" is ")[0] if " is " in description else account_id
+            )
 
             # Build monthly details
             monthly_details = []
@@ -523,15 +552,22 @@ class QuarterlyAgent:
 
             # Determine trend
             variances = [
-                d["variance_pct"] for d in monthly_details if d["variance_pct"] is not None
+                d["variance_pct"]
+                for d in monthly_details
+                if d["variance_pct"] is not None
             ]
             if len(variances) >= 2:
-                if all(variances[i] <= variances[i + 1] for i in range(len(variances) - 1)):
+                if all(
+                    variances[i] <= variances[i + 1] for i in range(len(variances) - 1)
+                ):
                     trend = "increasing"
-                elif all(variances[i] >= variances[i + 1] for i in range(len(variances) - 1)):
+                elif all(
+                    variances[i] >= variances[i + 1] for i in range(len(variances) - 1)
+                ):
                     trend = "decreasing"
                 elif all(
-                    abs(variances[i] - variances[i + 1]) <= 5 for i in range(len(variances) - 1)
+                    abs(variances[i] - variances[i + 1]) <= 5
+                    for i in range(len(variances) - 1)
                 ):
                     trend = "stable"
                 else:

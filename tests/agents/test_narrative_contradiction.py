@@ -8,12 +8,7 @@ unchanged and still fails after two attempts.
 
 from __future__ import annotations
 
-import uuid
-from datetime import date
-from unittest.mock import MagicMock
-
 from backend import messages
-from backend.agents.interpreter import InterpreterAgent
 from backend.domain.contracts import AccountSummary, NarrativeJSON, PandasSummary
 from backend.domain.run_state_machine import RunStatus
 from backend.tools.narrative_check import (

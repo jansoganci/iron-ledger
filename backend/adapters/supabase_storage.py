@@ -45,7 +45,10 @@ class SupabaseFileStorage:
                     key,
                     data,
                     file_options={
-                        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "content-type": (
+                            "application/vnd.openxmlformats-officedocument"
+                            ".spreadsheetml.sheet"
+                        ),
                         "upsert": "true",
                     },
                 )

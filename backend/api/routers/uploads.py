@@ -103,7 +103,8 @@ class ConfirmDiscoveryRequest(BaseModel):
 
 
 def _map_low_confidence(columns: list) -> list:
-    """C2: map stored {column, category, confidence} to {column, agent_guess, confidence}."""
+    """C2: map stored {column, category, confidence} to {column, agent_guess,
+    confidence}."""
     result = []
     for c in columns:
         if isinstance(c, dict):
@@ -310,7 +311,8 @@ async def run_raw(
         f"Period: {period}\n"
         f"Generated: {datetime.utcnow().isoformat()}Z\n\n"
         f"This data was NOT verified by the numeric guardrail.\n"
-        f"The automated report could not be produced. See /report for verified reports only.\n"
+        f"The automated report could not be produced. "
+        f"See /report for verified reports only.\n"
         f"===\n\n"
     )
 
@@ -340,7 +342,8 @@ async def run_raw(
                 entry.account_id, {"name": entry.account_id, "category": "OTHER"}
             )
             lines.append(
-                f"{info['name']} ({info['category']}): {float(entry.actual_amount):,.2f}\n"
+                f"{info['name']} ({info['category']}): "
+                f"{float(entry.actual_amount):,.2f}\n"
             )
 
     content = "".join(lines)
@@ -407,7 +410,8 @@ async def run_retry(
 
     ensure_period_open(company_id, period_date)
 
-    # Create fresh run row; inherit storage_key for downstream retries if this one also fails
+    # Create fresh run row; inherit storage_key for downstream retries if this
+    # one also fails
     new_run = runs_repo.create(company_id=company_id, period=period_date)
     new_run_id = new_run["id"]
     if run_wants_regenerate(old_run):
@@ -696,7 +700,8 @@ class ConfirmMappingsRequest(BaseModel):
     decisions: dict[str, str] = {}
     # {source_pattern: gl_account_name} — row mapping
     file_total_decisions: dict[str, str] = {}
-    # {source_file: gl_account_name} — file-total mapping, not persisted as a vendor rule
+    # {source_file: gl_account_name} — file-total mapping, not persisted as a
+    # vendor rule
 
 
 @router.post("/runs/{run_id}/confirm-mappings")
@@ -723,7 +728,10 @@ async def confirm_mappings(
     if run.get("status") != RunStatus.AWAITING_MAPPING_CONFIRMATION.value:
         raise HTTPException(
             status_code=409,
-            detail=f"Run is not awaiting mapping confirmation (status: {run.get('status')})",
+            detail=(
+                "Run is not awaiting mapping confirmation "
+                f"(status: {run.get('status')})"
+            ),
         )
 
     pp = run.get("parse_preview") or {}

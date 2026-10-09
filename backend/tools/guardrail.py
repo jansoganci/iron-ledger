@@ -18,7 +18,8 @@ logger = get_logger(__name__)
 #
 # This flag only affects the strict=True path (monthly interpreter, and
 # quarterly/Opus once those callers pass strict=True). Do not re-express it
-# as an inline conditional. See docs/archive/sprint-complete/pre-analysis-guardrail-second-gate.md.
+# as an inline conditional. See
+# docs/archive/sprint-complete/pre-analysis-guardrail-second-gate.md.
 ENFORCE_NARRATIVE_CONSISTENCY = True
 
 

@@ -118,7 +118,10 @@ async def generate_quarterly_report(
             status_code=400,
             content={
                 "error_type": "empty_data",
-                "message": "At least 2 months of data required to generate a quarterly summary.",
+                "message": (
+                    "At least 2 months of data required to generate a "
+                    "quarterly summary."
+                ),
             },
         )
 
@@ -239,7 +242,8 @@ async def delete_quarterly_report(
     quarter: int,
     company_id: str = Depends(get_company_id),
 ):
-    """Delete a persisted quarterly report. Idempotent — returns 200 even if no row exists.
+    """Delete a persisted quarterly report. Idempotent — returns 200 even if
+    no row exists.
 
     Frontend calls this before POST /generate when regenerating, so that
     write_quarterly always does a clean INSERT (no UPSERT).

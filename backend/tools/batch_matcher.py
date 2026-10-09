@@ -86,8 +86,9 @@ def build_match_id(
 
     **Forbidden by spec** — do not "helpfully" substitute any of these:
     a UUID, a hash of object identity, a global insertion counter, or anything
-    derived from dict/set iteration order. ``tests/tools/test_batch_matcher_scaffold.py``
-    is written to fail if one is introduced.
+    derived from dict/set iteration order.
+    ``tests/tools/test_batch_matcher_scaffold.py`` is written to fail if one is
+    introduced.
 
     Ambiguity is a document defect, not a coding decision: this function raises
     rather than inventing a fallback when a required component is missing.

@@ -175,7 +175,8 @@ def sanitize_sample(
 ) -> list[dict]:
     """Redact value-level PII from the Discovery sample before Claude sees it.
 
-    Scope (regex-only, deliberately narrow — see docs/sprint/discovery-layer-plan.md §Step 3.5):
+    Scope (regex-only, deliberately narrow — see
+    docs/sprint/discovery-layer-plan.md §Step 3.5):
       - SSN (hyphenated): 123-45-6789
       - Email: alice@example.com
       - Credit card: 16-digit runs with optional separators

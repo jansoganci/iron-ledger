@@ -21,8 +21,6 @@ Pipeline:
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass, field
 from typing import Literal
 
 import pandas as pd
@@ -245,7 +243,8 @@ def _detect_deltas(
     canonical_map: dict[str, str],
     sources: list[tuple[str, pd.DataFrame]],
 ) -> list[ReconciliationItem]:
-    """Produce one ReconciliationItem per account that has a material cross-source delta."""
+    """Produce one ReconciliationItem per account that has a material
+    cross-source delta."""
     if tagged.empty:
         return []
 

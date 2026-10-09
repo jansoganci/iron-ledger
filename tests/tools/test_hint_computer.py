@@ -10,7 +10,6 @@ from __future__ import annotations
 from datetime import date
 
 import pandas as pd
-import pytest
 
 from backend.domain.contracts import (
     ReconciliationHints,
@@ -66,7 +65,8 @@ def _item(
 
 
 def _consolidated_df(*rows: tuple[str, str, float]) -> pd.DataFrame:
-    """Build a minimal consolidated DataFrame from (account, category, amount) tuples."""
+    """Build a minimal consolidated DataFrame from (account, category, amount)
+    tuples."""
     return pd.DataFrame(
         [{"account": a, "category": c, "amount": amt} for a, c, amt in rows]
     )
@@ -254,7 +254,8 @@ def test_is_round_fraction_false_when_no_gl_amount() -> None:
 
 
 def test_similar_amount_matches_contractors_line() -> None:
-    """$700 Payroll delta matches $700 Contractors line → categorical misclassification."""
+    """$700 Payroll delta matches $700 Contractors line → categorical
+    misclassification."""
     item = _item(account="Payroll", delta=700.0)
     df = _consolidated_df(
         ("Payroll", "OPEX", 43500.0),
@@ -372,7 +373,8 @@ def test_other_account_12x_is_not_annual_prepayment() -> None:
 
 
 def test_compute_hints_payroll_misclassification() -> None:
-    """Full hint set for Payroll $700 delta — should flag similar_amount_in_other_account."""
+    """Full hint set for Payroll $700 delta — should flag
+    similar_amount_in_other_account."""
     item = _item(account="Payroll", delta=700.0)
     df = _consolidated_df(
         ("Payroll", "OPEX", 43500.0),
@@ -396,7 +398,8 @@ def test_compute_hints_payroll_misclassification() -> None:
 
 
 def test_compute_hints_installation_timing() -> None:
-    """Full hint set for Installation Revenue $4,000 gap — should flag period boundary."""
+    """Full hint set for Installation Revenue $4,000 gap — should flag period
+    boundary."""
     item = _item(
         account="Installation Revenue",
         category="REVENUE",

@@ -8,7 +8,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
 from backend.agents.orchestrator import (
     _detect_file_type,
@@ -285,9 +284,7 @@ def test_saved_payroll_roles_skip_the_mapping_screen(
     mock_get_accounts.return_value = accounts_repo
     mock_mapper_cls.return_value = MagicMock()
 
-    with patch(
-        "backend.agents.orchestrator.apply_mapping_and_consolidate"
-    ) as apply:
+    with patch("backend.agents.orchestrator.apply_mapping_and_consolidate") as apply:
         run_multi_file_parser_with_mapping(
             run_id="run-saved",
             storage_keys=[
@@ -692,7 +689,8 @@ def test_gl_files_bypass_mapper(
 def test_phase_b_applies_user_decisions_to_non_gl(
     mock_parser_cls, mock_get_runs, mock_get_accounts, mock_get_storage, mock_get_llm
 ):
-    """apply_mapping_and_consolidate passes user_decisions as account_name_map for non-GL files."""
+    """apply_mapping_and_consolidate passes user_decisions as account_name_map
+    for non-GL files."""
     gl_preview = _mock_preview_rows(["Salaries & Wages"])
     payroll_preview = _mock_preview_rows(["Salaries & Wages"])  # after mapping
 

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from backend.agents.account_mapper import AccountMapper
 from backend.domain.contracts import (
     AccountMappingDecision,
